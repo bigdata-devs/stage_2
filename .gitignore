@@ -1,3 +1,6 @@
+# Local AI agent guidelines (never committed)
+/AGENTS.md
+
 # Runtime data produced by the services (leading slash: only the root folders)
 /datalake/
 /datamarts/
