@@ -1,0 +1,20 @@
+# Runtime data produced by the services (leading slash: only the root folders)
+/datalake/
+/datamarts/
+/control/
+
+# Build and test output
+/bin/
+*.exe
+*.test
+*.out
+coverage.*
+
+# Interrupted atomic writes
+*.tmp
+
+# IDE and OS files
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
