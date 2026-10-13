@@ -2,6 +2,7 @@ package indexer
 
 import (
 	"regexp"
+	"strconv"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -15,6 +16,8 @@ const UnknownValue = "Unknown"
 var (
 	fieldLinePattern         = regexp.MustCompile(`^([A-Za-z][A-Za-z ]*?):[ \t]*(.*)$`)
 	languageSeparatorPattern = regexp.MustCompile(`\s*,\s*|\s+and\s+|\s*;\s*`)
+	bracketSegmentPattern    = regexp.MustCompile(`\[[^\]]*\]`)
+	yearPattern              = regexp.MustCompile(`\d{4}`)
 )
 
 // languageCodes maps Gutenberg language names to ISO 639 codes (Stage 1 LANGUAGE_CODES).
@@ -32,15 +35,18 @@ var languageCodes = map[string]string{
 // headerFields maps each lower-cased field name ("title", "author"...) to its values in order.
 type headerFields map[string][]string
 
-// ExtractMetadata ports extract_metadata: it returns the title, the authors joined with "; "
-// and the language codes of a header. Missing fields become UnknownValue.
+// ExtractMetadata ports extract_metadata: it returns the title, the authors joined with "; ",
+// the language codes, the original publication year and the Gutenberg release year of a header.
+// Missing text fields become UnknownValue and missing years become 0.
 func ExtractMetadata(bookID models.BookID, header string) models.BookMetadata {
 	fields := parseHeaderFields(header)
 	return models.BookMetadata{
-		BookID:   bookID,
-		Title:    firstValueOrUnknown(fields["title"]),
-		Author:   joinedValuesOrUnknown(fields["author"]),
-		Language: NormalizeLanguage(strings.Join(fields["language"], ", ")),
+		BookID:          bookID,
+		Title:           firstValueOrUnknown(fields["title"]),
+		Author:          joinedValuesOrUnknown(fields["author"]),
+		Language:        NormalizeLanguage(strings.Join(fields["language"], ", ")),
+		PublicationYear: firstYear(fields["original publication"]),
+		ReleaseYear:     firstYear(fields["release date"]),
 	}
 }
 
@@ -118,6 +124,30 @@ func joinedValuesOrUnknown(values []string) string {
 		return UnknownValue
 	}
 	return joined
+}
+
+// firstYear returns the first four-digit year of the first value that contains one,
+// ignoring bracketed segments such as "[eBook #2147]". A missing or unreadable year
+// yields 0, which models.BookMetadata documents as "unknown".
+func firstYear(values []string) int {
+	for _, value := range values {
+		if year := yearIn(bracketSegmentPattern.ReplaceAllString(value, " ")); year != 0 {
+			return year
+		}
+	}
+	return 0
+}
+
+func yearIn(text string) int {
+	match := yearPattern.FindString(text)
+	if match == "" {
+		return 0
+	}
+	year, err := strconv.Atoi(match)
+	if err != nil || year == 0 {
+		return 0
+	}
+	return year
 }
 
 func distinctLanguageCodes(languageNames []string) []string {
