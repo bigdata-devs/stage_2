@@ -40,9 +40,48 @@ func TestParseHeaderFieldsJoinsContinuationLinesAndIgnoresPreamble(t *testing.T)
 }
 
 func TestExtractMetadataNormalizesFields(t *testing.T) {
-	expected := models.BookMetadata{BookID: 2147, Title: "The Works of Edgar Allan Poe Volume 1", Author: "Edgar Allan Poe", Language: "en"}
+	expected := models.BookMetadata{
+		BookID:          2147,
+		Title:           "The Works of Edgar Allan Poe Volume 1",
+		Author:          "Edgar Allan Poe",
+		Language:        "en",
+		PublicationYear: 0,
+		ReleaseYear:     2000,
+	}
 	if metadata := ExtractMetadata(2147, gutenbergHeader); metadata != expected {
 		t.Fatalf("expected %+v, got %+v", expected, metadata)
+	}
+}
+
+func TestExtractMetadataReadsPublicationAndReleaseYears(t *testing.T) {
+	header := "Title: Pride and Prejudice\n" +
+		"Author: Jane Austen\n" +
+		"Release date: September 27, 2007 [eBook #1342]\n" +
+		"Original Publication: 1813\n" +
+		"Language: English\n"
+	metadata := ExtractMetadata(1342, header)
+	if metadata.PublicationYear != 1813 {
+		t.Errorf("expected publication year 1813, got %d", metadata.PublicationYear)
+	}
+	if metadata.ReleaseYear != 2007 {
+		t.Errorf("expected release year 2007, got %d", metadata.ReleaseYear)
+	}
+}
+
+func TestExtractMetadataMissingYearsAreZero(t *testing.T) {
+	metadata := ExtractMetadata(1, "Title: Undated Work\nAuthor: Nobody\nLanguage: English\n")
+	if metadata.PublicationYear != 0 || metadata.ReleaseYear != 0 {
+		t.Fatalf("expected both years to be 0, got %d and %d",
+			metadata.PublicationYear, metadata.ReleaseYear)
+	}
+}
+
+func TestExtractMetadataUnreadableYearIsZero(t *testing.T) {
+	header := "Original Publication: n.d.\nRelease date: [eBook #99]\n"
+	metadata := ExtractMetadata(99, header)
+	if metadata.PublicationYear != 0 || metadata.ReleaseYear != 0 {
+		t.Fatalf("expected both years to be 0, got %d and %d",
+			metadata.PublicationYear, metadata.ReleaseYear)
 	}
 }
 
