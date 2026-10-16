@@ -19,6 +19,10 @@ const (
 	BooksCollection = "books"
 )
 
+// rebuildSuffix names the temporary collections a rebuild fills before swapping them over the live
+// ones, so search keeps reading the previous complete index until the new one is ready.
+const rebuildSuffix = "_rebuild"
+
 // Publication states of a metadata document. A book only becomes searchable once its status is
 // StatusPublished, which is how a partially indexed book stays invisible to readers.
 const (
@@ -45,10 +49,16 @@ var bookFilterIndexes = []mongo.IndexModel{
 // EnsureIndexes creates every index the datamart queries rely on. It is idempotent: MongoDB
 // keeps an index whose name and key already exist, so services call it at each start-up.
 func (client Client) EnsureIndexes(ctx context.Context) error {
-	created, err := client.database.Collection(BooksCollection).Indexes().CreateMany(ctx, bookFilterIndexes)
+	created, err := createBookIndexes(ctx, client.database.Collection(BooksCollection))
 	if err != nil {
 		return fmt.Errorf("ensure book indexes: %w", err)
 	}
 	slog.Info("mongodb indexes ready", "created", created)
 	return nil
+}
+
+// createBookIndexes creates the query indexes on the given books collection and reports the names
+// MongoDB assigned. A rebuild runs it on its temporary collection before swapping it into place.
+func createBookIndexes(ctx context.Context, books *mongo.Collection) ([]string, error) {
+	return books.Indexes().CreateMany(ctx, bookFilterIndexes)
 }
