@@ -1,0 +1,15 @@
+== building the three binaries ==
+PASS: ingestion, indexing and control binaries built
+== starting both services on high ports ==
+PASS: both services answer their documented status routes
+== orchestration of two real books ==
+PASS: books 1342 and 84 are downloaded and indexed in the control state
+PASS: services agree: datalake has 2 books, index has 2
+== restart semantics: a replayed run skips finished books ==
+PASS: replayed run skips both books and keeps the state files intact
+== permanent failure: an unknown book is recorded once ==
+PASS: unknown book recorded once in failed_books.txt with its reason
+== discovery mode: candidates come from GET /ingest/list ==
+PASS: discover run processes the datalake listing and skips finished books
+ALL E2E CHECKS PASSED
+evidence under /tmp/tmp.eJt3PSswYE

@@ -1,52 +1,80 @@
-// Command ingestion is the entry point of the Boogle Engine Ingestion Service. It downloads
-// Project Gutenberg books with a pool of concurrent workers, splits each one into header and
-// body and stores both files in the batch-based datalake: datalake/batch_<LOW>_<HIGH>/<book_id>/.
+// Command ingestion is the entry point of the Boogle Engine Ingestion Service. It exposes the
+// internal REST API that the Control Module calls to bring Project Gutenberg books into the
+// batch-based datalake (datalake/batch_<LOW>_<HIGH>/<book_id>/), plus its OpenAPI documentation.
 //
 // Usage:
 //
-//	go run ./cmd/ingestion -ids 1342,84,11,174
-//	go run ./cmd/ingestion -from 1 -to 500 -workers 16
+//	go run ./cmd/ingestion
+//	go run ./cmd/ingestion -addr :7001 -datalake datalake -workers 8 -ingest-timeout 2m
 //
+// Then call it from the Control Module or by hand:
+//
+//	curl -X POST http://localhost:7001/ingest/1342
+//	curl http://localhost:7001/ingest/status/1342
+//	curl http://localhost:7001/ingest/list
+//
+// The interactive documentation lives at http://localhost:7001/swagger/index.html.
 // Run "go run ./cmd/ingestion -h" to list every option.
+//
+// After changing any swag annotation, regenerate the specification in api/ingestion with:
+//
+//	go generate ./cmd/ingestion
 package main
+
+//go:generate go run github.com/swaggo/swag/cmd/swag@v1.16.6 init -g main.go -d ./,../../internal/api -o ../../api/ingestion -t ingestion
 
 import (
 	"context"
 	"errors"
 	"flag"
-	"fmt"
 	"log/slog"
+	"net/http"
 	"os"
 	"os/signal"
-	"strings"
 	"syscall"
 	"time"
 
+	httpSwagger "github.com/swaggo/http-swagger/v2"
+
+	_ "boogle-engine/api/ingestion"
+	"boogle-engine/internal/api"
 	"boogle-engine/internal/crawler"
 	"boogle-engine/internal/datalake"
-	"boogle-engine/internal/models"
 )
 
-const defaultWorkers = 8
+const (
+	defaultAddress       = ":7001"
+	defaultWorkers       = 8
+	defaultIngestTimeout = 2 * time.Minute
+	// responseMargin keeps the server write deadline above the ingestion budget, so a response
+	// for an ingestion that ends right at its deadline is never cut off.
+	responseMargin      = 10 * time.Second
+	shutdownGracePeriod = 30 * time.Second
+)
 
-// serviceConfig gathers every setting of one ingestion run.
+// serviceConfig gathers every setting of the Ingestion Service.
 type serviceConfig struct {
+	address        string
 	datalakeDir    string
 	batchSize      int
 	baseURL        string
 	requestTimeout time.Duration
-	workers        int
 	retry          crawler.RetryPolicy
-	bookIDs        []models.BookID
+	limits         api.IngestionLimits
 }
 
-// bookSelection holds the raw -ids, -from and -to flags before they are validated.
-type bookSelection struct {
-	rawIDs  string
-	firstID int
-	lastID  int
-}
-
+// main starts the Ingestion Service. The annotations below are the general information of the
+// OpenAPI specification generated in api/ingestion.
+//
+//	@title				Boogle Engine Ingestion API
+//	@version			1.0.0
+//	@description		Internal API of the Boogle Engine Ingestion Service. Provider: Ingestion Service.
+//	@description		Intended consumer: the Control Module, which orchestrates ingestion, indexing and publication.
+//	@description		It is not part of the front-end contract.
+//	@BasePath			/
+//	@schemes			http
+//	@tag.name			ingestion
+//	@tag.description	Internal API. Provider: Ingestion Service. Consumer: Control Module.
 func main() {
 	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo})))
 	err := run(os.Args[1:])
@@ -54,165 +82,114 @@ func main() {
 		return
 	}
 	if err != nil {
-		slog.Error("ingestion stopped", "error", err)
+		slog.Error("[INGESTION] service stopped", "error", err)
 		os.Exit(1)
 	}
 }
 
-// run wires the service together and ingests every requested book. Ctrl+C or SIGTERM stops
-// queuing new books; the books already in flight finish before the summary is logged.
+// run wires the service together and serves requests until Ctrl+C or SIGTERM.
 func run(arguments []string) error {
 	config, err := parseConfig(arguments)
 	if err != nil {
 		return err
 	}
-	pool, err := buildWorkerPool(config)
+	ingestionHandler, err := buildIngestionHandler(config)
 	if err != nil {
 		return err
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-	ingestAll(ctx, pool, config.bookIDs)
-	if err := ctx.Err(); err != nil {
-		return fmt.Errorf("run interrupted: %w", err)
-	}
-	return nil
+	logStartup(config)
+	return serve(ctx, newServer(config, newRouter(ingestionHandler)))
 }
 
-// buildWorkerPool performs the dependency injection: the Gutenberg client and the datalake go
-// into the ingester, and the ingester goes into the pool.
-func buildWorkerPool(config serviceConfig) (crawler.WorkerPool, error) {
+// buildIngestionHandler performs the dependency injection: the Gutenberg client and the datalake
+// go into the ingester, and the ingester and the datalake go into the HTTP handler.
+func buildIngestionHandler(config serviceConfig) (api.IngestionHandler, error) {
 	lake, err := datalake.New(config.datalakeDir, config.batchSize)
 	if err != nil {
-		return crawler.WorkerPool{}, err
+		return api.IngestionHandler{}, err
 	}
 	client := crawler.NewGutenbergClient(config.baseURL, config.requestTimeout)
 	ingester, err := crawler.NewIngester(client, lake, config.retry)
 	if err != nil {
-		return crawler.WorkerPool{}, err
+		return api.IngestionHandler{}, err
 	}
-	return crawler.NewWorkerPool(ingester, config.workers)
-}
-
-// ingestAll runs the pool over the books and logs every result plus a final summary.
-func ingestAll(ctx context.Context, pool crawler.WorkerPool, bookIDs []models.BookID) {
-	startedAt := time.Now()
-	summary := collectResults(pool.Run(ctx, bookIDs))
-	summary.log(time.Since(startedAt))
+	return api.NewIngestionHandler(ingester, lake, config.limits)
 }
 
 func parseConfig(arguments []string) (serviceConfig, error) {
 	flags := flag.NewFlagSet("ingestion", flag.ContinueOnError)
-	config := registerServiceFlags(flags)
-	selection := registerSelectionFlags(flags)
+	config := registerFlags(flags)
 	if err := flags.Parse(arguments); err != nil {
 		return serviceConfig{}, err
 	}
-	bookIDs, err := selection.bookIDs()
-	if err != nil {
-		return serviceConfig{}, err
-	}
-	config.bookIDs = bookIDs
 	return *config, nil
 }
 
-func registerServiceFlags(flags *flag.FlagSet) *serviceConfig {
+func registerFlags(flags *flag.FlagSet) *serviceConfig {
 	config := &serviceConfig{}
+	flags.StringVar(&config.address, "addr", defaultAddress, "host:port the HTTP server listens on")
 	flags.StringVar(&config.datalakeDir, "datalake", "datalake", "root folder of the datalake")
 	flags.IntVar(&config.batchSize, "batch-size", datalake.DefaultBatchSize, "book IDs per batch folder")
 	flags.StringVar(&config.baseURL, "base-url", crawler.DefaultBaseURL, "base URL of the Gutenberg mirror")
-	flags.DurationVar(&config.requestTimeout, "timeout", crawler.DefaultRequestTimeout, "time limit of one download")
-	flags.IntVar(&config.workers, "workers", defaultWorkers, "number of concurrent download workers")
+	flags.DurationVar(&config.requestTimeout, "timeout", crawler.DefaultRequestTimeout, "time limit of one download attempt")
 	flags.IntVar(&config.retry.MaxAttempts, "attempts", 3, "download attempts per book on transient errors")
 	flags.DurationVar(&config.retry.InitialBackoff, "backoff", time.Second, "wait before the first retry (doubles each time)")
+	flags.IntVar(&config.limits.MaxConcurrentDownloads, "workers", defaultWorkers, "books downloaded at the same time")
+	flags.DurationVar(&config.limits.Timeout, "ingest-timeout", defaultIngestTimeout,
+		"budget of one ingestion, queueing and retries included; keep it above attempts x timeout plus backoffs")
 	return config
 }
 
-func registerSelectionFlags(flags *flag.FlagSet) *bookSelection {
-	selection := &bookSelection{}
-	flags.StringVar(&selection.rawIDs, "ids", "", "comma-separated book IDs, e.g. 1342,84,11")
-	flags.IntVar(&selection.firstID, "from", 0, "first book ID of an inclusive range (use with -to)")
-	flags.IntVar(&selection.lastID, "to", 0, "last book ID of an inclusive range (use with -from)")
-	return selection
+// newRouter mounts the ingestion endpoints and the Swagger UI.
+func newRouter(ingestionHandler api.IngestionHandler) *http.ServeMux {
+	router := http.NewServeMux()
+	ingestionHandler.RegisterRoutes(router)
+	router.Handle("GET /swagger/", httpSwagger.Handler(httpSwagger.URL("/swagger/doc.json")))
+	return router
 }
 
-// bookIDs merges the -ids list and the -from/-to range; at least one of them must be given.
-func (selection bookSelection) bookIDs() ([]models.BookID, error) {
-	listedIDs, err := parseBookIDList(selection.rawIDs)
-	if err != nil {
-		return []models.BookID{}, err
+// newServer bounds every phase of a connection. A POST /ingest response may legitimately take as
+// long as a whole ingestion, so the write deadline follows the ingestion budget.
+func newServer(config serviceConfig, router http.Handler) *http.Server {
+	return &http.Server{
+		Addr:              config.address,
+		Handler:           router,
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       10 * time.Second,
+		WriteTimeout:      config.limits.Timeout + responseMargin,
+		IdleTimeout:       60 * time.Second,
 	}
-	rangeIDs, err := bookIDRange(selection.firstID, selection.lastID)
-	if err != nil {
-		return []models.BookID{}, err
-	}
-	bookIDs := append(listedIDs, rangeIDs...)
-	if len(bookIDs) == 0 {
-		return []models.BookID{}, errors.New("no book IDs given: use -ids and/or -from/-to")
-	}
-	return bookIDs, nil
 }
 
-func parseBookIDList(rawIDs string) ([]models.BookID, error) {
-	bookIDs := []models.BookID{}
-	for _, rawID := range strings.Split(rawIDs, ",") {
-		if strings.TrimSpace(rawID) == "" {
-			continue
-		}
-		bookID, err := models.ParseBookID(rawID)
-		if err != nil {
-			return []models.BookID{}, err
-		}
-		bookIDs = append(bookIDs, bookID)
-	}
-	return bookIDs, nil
-}
-
-// bookIDRange returns firstID..lastID inclusive; leaving both flags at 0 means "no range".
-func bookIDRange(firstID int, lastID int) ([]models.BookID, error) {
-	if firstID == 0 && lastID == 0 {
-		return []models.BookID{}, nil
-	}
-	if firstID < 1 || lastID < firstID {
-		return []models.BookID{}, fmt.Errorf("invalid range -from %d -to %d: need 1 <= from <= to", firstID, lastID)
-	}
-	bookIDs := make([]models.BookID, 0, lastID-firstID+1)
-	for bookID := firstID; bookID <= lastID; bookID++ {
-		bookIDs = append(bookIDs, models.BookID(bookID))
-	}
-	return bookIDs, nil
-}
-
-// ingestionSummary counts the results of a run by status.
-type ingestionSummary map[models.IngestionStatus]int
-
-// collectResults drains the results channel, logging every book as soon as it completes.
-func collectResults(results <-chan models.IngestionResult) ingestionSummary {
-	summary := ingestionSummary{}
-	for result := range results {
-		logResult(result)
-		summary[result.Status]++
-	}
-	return summary
-}
-
-func logResult(result models.IngestionResult) {
-	if result.Err != nil {
-		slog.Warn("[INGESTION] book not ingested", "book_id", result.BookID, "status", result.Status, "error", result.Err)
-		return
-	}
-	slog.Info("[INGESTION] book ready", "book_id", result.BookID, "status", result.Status, "path", result.Path)
-}
-
-// log prints the totals and the ingestion throughput, a key metric of the Stage 2 benchmarks.
-func (summary ingestionSummary) log(elapsed time.Duration) {
-	downloaded := summary[models.StatusDownloaded]
-	slog.Info("[INGESTION] run finished",
-		"downloaded", downloaded,
-		"already_available", summary[models.StatusAvailable],
-		"unavailable", summary[models.StatusUnavailable],
-		"failed", summary[models.StatusFailed],
-		"elapsed", elapsed.Round(time.Millisecond),
-		"books_per_second", fmt.Sprintf("%.2f", float64(downloaded)/elapsed.Seconds()),
+func logStartup(config serviceConfig) {
+	slog.Info("[INGESTION] service listening",
+		"address", config.address,
+		"datalake", config.datalakeDir,
+		"workers", config.limits.MaxConcurrentDownloads,
+		"ingest_timeout", config.limits.Timeout,
+		"docs", "/swagger/index.html",
 	)
+}
+
+// serve runs the server until ctx is cancelled, then gives in-flight requests a grace period.
+// An ingestion cut short by shutdown leaves no partial book behind, because files are written
+// atomically, and the caller simply retries its idempotent request.
+func serve(ctx context.Context, server *http.Server) error {
+	listenErrors := make(chan error, 1)
+	go func() { listenErrors <- server.ListenAndServe() }()
+	select {
+	case err := <-listenErrors:
+		return err
+	case <-ctx.Done():
+		return shutdown(server)
+	}
+}
+
+func shutdown(server *http.Server) error {
+	slog.Info("[INGESTION] service shutting down", "grace_period", shutdownGracePeriod)
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownGracePeriod)
+	defer cancel()
+	return server.Shutdown(shutdownCtx)
 }
