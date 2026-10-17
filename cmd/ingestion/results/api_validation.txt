@@ -1,0 +1,16 @@
+=== INGESTION SERVICE - API VALIDATION EVIDENCE ===
+
+1. Request: Start downloading book 1342
+Command: curl.exe -X POST http://localhost:7001/ingest/1342
+Expected Output:
+{"book_id":1342,"status":"downloaded","path":"datalake\\batch_1000_1999\\1342"}
+
+2. Request: Check status of book 1342
+Command: curl.exe http://localhost:7001/ingest/status/1342
+Expected Output:
+{"book_id":1342,"status":"available"}
+
+3. Request: List all available books
+Command: curl.exe http://localhost:7001/ingest/list
+Expected Output:
+{"books":[1342],"count":1}
