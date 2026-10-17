@@ -6,6 +6,10 @@
 //
 //	go run ./cmd/control -ids 1342,84,11 -workers 4
 //	go run ./cmd/control -from 1 -to 500
+//	go run ./cmd/control -discover
+//
+// With -discover the candidates come from GET /ingest/list, so the module processes
+// every complete book of the datalake that is not indexed or failed yet.
 //
 // Service endpoints come from flags or the INGESTION_URL, INDEXING_URL and
 // CONTROL_STATE_DIR environment variables. Run "go run ./cmd/control -h" to list
@@ -53,6 +57,7 @@ type serviceConfig struct {
 	workers        int
 	maxAttempts    int
 	initialBackoff time.Duration
+	discover       bool
 	bookIDs        []models.BookID
 }
 
@@ -81,6 +86,10 @@ func run(arguments []string) error {
 	ingestion := httpclient.NewIngestionClient(config.ingestionURL, config.ingestTimeout)
 	indexing := httpclient.NewIndexingClient(config.indexingURL, config.requestTimeout)
 	if err := checkServices(ctx, ingestion, indexing); err != nil {
+		return err
+	}
+	config.bookIDs, err = resolveCandidates(ctx, config, ingestion)
+	if err != nil {
 		return err
 	}
 	orchestrator, err := buildOrchestrator(config, ingestion, indexing)
@@ -116,6 +125,7 @@ func parseConfig(arguments []string) (serviceConfig, error) {
 		return serviceConfig{}, err
 	}
 	config.bookIDs = bookIDs
+	config.discover = selection.discover
 	return *config, nil
 }
 
@@ -137,11 +147,12 @@ func registerServiceFlags(flags *flag.FlagSet) *serviceConfig {
 	return config
 }
 
-// bookSelection holds the raw -ids, -from and -to flags before they are validated.
+// bookSelection holds the raw -ids, -from, -to and -discover flags before they are validated.
 type bookSelection struct {
-	rawIDs  string
-	firstID int
-	lastID  int
+	rawIDs   string
+	firstID  int
+	lastID   int
+	discover bool
 }
 
 func registerSelectionFlags(flags *flag.FlagSet) *bookSelection {
@@ -149,10 +160,13 @@ func registerSelectionFlags(flags *flag.FlagSet) *bookSelection {
 	flags.StringVar(&selection.rawIDs, "ids", "", "comma-separated book IDs, e.g. 1342,84,11")
 	flags.IntVar(&selection.firstID, "from", 0, "first book ID of an inclusive range (use with -to)")
 	flags.IntVar(&selection.lastID, "to", 0, "last book ID of an inclusive range (use with -from)")
+	flags.BoolVar(&selection.discover, "discover", false,
+		"add every complete book of the datalake reported by GET /ingest/list")
 	return selection
 }
 
-// bookIDs merges the -ids list and the -from/-to range; at least one of them must be given.
+// bookIDs merges the -ids list and the -from/-to range; unless -discover is set, at least
+// one of them must be given.
 func (selection bookSelection) bookIDs() ([]models.BookID, error) {
 	listedIDs, err := parseBookIDList(selection.rawIDs)
 	if err != nil {
@@ -163,8 +177,8 @@ func (selection bookSelection) bookIDs() ([]models.BookID, error) {
 		return []models.BookID{}, err
 	}
 	bookIDs := append(listedIDs, rangeIDs...)
-	if len(bookIDs) == 0 {
-		return []models.BookID{}, errors.New("no book IDs given: use -ids and/or -from/-to")
+	if len(bookIDs) == 0 && !selection.discover {
+		return []models.BookID{}, errors.New("no book IDs given: use -ids and/or -from/-to, or -discover")
 	}
 	return bookIDs, nil
 }
@@ -212,6 +226,20 @@ func checkServices(ctx context.Context, ingestion httpclient.IngestionClient, in
 		return fmt.Errorf("indexing service is not ready: %w", err)
 	}
 	return nil
+}
+
+// resolveCandidates returns the explicitly selected books plus, in discover mode, every
+// complete book of the datalake; the orchestrator skips the ones already indexed or failed.
+func resolveCandidates(ctx context.Context, config serviceConfig, ingestion httpclient.IngestionClient) ([]models.BookID, error) {
+	if !config.discover {
+		return config.bookIDs, nil
+	}
+	list, err := ingestion.List(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("discover pending books: %w", err)
+	}
+	slog.Info("[CONTROL] discovered complete books", "count", list.Count)
+	return append(config.bookIDs, list.Books...), nil
 }
 
 func buildOrchestrator(config serviceConfig, ingestion httpclient.IngestionClient, indexing httpclient.IndexingClient) (control.Orchestrator, error) {
