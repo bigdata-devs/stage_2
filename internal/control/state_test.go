@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 
 	"boogle-engine/internal/models"
@@ -158,4 +159,53 @@ func writeControlFile(t *testing.T, directory string, name string, content strin
 	if err := os.WriteFile(path, []byte(content), filePermissions); err != nil {
 		t.Fatalf("write %s: %v", name, err)
 	}
+}
+
+func BenchmarkRecordDownloaded(b *testing.B) {
+	state := newBenchmarkState(b)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if err := state.RecordDownloaded(models.BookID(1_000_000 + i)); err != nil {
+			b.Fatalf("unexpected error: %v", err)
+		}
+	}
+}
+
+func BenchmarkRecordDownloadedConcurrent(b *testing.B) {
+	state := newBenchmarkState(b)
+	var nextBookID atomic.Int64
+	b.ResetTimer()
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			bookID := models.BookID(10_000_000 + nextBookID.Add(1))
+			if err := state.RecordDownloaded(bookID); err != nil {
+				b.Errorf("unexpected error: %v", err)
+				return
+			}
+		}
+	})
+}
+
+func BenchmarkLoadState(b *testing.B) {
+	state := newBenchmarkState(b)
+	for i := 0; i < 1000; i++ {
+		if err := state.RecordDownloaded(models.BookID(i)); err != nil {
+			b.Fatalf("unexpected error: %v", err)
+		}
+	}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if _, err := LoadState(state.directory); err != nil {
+			b.Fatalf("unexpected error: %v", err)
+		}
+	}
+}
+
+func newBenchmarkState(b *testing.B) *ControlState {
+	b.Helper()
+	state, err := LoadState(filepath.Join(b.TempDir(), "control"))
+	if err != nil {
+		b.Fatalf("unexpected error: %v", err)
+	}
+	return state
 }
