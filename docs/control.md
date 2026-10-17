@@ -10,10 +10,13 @@ every completed step on disk so a restarted run resumes instead of duplicating w
 go build -o bin/control ./cmd/control
 ./bin/control -ids 1342,84,11 -workers 4
 ./bin/control -from 1 -to 500
+./bin/control -discover
 ```
 
-The module refuses to start when a required service is unhealthy: it pings
-`GET /health` on both services before the first book is claimed.
+The module refuses to start when a required service is unreachable: it reads
+`GET /ingest/list` on the Ingestion Service and `GET /index/status` on the
+Indexing Service before the first book is claimed, with a 10 second readiness
+deadline.
 
 ## Configuration
 
@@ -22,15 +25,18 @@ The module refuses to start when a required service is unhealthy: it pings
 | `-ingestion-url` | `INGESTION_URL` | `http://localhost:7001` | Base URL of the Ingestion Service |
 | `-indexing-url` | `INDEXING_URL` | `http://localhost:7002` | Base URL of the Indexing Service |
 | `-state-dir` | `CONTROL_STATE_DIR` | `control` | Folder of the control state files |
-| `-timeout` | — | `30s` | Time limit of one service call |
+| `-ingest-timeout` | — | `150s` | Time limit of one `POST /ingest` call, above the service download budget (2 minutes by default) |
+| `-timeout` | — | `30s` | Time limit of one indexing, status or readiness call |
 | `-workers` | — | `4` | Concurrent pipeline workers |
 | `-attempts` | — | `3` | Attempts per step on transient errors |
 | `-backoff` | — | `1s` | Wait before the first retry (doubles each time) |
 | `-ids` | — | — | Comma-separated book IDs |
 | `-from`, `-to` | — | — | Inclusive range of book IDs |
+| `-discover` | — | `false` | Add every complete book of the datalake reported by `GET /ingest/list` |
 
-Book selection requires `-ids` and/or `-from`/`-to`. Flags override environment
-variables; both endpoints are configurable so no `localhost` address is hard-coded.
+Book selection requires `-ids` and/or `-from`/`-to`, or the `-discover` flag.
+Flags override environment variables; both endpoints are configurable so no
+`localhost` address is hard-coded.
 
 ## Orchestration flow
 
@@ -84,7 +90,11 @@ workers. The HTTP clients are tested separately against `httptest` servers.
 
 ## Service contracts used by the Control Module
 
-* `POST /ingest/{book_id}` → `{"book_id":1342,"status":"downloaded","path":"..."}`
-  (also accepts `available` / `unavailable` / `failed`)
-* `POST /index/update/{book_id}` → `{"book_id":1342,"index":"updated"}`
-* `GET /health` on both services (status code only, body free-form)
+* `POST /ingest/{book_id}` → `200 {"book_id":1342,"status":"downloaded","path":"..."}`
+  (also answers `available` / `unavailable` / `failed`); `404 book_unavailable`
+  is permanent, `503 download_failed` is transient.
+* `GET /ingest/list` → `{"count":3,"books":[5,17,1342]}`; readiness check of the
+  Ingestion Service and source of the `-discover` candidates.
+* `POST /index/update/{book_id}` → `200 {"book_id":1342,"index":"updated"}`;
+  `404 book_not_found` is permanent (the book must be ingested first).
+* `GET /index/status` → index statistics; readiness check of the Indexing Service.
