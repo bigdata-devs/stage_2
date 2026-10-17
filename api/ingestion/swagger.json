@@ -1,0 +1,242 @@
+{
+    "schemes": [
+        "http"
+    ],
+    "swagger": "2.0",
+    "info": {
+        "description": "Internal API of the Boogle Engine Ingestion Service. Provider: Ingestion Service.\nIntended consumer: the Control Module, which orchestrates ingestion, indexing and publication.\nIt is not part of the front-end contract.",
+        "title": "Boogle Engine Ingestion API",
+        "contact": {},
+        "version": "1.0.0"
+    },
+    "basePath": "/",
+    "paths": {
+        "/ingest/list": {
+            "get": {
+                "description": "- **Provider:** Ingestion Service\n- **Intended consumer:** Control Module (internal API), to pick books not processed yet and to rebuild its work\nqueue after a restart\n\nReturns the IDs of the books whose header and body are both complete, in ascending order, and their count. Books\nstill being ingested are not listed until their POST /ingest/{book_id} has completed. The list is a snapshot taken\nwhile scanning the datalake folders and is not paginated.\n\n**Idempotency, timeouts and retries.** Read-only and safe to repeat. The scan grows with the number of stored books,\nso allow a generous client timeout (about 30 s) and retry `500 internal_error` with exponential backoff.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "ingestion"
+                ],
+                "summary": "List the books in the datalake",
+                "responses": {
+                    "200": {
+                        "description": "Complete books in ascending order",
+                        "schema": {
+                            "$ref": "#/definitions/api.BookListResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "internal_error: the datalake folders could not be read",
+                        "schema": {
+                            "$ref": "#/definitions/api.ErrorResponse"
+                        }
+                    }
+                },
+                "x-audience": "internal",
+                "x-completion": "synchronous",
+                "x-consumers": [
+                    "Control Module"
+                ],
+                "x-idempotent": true,
+                "x-provider": "Ingestion Service"
+            }
+        },
+        "/ingest/status/{book_id}": {
+            "get": {
+                "description": "- **Provider:** Ingestion Service\n- **Intended consumer:** Control Module (internal API), as the readiness check before a book is indexed\n\nAnswers 200 `available` only when both the header and the body of the book are completely written. Because files\nare written atomically, a book whose ingestion is still running answers 404 until its POST /ingest/{book_id}\nhas completed.\n\n**Idempotency, timeouts and retries.** Read-only and safe to poll or repeat at any time. It only checks two files\non disk, so a short client timeout (about 5 s) is enough; retry on timeouts and connection errors.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "ingestion"
+                ],
+                "summary": "Check whether a book is in the datalake",
+                "parameters": [
+                    {
+                        "minimum": 1,
+                        "type": "integer",
+                        "example": 1342,
+                        "description": "Project Gutenberg book ID (positive integer)",
+                        "name": "book_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Both files of the book are in the datalake",
+                        "schema": {
+                            "$ref": "#/definitions/api.BookStatusResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "invalid_book_id: book_id is not a positive integer",
+                        "schema": {
+                            "$ref": "#/definitions/api.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "book_not_found: the datalake holds no complete copy of the book",
+                        "schema": {
+                            "$ref": "#/definitions/api.ErrorResponse"
+                        }
+                    }
+                },
+                "x-audience": "internal",
+                "x-completion": "synchronous",
+                "x-consumers": [
+                    "Control Module"
+                ],
+                "x-idempotent": true,
+                "x-provider": "Ingestion Service"
+            }
+        },
+        "/ingest/{book_id}": {
+            "post": {
+                "description": "- **Provider:** Ingestion Service\n- **Intended consumer:** Control Module (internal API, not exposed to the front-end)\n- **Position in the workflow:** first step of a book's lifecycle; index a book only after this call returns 200\n\nDownloads book `book_id` from Project Gutenberg, splits it into header and body and stores both files in the\ndatalake folder returned in `path`. The request has no body.\n\n**Completion semantics.** Synchronous: a 200 response means the work has fully completed. Each file is written\natomically (temporary file, flush to disk, rename), so the book is complete and immediately eligible for indexing,\nand no reader ever sees a partial book. `status` is `downloaded` when this call wrote the files and `available`\nwhen the datalake already held them; both mean success.\n\n**Idempotency.** Safe to repeat; it never duplicates work or data. A duplicate call returns `available` with the\nsame `path` without downloading again, and concurrent calls for the same book share one single download and all\nreceive its result. This coordination lives inside one service process: two replicas may download the same book\nat once, and the atomic rename still leaves exactly one complete copy.\n\n**Timeouts and retries expected of the caller.**\n- The service retries transient download errors by itself within an ingestion budget (`-ingest-timeout`, 2 minutes\nby default) that also covers waiting for a free download slot. Use a client timeout above it, for example 150 s.\n- `503 download_failed` and `500 internal_error`: retry the same request later with exponential backoff.\n- `404 book_unavailable`: permanent. Do not retry; record the book as unavailable.\n- Client timeout or lost connection: retry the same request. The ingestion keeps running in the service, so the\nretry joins it or finds the book `available`.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "ingestion"
+                ],
+                "summary": "Ingest a book into the datalake",
+                "parameters": [
+                    {
+                        "minimum": 1,
+                        "type": "integer",
+                        "example": 1342,
+                        "description": "Project Gutenberg book ID (positive integer)",
+                        "name": "book_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The book is complete in the datalake",
+                        "schema": {
+                            "$ref": "#/definitions/api.IngestionResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "invalid_book_id: book_id is not a positive integer",
+                        "schema": {
+                            "$ref": "#/definitions/api.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "book_unavailable: Gutenberg has no such book or its text lacks the START/END markers",
+                        "schema": {
+                            "$ref": "#/definitions/api.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "internal_error: the datalake could not be written",
+                        "schema": {
+                            "$ref": "#/definitions/api.ErrorResponse"
+                        }
+                    },
+                    "503": {
+                        "description": "download_failed: Gutenberg failed transiently or the ingestion budget ran out",
+                        "schema": {
+                            "$ref": "#/definitions/api.ErrorResponse"
+                        }
+                    }
+                },
+                "x-audience": "internal",
+                "x-completion": "synchronous",
+                "x-consumers": [
+                    "Control Module"
+                ],
+                "x-idempotent": true,
+                "x-provider": "Ingestion Service"
+            }
+        }
+    },
+    "definitions": {
+        "api.BookListResponse": {
+            "type": "object",
+            "properties": {
+                "books": {
+                    "description": "IDs of the complete books in ascending order; never null",
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    },
+                    "example": [
+                        5,
+                        17,
+                        1342
+                    ]
+                },
+                "count": {
+                    "description": "Number of complete books in the datalake",
+                    "type": "integer",
+                    "example": 3
+                }
+            }
+        },
+        "api.BookStatusResponse": {
+            "type": "object",
+            "properties": {
+                "book_id": {
+                    "type": "integer",
+                    "example": 1342
+                },
+                "status": {
+                    "type": "string",
+                    "enum": [
+                        "available"
+                    ],
+                    "example": "available"
+                }
+            }
+        },
+        "api.ErrorResponse": {
+            "type": "object",
+            "properties": {
+                "error": {
+                    "type": "string",
+                    "example": "invalid_parameter"
+                },
+                "message": {
+                    "type": "string",
+                    "example": "query parameter \"limit\" must be an integer between 1 and 100"
+                }
+            }
+        },
+        "api.IngestionResponse": {
+            "type": "object",
+            "properties": {
+                "book_id": {
+                    "type": "integer",
+                    "example": 1342
+                },
+                "path": {
+                    "description": "Folder of the book in the datalake, always written with forward slashes",
+                    "type": "string",
+                    "example": "datalake/batch_1000_1999/1342"
+                },
+                "status": {
+                    "description": "downloaded: this call wrote the files; available: the datalake already held them",
+                    "type": "string",
+                    "enum": [
+                        "downloaded",
+                        "available"
+                    ],
+                    "example": "downloaded"
+                }
+            }
+        }
+    },
+    "tags": [
+        {
+            "description": "Internal API. Provider: Ingestion Service. Consumer: Control Module.",
+            "name": "ingestion"
+        }
+    ]
+}
