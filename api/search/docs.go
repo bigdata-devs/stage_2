@@ -95,7 +95,14 @@ const docTemplate = `{
                             "$ref": "#/definitions/api.ErrorResponse"
                         }
                     }
-                }
+                },
+                "x-audience": "front-end",
+                "x-completion": "synchronous",
+                "x-consumers": [
+                    "Front-end"
+                ],
+                "x-idempotent": true,
+                "x-provider": "Search Service"
             }
         }
     },
@@ -132,11 +139,6 @@ const docTemplate = `{
             "properties": {
                 "error": {
                     "type": "string",
-                    "enum": [
-                        "missing_parameter",
-                        "invalid_parameter",
-                        "internal_error"
-                    ],
                     "example": "invalid_parameter"
                 },
                 "message": {

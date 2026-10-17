@@ -24,10 +24,6 @@ definitions:
   api.ErrorResponse:
     properties:
       error:
-        enum:
-        - missing_parameter
-        - invalid_parameter
-        - internal_error
         example: invalid_parameter
         type: string
       message:
@@ -148,6 +144,12 @@ paths:
       summary: Search books by keyword
       tags:
       - search
+      x-audience: front-end
+      x-completion: synchronous
+      x-consumers:
+      - Front-end
+      x-idempotent: true
+      x-provider: Search Service
 schemes:
 - http
 swagger: "2.0"
