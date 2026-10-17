@@ -6,7 +6,6 @@ package api
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -26,11 +25,10 @@ const (
 	MaxLimit = 100
 )
 
-// Error codes returned in ErrorResponse.Error.
+// Error codes returned in ErrorResponse.Error by the search endpoint.
 const (
 	missingParameterCode = "missing_parameter"
 	invalidParameterCode = "invalid_parameter"
-	internalErrorCode    = "internal_error"
 )
 
 // ErrMissingEngine is returned by NewSearchHandler when it receives no SearchEngine.
@@ -90,12 +88,6 @@ type BookResult struct {
 	Year int `json:"year" example:"1813"`
 }
 
-// ErrorResponse is the body of every 4xx and 5xx answer of the Search Service.
-type ErrorResponse struct {
-	Error   string `json:"error" enums:"missing_parameter,invalid_parameter,internal_error" example:"invalid_parameter"`
-	Message string `json:"message" example:"query parameter \"limit\" must be an integer between 1 and 100"`
-}
-
 // SearchHandler serves GET /search on top of a SearchEngine.
 type SearchHandler struct {
 	engine SearchEngine
@@ -130,6 +122,11 @@ func NewSearchHandler(engine SearchEngine) (SearchHandler, error) {
 //	@Success		200			{object}	SearchResponse	"One page of matching books"
 //	@Failure		400			{object}	ErrorResponse	"q is missing (missing_parameter) or a parameter is malformed (invalid_parameter)"
 //	@Failure		500			{object}	ErrorResponse	"The search engine failed (internal_error)"
+//	@x-provider		"Search Service"
+//	@x-consumers	["Front-end"]
+//	@x-audience		"front-end"
+//	@x-idempotent	true
+//	@x-completion	"synchronous"
 //	@Router			/search [get]
 func (handler SearchHandler) Search(writer http.ResponseWriter, request *http.Request) {
 	query, err := parseSearchQuery(request.URL.Query())
@@ -270,12 +267,4 @@ func writeEngineFailure(writer http.ResponseWriter, query SearchQuery, err error
 		Error:   internalErrorCode,
 		Message: "the search could not be completed, please try again later",
 	})
-}
-
-func writeJSON(writer http.ResponseWriter, status int, payload any) {
-	writer.Header().Set("Content-Type", "application/json; charset=utf-8")
-	writer.WriteHeader(status)
-	if err := json.NewEncoder(writer).Encode(payload); err != nil {
-		slog.Warn("search response not delivered", "status", status, "error", err)
-	}
 }
