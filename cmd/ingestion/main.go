@@ -23,13 +23,13 @@ type Server struct {
 func main() {
 	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo})))
 
-	port := flag.Int("port", 7001, "Puerto del servidor HTTP")
-	lakeDir := flag.String("datalake", "datalake", "Directorio raíz del datalake")
+	port := flag.Int("port", 7001, "Server port HTTP")
+	lakeDir := flag.String("datalake", "datalake", "Datalake root directory")
 	flag.Parse()
 
 	lake, err := datalake.New(*lakeDir, datalake.DefaultBatchSize)
 	if err != nil {
-		slog.Error("Error al iniciar datalake", "error", err)
+		slog.Error("Error starting data lake", "error", err)
 		os.Exit(1)
 	}
 
@@ -37,7 +37,7 @@ func main() {
 	retryPolicy := crawler.RetryPolicy{MaxAttempts: 3, InitialBackoff: time.Second}
 	ingester, err := crawler.NewIngester(client, lake, retryPolicy)
 	if err != nil {
-		slog.Error("Error al iniciar ingester", "error", err)
+		slog.Error("Error starting ingester", "error", err)
 		os.Exit(1)
 	}
 
@@ -48,9 +48,9 @@ func main() {
 	mux.HandleFunc("GET /ingest/status/{book_id}", server.handleStatus)
 	mux.HandleFunc("GET /ingest/list", server.handleList)
 
-	slog.Info("Servidor de Ingesta iniciado", "puerto", *port)
+	slog.Info("Ingest server started", "port", *port)
 	if err := http.ListenAndServe(fmt.Sprintf(":%d", *port), mux); err != nil {
-		slog.Error("El servidor se detuvo", "error", err)
+		slog.Error("The server stopped", "error", err)
 	}
 }
 
@@ -58,7 +58,7 @@ func main() {
 func (s *Server) handleIngest(w http.ResponseWriter, r *http.Request) {
 	bookID, err := models.ParseBookID(r.PathValue("book_id"))
 	if err != nil {
-		http.Error(w, `{"error": "ID de libro inválido"}`, http.StatusBadRequest)
+		http.Error(w, `{"error": "Invalid book ID"}`, http.StatusBadRequest)
 		return
 	}
 
@@ -75,7 +75,7 @@ func (s *Server) handleIngest(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 	bookID, err := models.ParseBookID(r.PathValue("book_id"))
 	if err != nil {
-		http.Error(w, `{"error": "ID de libro inválido"}`, http.StatusBadRequest)
+		http.Error(w, `{"error": "Invalid book ID"}`, http.StatusBadRequest)
 		return
 	}
 
@@ -95,7 +95,7 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleList(w http.ResponseWriter, r *http.Request) {
 	bookIDs, err := s.lake.ListBookIDs()
 	if err != nil {
-		http.Error(w, `{"error": "Error al leer el datalake"}`, http.StatusInternalServerError)
+		http.Error(w, `{"error": "Error reading the datalake"}`, http.StatusInternalServerError)
 		return
 	}
 
