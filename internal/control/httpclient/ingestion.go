@@ -48,9 +48,14 @@ func (client IngestionClient) Status(ctx context.Context, bookID models.BookID) 
 	return result, nil
 }
 
-// Ping checks that the Ingestion Service answers its health endpoint.
-func (client IngestionClient) Ping(ctx context.Context) error {
-	return pingService(ctx, client.httpClient, client.baseURL)
+// List returns every complete book of the datalake. The Control Module uses it both as
+// the readiness check of the Ingestion Service and to discover pending books.
+func (client IngestionClient) List(ctx context.Context) (models.IngestionList, error) {
+	var list models.IngestionList
+	if err := doJSON(ctx, client.httpClient, http.MethodGet, client.baseURL+"/ingest/list", &list); err != nil {
+		return models.IngestionList{}, err
+	}
+	return list, nil
 }
 
 func (client IngestionClient) bookURL(bookID models.BookID) string {

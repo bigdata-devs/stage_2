@@ -46,11 +46,6 @@ func (client IndexingClient) Stats(ctx context.Context) (models.IndexStats, erro
 	return stats, nil
 }
 
-// Ping checks that the Indexing Service answers its health endpoint.
-func (client IndexingClient) Ping(ctx context.Context) error {
-	return pingService(ctx, client.httpClient, client.baseURL)
-}
-
 func (client IndexingClient) updateURL(bookID models.BookID) string {
 	return fmt.Sprintf("%s/index/update/%s", client.baseURL, bookID.String())
 }

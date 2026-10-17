@@ -72,6 +72,36 @@ func TestIngestTreatsMalformedAnswerAsTransient(t *testing.T) {
 	}
 }
 
+func TestListReturnsEveryCompleteBook(t *testing.T) {
+	url := serveHandler(t, func(writer http.ResponseWriter, request *http.Request) {
+		if request.Method != http.MethodGet {
+			t.Errorf("expected GET, got %s", request.Method)
+		}
+		if request.URL.Path != "/ingest/list" {
+			t.Errorf("expected path /ingest/list, got %s", request.URL.Path)
+		}
+		fmt.Fprint(writer, `{"count":3,"books":[5,17,1342]}`)
+	})
+	list, err := NewIngestionClient(url, testTimeout).List(context.Background())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if list.Count != 3 || len(list.Books) != 3 || list.Books[2] != 1342 {
+		t.Fatalf("unexpected list %+v", list)
+	}
+}
+
+func TestListOnEmptyDatalakeDecodesEmptySlice(t *testing.T) {
+	url := serveStatus(t, http.StatusOK, `{"count":0,"books":[]}`)
+	list, err := NewIngestionClient(url, testTimeout).List(context.Background())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if list.Count != 0 || list.Books == nil || len(list.Books) != 0 {
+		t.Fatalf("expected a non-nil empty slice, got %+v", list)
+	}
+}
+
 func TestStatusAsksDedicatedRoute(t *testing.T) {
 	url := serveHandler(t, func(writer http.ResponseWriter, request *http.Request) {
 		if request.Method != http.MethodGet {

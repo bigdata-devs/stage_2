@@ -34,9 +34,13 @@ const (
 	defaultIndexingURL  = "http://localhost:7002"
 	defaultStateDir     = "control"
 	defaultWorkers      = 4
-	defaultTimeout      = 30 * time.Second
-	defaultAttempts     = 3
-	defaultBackoff      = time.Second
+	// defaultIngestTimeout stays above the Ingestion Service budget (2 minutes by default),
+	// so a slow download is never aborted by the control module itself.
+	defaultIngestTimeout = 150 * time.Second
+	defaultTimeout       = 30 * time.Second
+	defaultAttempts      = 3
+	defaultBackoff       = time.Second
+	readinessTimeout     = 10 * time.Second
 )
 
 // serviceConfig gathers every setting of one control run.
@@ -44,6 +48,7 @@ type serviceConfig struct {
 	ingestionURL   string
 	indexingURL    string
 	stateDir       string
+	ingestTimeout  time.Duration
 	requestTimeout time.Duration
 	workers        int
 	maxAttempts    int
@@ -63,9 +68,9 @@ func main() {
 	}
 }
 
-// run pings both services, loads the control state and orchestrates every requested
-// book. Ctrl+C or SIGTERM stops claiming new books; the books already in flight run
-// until their current step returns, and the summary is logged.
+// run checks that both services answer, resolves the candidate books, loads the control
+// state and orchestrates every requested book. Ctrl+C or SIGTERM stops claiming new books;
+// the books already in flight run until their current step returns, and the summary is logged.
 func run(arguments []string) error {
 	config, err := parseConfig(arguments)
 	if err != nil {
@@ -73,7 +78,7 @@ func run(arguments []string) error {
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-	ingestion := httpclient.NewIngestionClient(config.ingestionURL, config.requestTimeout)
+	ingestion := httpclient.NewIngestionClient(config.ingestionURL, config.ingestTimeout)
 	indexing := httpclient.NewIndexingClient(config.indexingURL, config.requestTimeout)
 	if err := checkServices(ctx, ingestion, indexing); err != nil {
 		return err
@@ -103,6 +108,9 @@ func parseConfig(arguments []string) (serviceConfig, error) {
 	if config.requestTimeout <= 0 {
 		return serviceConfig{}, fmt.Errorf("timeout must be positive, got %s", config.requestTimeout)
 	}
+	if config.ingestTimeout <= 0 {
+		return serviceConfig{}, fmt.Errorf("ingest timeout must be positive, got %s", config.ingestTimeout)
+	}
 	bookIDs, err := selection.bookIDs()
 	if err != nil {
 		return serviceConfig{}, err
@@ -119,7 +127,10 @@ func registerServiceFlags(flags *flag.FlagSet) *serviceConfig {
 		"base URL of the Indexing Service (env INDEXING_URL)")
 	flags.StringVar(&config.stateDir, "state-dir", envOr("CONTROL_STATE_DIR", defaultStateDir),
 		"folder of the control state files (env CONTROL_STATE_DIR)")
-	flags.DurationVar(&config.requestTimeout, "timeout", defaultTimeout, "time limit of one service call")
+	flags.DurationVar(&config.ingestTimeout, "ingest-timeout", defaultIngestTimeout,
+		"time limit of one POST /ingest call, above the service download budget")
+	flags.DurationVar(&config.requestTimeout, "timeout", defaultTimeout,
+		"time limit of one indexing, status or readiness call")
 	flags.IntVar(&config.workers, "workers", defaultWorkers, "number of concurrent pipeline workers")
 	flags.IntVar(&config.maxAttempts, "attempts", defaultAttempts, "attempts per step on transient errors")
 	flags.DurationVar(&config.initialBackoff, "backoff", defaultBackoff, "wait before the first retry (doubles each time)")
@@ -188,13 +199,17 @@ func bookIDRange(firstID int, lastID int) ([]models.BookID, error) {
 	return bookIDs, nil
 }
 
-// checkServices fails fast when a required service is unreachable or unhealthy.
+// checkServices fails fast when a required service is unreachable: it reads the documented
+// status endpoint of each service, which answers 2xx only while the service runs. The short
+// readiness deadline keeps a hanging service from blocking the start.
 func checkServices(ctx context.Context, ingestion httpclient.IngestionClient, indexing httpclient.IndexingClient) error {
-	if err := ingestion.Ping(ctx); err != nil {
-		return fmt.Errorf("ingestion service is not healthy: %w", err)
+	readinessCtx, cancel := context.WithTimeout(ctx, readinessTimeout)
+	defer cancel()
+	if _, err := ingestion.List(readinessCtx); err != nil {
+		return fmt.Errorf("ingestion service is not ready: %w", err)
 	}
-	if err := indexing.Ping(ctx); err != nil {
-		return fmt.Errorf("indexing service is not healthy: %w", err)
+	if _, err := indexing.Stats(readinessCtx); err != nil {
+		return fmt.Errorf("indexing service is not ready: %w", err)
 	}
 	return nil
 }
