@@ -53,12 +53,17 @@ const (
 	OutcomePending BookOutcome = "pending"
 )
 
-// Summary counts the outcomes of one orchestrator run.
+// Summary counts the outcomes of one orchestrator run and sums the wall-clock time
+// its pipeline steps waited on the services: the coordination cost of the run.
 type Summary struct {
 	Indexed int
 	Skipped int
 	Failed  int
 	Pending int
+	// IngestElapsed totals the ingestion steps that ran during this run.
+	IngestElapsed time.Duration
+	// IndexElapsed totals the index-update steps that ran during this run.
+	IndexElapsed time.Duration
 }
 
 // Total returns how many candidate books were claimed during the run.
@@ -66,8 +71,16 @@ func (summary Summary) Total() int {
 	return summary.Indexed + summary.Skipped + summary.Failed + summary.Pending
 }
 
-func (summary *Summary) count(outcome BookOutcome) {
-	switch outcome {
+// bookReport is the outcome of one claimed book together with the wall-clock time
+// of each pipeline step it executed.
+type bookReport struct {
+	outcome       BookOutcome
+	ingestElapsed time.Duration
+	indexElapsed  time.Duration
+}
+
+func (summary *Summary) add(report bookReport) {
+	switch report.outcome {
 	case OutcomeIndexed:
 		summary.Indexed++
 	case OutcomeSkipped:
@@ -77,6 +90,8 @@ func (summary *Summary) count(outcome BookOutcome) {
 	case OutcomePending:
 		summary.Pending++
 	}
+	summary.IngestElapsed += report.ingestElapsed
+	summary.IndexElapsed += report.indexElapsed
 }
 
 // OrchestratorConfig gathers everything one orchestration run needs.
@@ -150,33 +165,43 @@ func (orchestrator Orchestrator) runWorker(ctx context.Context) Summary {
 		if !claimed {
 			break
 		}
-		summary.count(orchestrator.processCandidate(ctx, bookID))
+		summary.add(orchestrator.processCandidate(ctx, bookID))
 	}
 	return summary
 }
 
 // processCandidate skips books that need no work and runs the pipeline for the rest.
-func (orchestrator Orchestrator) processCandidate(ctx context.Context, bookID models.BookID) BookOutcome {
+func (orchestrator Orchestrator) processCandidate(ctx context.Context, bookID models.BookID) bookReport {
 	if orchestrator.state.IsIndexed(bookID) {
-		return OutcomeSkipped
+		return bookReport{outcome: OutcomeSkipped}
 	}
 	if reason, failed := orchestrator.state.FailureReason(bookID); failed {
 		slog.Info("[CONTROL] skipping previously failed book", "book_id", bookID, "reason", reason)
-		return OutcomeSkipped
+		return bookReport{outcome: OutcomeSkipped}
 	}
 	return orchestrator.processBook(ctx, bookID)
 }
 
-func (orchestrator Orchestrator) processBook(ctx context.Context, bookID models.BookID) BookOutcome {
+// processBook runs the ingestion and indexing steps back to back and reports how long
+// each step waited on the services; the durations feed the coordination metrics.
+func (orchestrator Orchestrator) processBook(ctx context.Context, bookID models.BookID) bookReport {
 	slog.Info("[CONTROL] processing book", "book_id", bookID)
+	ingestStart := time.Now()
 	if err := orchestrator.ensureDownloaded(ctx, bookID); err != nil {
 		return orchestrator.finishBook(ctx, bookID, err)
 	}
+	ingestElapsed := time.Since(ingestStart)
+	slog.Info("[CONTROL] ingest step finished", "book_id", bookID, "duration", ingestElapsed)
+	indexStart := time.Now()
 	if err := orchestrator.ensureIndexed(ctx, bookID); err != nil {
-		return orchestrator.finishBook(ctx, bookID, err)
+		report := orchestrator.finishBook(ctx, bookID, err)
+		report.ingestElapsed = ingestElapsed
+		return report
 	}
+	indexElapsed := time.Since(indexStart)
+	slog.Info("[CONTROL] index step finished", "book_id", bookID, "duration", indexElapsed)
 	slog.Info("[CONTROL] book indexed", "book_id", bookID)
-	return OutcomeIndexed
+	return bookReport{outcome: OutcomeIndexed, ingestElapsed: ingestElapsed, indexElapsed: indexElapsed}
 }
 
 // ensureDownloaded brings a book into the datalake and records the fact. A book the
@@ -261,16 +286,16 @@ func isPermanent(err error) bool {
 
 // finishBook classifies a book that hit an error: an interrupted run leaves it pending
 // for the next execution, while a real failure is recorded so it is not retried.
-func (orchestrator Orchestrator) finishBook(ctx context.Context, bookID models.BookID, err error) BookOutcome {
+func (orchestrator Orchestrator) finishBook(ctx context.Context, bookID models.BookID, err error) bookReport {
 	if ctx.Err() != nil {
 		slog.Info("[CONTROL] book left pending by shutdown", "book_id", bookID, "error", err)
-		return OutcomePending
+		return bookReport{outcome: OutcomePending}
 	}
 	slog.Warn("[CONTROL] book failed", "book_id", bookID, "error", err)
 	if recordErr := orchestrator.state.RecordFailed(bookID, err.Error()); recordErr != nil {
 		slog.Error("[CONTROL] could not record failure", "book_id", bookID, "error", recordErr)
 	}
-	return OutcomeFailed
+	return bookReport{outcome: OutcomeFailed}
 }
 
 func mergeSummaries(summaries <-chan Summary) Summary {
@@ -280,6 +305,8 @@ func mergeSummaries(summaries <-chan Summary) Summary {
 		merged.Skipped += summary.Skipped
 		merged.Failed += summary.Failed
 		merged.Pending += summary.Pending
+		merged.IngestElapsed += summary.IngestElapsed
+		merged.IndexElapsed += summary.IndexElapsed
 	}
 	return merged
 }

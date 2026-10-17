@@ -77,16 +77,34 @@ idempotent service call is safe, losing a book ID would not be.
   files, so the next run replays the call; the idempotent services answer without
   duplicating anything.
 
+## Coordination metrics
+
+Every finished step is logged with its wall-clock duration
+(`[CONTROL] ingest step finished` / `[CONTROL] index step finished`), and the run
+summary adds the coordination cost of the whole run:
+
+```
+[CONTROL] run finished indexed=2 skipped=0 failed=0 pending=0 elapsed=... books_per_second=...
+         ingest_step_total=... ingest_step_avg=... index_step_total=... index_step_avg=...
+```
+
+`*_step_avg` spreads each total over the books that entered the pipeline (indexed
+plus failed), so the report can compare ingestion cost against indexing cost per
+book and justify the worker count with `-workers`.
+
 ## Tests
 
 ```bash
 go test ./internal/control/...
 go test -race ./internal/control/...
+go test -bench . -benchmem ./internal/control/
 ```
 
 The tests exercise the orchestration loop against fake services: happy path,
-resume from downloaded state, retries, permanent failures, shutdown, and concurrent
-workers. The HTTP clients are tested separately against `httptest` servers.
+resume from downloaded state, retries, permanent failures, shutdown, concurrent
+workers and step-duration metrics. The HTTP clients are tested separately against
+`httptest` servers, and the microbenchmarks measure the control-state append and
+load costs (the Go substitute for JMH).
 
 ## Service contracts used by the Control Module
 

@@ -260,9 +260,10 @@ func buildOrchestrator(config serviceConfig, ingestion httpclient.IngestionClien
 	})
 }
 
-// logSummary prints the totals and the indexing throughput, a key metric of the
-// Stage 2 benchmarks.
+// logSummary prints the totals, the per-step coordination cost and the indexing
+// throughput, the key metrics of the Stage 2 benchmarks.
 func logSummary(summary control.Summary, elapsed time.Duration) {
+	pipelineBooks := summary.Indexed + summary.Failed
 	slog.Info("[CONTROL] run finished",
 		"indexed", summary.Indexed,
 		"skipped", summary.Skipped,
@@ -270,7 +271,19 @@ func logSummary(summary control.Summary, elapsed time.Duration) {
 		"pending", summary.Pending,
 		"elapsed", elapsed.Round(time.Millisecond),
 		"books_per_second", fmt.Sprintf("%.2f", float64(summary.Indexed)/elapsed.Seconds()),
+		"ingest_step_total", summary.IngestElapsed.Round(time.Millisecond),
+		"ingest_step_avg", averageStepDuration(summary.IngestElapsed, pipelineBooks),
+		"index_step_total", summary.IndexElapsed.Round(time.Millisecond),
+		"index_step_avg", averageStepDuration(summary.IndexElapsed, pipelineBooks),
 	)
+}
+
+// averageStepDuration spreads one step total over the books that entered the pipeline.
+func averageStepDuration(total time.Duration, books int) time.Duration {
+	if books == 0 {
+		return 0
+	}
+	return (total / time.Duration(books)).Round(time.Millisecond)
 }
 
 // envOr reads an environment variable or falls back to a default value.

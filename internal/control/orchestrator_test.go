@@ -103,6 +103,10 @@ func TestRunIngestsIndexesAndRecords(t *testing.T) {
 		t.Fatalf("expected one call per service, got %d ingest and %d index",
 			ingestion.callCount(1342), indexing.callCount(1342))
 	}
+	if summary.IngestElapsed <= 0 || summary.IndexElapsed <= 0 {
+		t.Fatalf("expected positive step durations, got ingest %s and index %s",
+			summary.IngestElapsed, summary.IndexElapsed)
+	}
 }
 
 func TestRunSkipsAlreadyIndexedBooks(t *testing.T) {
@@ -120,6 +124,10 @@ func TestRunSkipsAlreadyIndexedBooks(t *testing.T) {
 	}
 	if ingestion.callCount(1342) != 0 || indexing.callCount(1342) != 0 {
 		t.Fatal("expected no service calls for an already indexed book")
+	}
+	if summary.IngestElapsed != 0 || summary.IndexElapsed != 0 {
+		t.Fatalf("expected zero step durations for skipped books, got ingest %s and index %s",
+			summary.IngestElapsed, summary.IndexElapsed)
 	}
 }
 
