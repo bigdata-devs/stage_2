@@ -9,7 +9,7 @@ import (
 // These tests exercise a live server. They skip automatically when none is reachable, so the
 // suite stays green on machines without MongoDB (the same policy as the Stage 1 Python tests).
 
-func liveConfig(t *testing.T) Config {
+func liveConfig(t testing.TB) Config {
 	t.Helper()
 	config := ConfigFromEnvironment()
 	if !Available(context.Background(), config) {
