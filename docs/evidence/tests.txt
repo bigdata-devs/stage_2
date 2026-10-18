@@ -1,0 +1,72 @@
+=== RUN   TestIndexBookStoresTermFrequency
+--- PASS: TestIndexBookStoresTermFrequency (0.05s)
+=== RUN   TestIndexBookIsIdempotent
+--- PASS: TestIndexBookIsIdempotent (0.04s)
+=== RUN   TestIndexBookUpdatesTermFrequencyWithoutDuplicating
+--- PASS: TestIndexBookUpdatesTermFrequencyWithoutDuplicating (0.04s)
+=== RUN   TestIndexBookKeepsPostingsSortedAcrossBooks
+--- PASS: TestIndexBookKeepsPostingsSortedAcrossBooks (0.03s)
+=== RUN   TestIndexBookIsConcurrencySafeForSameBook
+--- PASS: TestIndexBookIsConcurrencySafeForSameBook (0.12s)
+=== RUN   TestIndexBookPublishesMetadata
+--- PASS: TestIndexBookPublishesMetadata (0.03s)
+=== RUN   TestIndexBookWithholdsUnpublishedBookFromReaders
+--- PASS: TestIndexBookWithholdsUnpublishedBookFromReaders (0.04s)
+=== RUN   TestConnectAndCloseRoundTrip
+--- PASS: TestConnectAndCloseRoundTrip (0.01s)
+=== RUN   TestEnsureIndexesIsIdempotent
+2026/10/18 17:03:47 INFO mongodb indexes ready created="[author_1_language_1_publication_year_1 language_1 publication_year_1]"
+2026/10/18 17:03:47 INFO mongodb indexes ready created="[author_1_language_1_publication_year_1 language_1 publication_year_1]"
+--- PASS: TestEnsureIndexesIsIdempotent (0.05s)
+=== RUN   TestConfigFromEnvironmentUsesDefaultsWhenUnset
+--- PASS: TestConfigFromEnvironmentUsesDefaultsWhenUnset (0.00s)
+=== RUN   TestConfigFromEnvironmentHonoursOverrides
+--- PASS: TestConfigFromEnvironmentHonoursOverrides (0.00s)
+=== RUN   TestPostingsForTermsReturnsMatchingTermsOrderedByTerm
+--- PASS: TestPostingsForTermsReturnsMatchingTermsOrderedByTerm (0.03s)
+=== RUN   TestPostingsForTermsWithOnlyUnknownTermsReturnsEmptyList
+--- PASS: TestPostingsForTermsWithOnlyUnknownTermsReturnsEmptyList (0.03s)
+=== RUN   TestPostingsForTermsWithoutTermsReturnsEmptyList
+--- PASS: TestPostingsForTermsWithoutTermsReturnsEmptyList (0.01s)
+=== RUN   TestBooksByIDReturnsMetadataOrderedByBookID
+--- PASS: TestBooksByIDReturnsMetadataOrderedByBookID (0.03s)
+=== RUN   TestBooksWithoutMatchesReturnsEmptyList
+--- PASS: TestBooksWithoutMatchesReturnsEmptyList (0.01s)
+=== RUN   TestBooksWithoutIDsReturnsEmptyList
+--- PASS: TestBooksWithoutIDsReturnsEmptyList (0.01s)
+=== RUN   TestRebuildSwapsInNewDatamart
+--- PASS: TestRebuildSwapsInNewDatamart (0.10s)
+=== RUN   TestRebuildLeavesNoTemporaryCollections
+--- PASS: TestRebuildLeavesNoTemporaryCollections (0.07s)
+=== RUN   TestRebuildIsIdempotent
+--- PASS: TestRebuildIsIdempotent (0.14s)
+=== RUN   TestSearchBooksRanksByTermFrequency
+--- PASS: TestSearchBooksRanksByTermFrequency (0.04s)
+=== RUN   TestSearchBooksBreaksRelevanceTiesByBookID
+--- PASS: TestSearchBooksBreaksRelevanceTiesByBookID (0.04s)
+=== RUN   TestSearchBooksPaginatesWithoutChangingTotal
+--- PASS: TestSearchBooksPaginatesWithoutChangingTotal (0.04s)
+=== RUN   TestSearchBooksWithholdsPendingBooks
+--- PASS: TestSearchBooksWithholdsPendingBooks (0.04s)
+=== RUN   TestSearchBooksFiltersByLanguageList
+--- PASS: TestSearchBooksFiltersByLanguageList (0.04s)
+=== RUN   TestSearchBooksFiltersByAuthorIgnoringCaseAndSubstring
+--- PASS: TestSearchBooksFiltersByAuthorIgnoringCaseAndSubstring (0.04s)
+=== RUN   TestSearchBooksFiltersByExactYear
+--- PASS: TestSearchBooksFiltersByExactYear (0.04s)
+=== RUN   TestSearchBooksCombinesFiltersAsConjunction
+--- PASS: TestSearchBooksCombinesFiltersAsConjunction (0.05s)
+=== RUN   TestSearchBooksWithUnknownTermReturnsEmptyList
+--- PASS: TestSearchBooksWithUnknownTermReturnsEmptyList (0.03s)
+=== RUN   TestSearchBooksRejectsInvalidRequests
+=== RUN   TestSearchBooksRejectsInvalidRequests/empty_term
+=== RUN   TestSearchBooksRejectsInvalidRequests/negative_offset
+=== RUN   TestSearchBooksRejectsInvalidRequests/zero_limit
+=== RUN   TestSearchBooksRejectsInvalidRequests/negative_year
+--- PASS: TestSearchBooksRejectsInvalidRequests (0.00s)
+    --- PASS: TestSearchBooksRejectsInvalidRequests/empty_term (0.00s)
+    --- PASS: TestSearchBooksRejectsInvalidRequests/negative_offset (0.00s)
+    --- PASS: TestSearchBooksRejectsInvalidRequests/zero_limit (0.00s)
+    --- PASS: TestSearchBooksRejectsInvalidRequests/negative_year (0.00s)
+PASS
+ok  	boogle-engine/internal/mongodb	2.457s
