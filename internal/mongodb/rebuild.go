@@ -2,6 +2,7 @@ package mongodb
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -13,6 +14,9 @@ import (
 
 // adminDatabase owns cluster-wide commands; renameCollection only runs against it.
 const adminDatabase = "admin"
+
+// namespaceExistsCode is the MongoDB error code reported when create targets a live collection.
+const namespaceExistsCode = 48
 
 // RebuildResult reports what a rebuild produced: how many books it stored and how long it took.
 type RebuildResult struct {
@@ -32,6 +36,9 @@ func (indexer BookIndexer) Rebuild(ctx context.Context, books []models.IndexBook
 	temporaryBooks := indexer.client.database.Collection(BooksCollection + rebuildSuffix)
 	temporaryIndex := indexer.client.database.Collection(InvertedIndexCollection + rebuildSuffix)
 	if err := dropIfExists(ctx, temporaryBooks, temporaryIndex); err != nil {
+		return RebuildResult{}, err
+	}
+	if err := ensureTemporary(ctx, temporaryBooks, temporaryIndex); err != nil {
 		return RebuildResult{}, err
 	}
 
@@ -79,6 +86,25 @@ func renameIntoPlace(ctx context.Context, temporary *mongo.Collection, live stri
 	admin := database.Client().Database(adminDatabase)
 	if err := admin.RunCommand(ctx, command).Err(); err != nil {
 		return fmt.Errorf("swap %s into %s: %w", temporaryName, live, err)
+	}
+	return nil
+}
+
+// ensureTemporary creates the temporary collections up front so the swap always finds its source,
+// even for a rebuild of an empty datalake: with no books to write, no upsert would ever create
+// them. An already existing collection is the wanted state, so NamespaceExists is not an error.
+func ensureTemporary(ctx context.Context, collections ...*mongo.Collection) error {
+	for _, collection := range collections {
+		command := bson.D{{Key: "create", Value: collection.Name()}}
+		err := collection.Database().RunCommand(ctx, command).Err()
+		if err == nil {
+			continue
+		}
+		var serverError mongo.ServerError
+		if errors.As(err, &serverError) && serverError.HasErrorCode(namespaceExistsCode) {
+			continue
+		}
+		return fmt.Errorf("create %s: %w", collection.Name(), err)
 	}
 	return nil
 }

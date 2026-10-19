@@ -16,8 +16,8 @@ definitions:
         example: 1200
         type: integer
       index_size_MB:
-        description: 'Rough estimate in MiB: live heap of the in-memory Indexing Service
-          after the last garbage collection'
+        description: 'Rough estimate in MiB: size of the stored index data (datamart
+          document bytes)'
         example: 42.7
         type: number
       last_update:
@@ -66,8 +66,8 @@ paths:
         - **Intended consumer:** Control Module (internal, administrative): after the service restarts, or to re-index
         every book after the tokenizer or the metadata parser changes
 
-        Builds a brand-new metadata catalog and inverted index from every complete book in the datalake, with parallel
-        workers (`-workers`). Books still being ingested are not included. The request has no body.
+        Builds a brand-new metadata catalog and inverted index from every complete book in the datalake, written to
+        fresh datamart collections. Books still being ingested are not included. The request has no body.
 
         **Completion and publication.** Synchronous and atomic. The new index is built aside while the previous one keeps
         answering, and replaces it in a single step once every book is indexed: a 200 response means the new index is
@@ -76,7 +76,7 @@ paths:
 
         **Idempotency and consistency.** Repeating it over the same datalake produces the same index. Only one rebuild runs
         at a time: another request meanwhile gets `409 rebuild_in_progress`. POST /index/update calls during a rebuild are
-        not blocked and reach both indexes, so the published result never loses them.
+        not blocked: they are recorded and replayed on the rebuilt index after the swap, so the published result never loses them.
 
         **Timeouts and retries expected of the caller.** The duration grows with the datalake (the assignment's reference
         is about 35 s per 1000 books) and is capped by the service's rebuild budget (`-rebuild-timeout`, 10 minutes by
@@ -120,10 +120,9 @@ paths:
         - **Intended consumer:** Control Module (internal, operational): to follow indexing progress, detect the end of a
         rebuild and record memory use during benchmarks
 
-        **Fields.** `books_indexed` counts the books of the published metadata catalog. `last_update` is the UTC time of the
-        last successful update or rebuild (at startup, the time the empty index was published). `index_size_MB` is a rough
-        estimate while the index lives in memory: the live heap of the Indexing Service after the last garbage collection,
-        which the index dominates; during a rebuild it includes both indexes.
+        **Fields.** `books_indexed` counts the published books of the metadata datamart. `last_update` is the UTC time of the
+        last successful update or rebuild (at startup, the time the adapter was created). `index_size_MB` is a rough
+        estimate of the stored index data: the document bytes of the MongoDB datamart.
 
         **Consistency.** Describes the published index only; a running rebuild shows up when it is published.
 
@@ -158,7 +157,8 @@ paths:
 
         **Completion and publication.** Synchronous: a 200 response means the work has fully completed and the book's
         metadata record and postings are in the published index, visible to every request that starts afterwards. If a
-        rebuild is running, the book is also written into the index being rebuilt, so the rebuild cannot lose it.
+        rebuild is running, the book is recorded and replayed on the rebuilt index right after it is published, so the
+        rebuild cannot lose it.
 
         **Idempotency and consistency.** Safe to repeat: re-indexing a book that is already indexed replaces its metadata
         record and adds no duplicate postings, so the index ends up exactly as after the first call. Updates of different
@@ -169,7 +169,7 @@ paths:
         blocked by a running rebuild.
         - Client timeout, connection error or `500 internal_error`: retry the same request with exponential backoff.
         - `404 book_not_found`: the book is not completely ingested. Ingest it first, then retry; repeating alone will not help.
-        - The index lives in memory: after the service restarts it is empty until POST /index/rebuild runs.
+        - The index is stored in the MongoDB datamart, so indexed books stay searchable across service restarts.
       parameters:
       - description: Project Gutenberg book ID (positive integer)
         example: 1342

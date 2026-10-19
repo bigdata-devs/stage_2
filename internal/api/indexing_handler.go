@@ -26,8 +26,8 @@ const bytesPerMegabyte = 1 << 20
 // ErrMissingIndex is returned by NewIndexingHandler when it receives no BookIndex.
 var ErrMissingIndex = errors.New("indexing handler needs a book index")
 
-// BookIndex is the searchable index that the Indexing API maintains. indexer.PublishedIndex
-// implements it with in-memory structures.
+// BookIndex is the searchable index that the Indexing API maintains. The service wires the
+// MongoDB datamart adapter to it; indexer.PublishedIndex is its in-memory counterpart.
 type BookIndex interface {
 	IndexBook(bookID models.BookID) error
 	Rebuild(ctx context.Context) (indexer.RebuildReport, error)
@@ -60,7 +60,7 @@ type IndexStatusResponse struct {
 	BooksIndexed int `json:"books_indexed" example:"1200"`
 	// UTC time of the last successful update or rebuild; at startup, when the empty index was published
 	LastUpdate time.Time `json:"last_update" swaggertype:"string" format:"date-time" example:"2025-10-08T14:05:00Z"`
-	// Rough estimate in MiB: live heap of the in-memory Indexing Service after the last garbage collection
+	// Rough estimate in MiB: size of the stored index data (datamart document bytes)
 	IndexSizeMB float64 `json:"index_size_MB" example:"42.7"`
 }
 
@@ -102,7 +102,8 @@ func (handler IndexingHandler) RegisterRoutes(router *http.ServeMux) {
 //	@Description
 //	@Description	**Completion and publication.** Synchronous: a 200 response means the work has fully completed and the book's
 //	@Description	metadata record and postings are in the published index, visible to every request that starts afterwards. If a
-//	@Description	rebuild is running, the book is also written into the index being rebuilt, so the rebuild cannot lose it.
+//	@Description	rebuild is running, the book is recorded and replayed on the rebuilt index right after it is published, so the
+//	@Description	rebuild cannot lose it.
 //	@Description
 //	@Description	**Idempotency and consistency.** Safe to repeat: re-indexing a book that is already indexed replaces its metadata
 //	@Description	record and adds no duplicate postings, so the index ends up exactly as after the first call. Updates of different
@@ -113,7 +114,7 @@ func (handler IndexingHandler) RegisterRoutes(router *http.ServeMux) {
 //	@Description	blocked by a running rebuild.
 //	@Description	- Client timeout, connection error or `500 internal_error`: retry the same request with exponential backoff.
 //	@Description	- `404 book_not_found`: the book is not completely ingested. Ingest it first, then retry; repeating alone will not help.
-//	@Description	- The index lives in memory: after the service restarts it is empty until POST /index/rebuild runs.
+//	@Description	- The index is stored in the MongoDB datamart, so indexed books stay searchable across service restarts.
 //	@Tags			indexing
 //	@Produce		json
 //	@Param			book_id	path		int					true	"Project Gutenberg book ID (positive integer)"	minimum(1)	example(1342)
@@ -147,8 +148,8 @@ func (handler IndexingHandler) UpdateBook(writer http.ResponseWriter, request *h
 //	@Description	- **Intended consumer:** Control Module (internal, administrative): after the service restarts, or to re-index
 //	@Description	every book after the tokenizer or the metadata parser changes
 //	@Description
-//	@Description	Builds a brand-new metadata catalog and inverted index from every complete book in the datalake, with parallel
-//	@Description	workers (`-workers`). Books still being ingested are not included. The request has no body.
+//	@Description	Builds a brand-new metadata catalog and inverted index from every complete book in the datalake, written to
+//	@Description	fresh datamart collections. Books still being ingested are not included. The request has no body.
 //	@Description
 //	@Description	**Completion and publication.** Synchronous and atomic. The new index is built aside while the previous one keeps
 //	@Description	answering, and replaces it in a single step once every book is indexed: a 200 response means the new index is
@@ -157,7 +158,7 @@ func (handler IndexingHandler) UpdateBook(writer http.ResponseWriter, request *h
 //	@Description
 //	@Description	**Idempotency and consistency.** Repeating it over the same datalake produces the same index. Only one rebuild runs
 //	@Description	at a time: another request meanwhile gets `409 rebuild_in_progress`. POST /index/update calls during a rebuild are
-//	@Description	not blocked and reach both indexes, so the published result never loses them.
+//	@Description	not blocked: they are recorded and replayed on the rebuilt index after the swap, so the published result never loses them.
 //	@Description
 //	@Description	**Timeouts and retries expected of the caller.** The duration grows with the datalake (the assignment's reference
 //	@Description	is about 35 s per 1000 books) and is capped by the service's rebuild budget (`-rebuild-timeout`, 10 minutes by
@@ -198,10 +199,9 @@ func (handler IndexingHandler) Rebuild(writer http.ResponseWriter, request *http
 //	@Description	- **Intended consumer:** Control Module (internal, operational): to follow indexing progress, detect the end of a
 //	@Description	rebuild and record memory use during benchmarks
 //	@Description
-//	@Description	**Fields.** `books_indexed` counts the books of the published metadata catalog. `last_update` is the UTC time of the
-//	@Description	last successful update or rebuild (at startup, the time the empty index was published). `index_size_MB` is a rough
-//	@Description	estimate while the index lives in memory: the live heap of the Indexing Service after the last garbage collection,
-//	@Description	which the index dominates; during a rebuild it includes both indexes.
+//	@Description	**Fields.** `books_indexed` counts the published books of the metadata datamart. `last_update` is the UTC time of the
+//	@Description	last successful update or rebuild (at startup, the time the adapter was created). `index_size_MB` is a rough
+//	@Description	estimate of the stored index data: the document bytes of the MongoDB datamart.
 //	@Description
 //	@Description	**Consistency.** Describes the published index only; a running rebuild shows up when it is published.
 //	@Description

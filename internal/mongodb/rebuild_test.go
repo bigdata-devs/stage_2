@@ -89,6 +89,33 @@ func TestRebuildIsIdempotent(t *testing.T) {
 	})
 }
 
+func TestRebuildWithNoBooksClearsTheDatamart(t *testing.T) {
+	client := liveClient(t)
+	resetDatamart(t, client)
+	indexer := NewBookIndexer(client)
+	if err := indexer.IndexBook(context.Background(), sampleInput(1, "stale", "stale")); err != nil {
+		t.Fatalf("seed book: %v", err)
+	}
+
+	result, err := indexer.Rebuild(context.Background(), []models.IndexBookInput{})
+	if err != nil {
+		t.Fatalf("rebuild of an empty datalake: %v", err)
+	}
+	if result.BooksProcessed != 0 {
+		t.Fatalf("expected 0 books processed, got %d", result.BooksProcessed)
+	}
+
+	if _, err := fetchExistingBook(client, 1); err == nil {
+		t.Fatal("expected the stale book to be gone after the empty rebuild")
+	}
+	for _, name := range []string{BooksCollection + rebuildSuffix, InvertedIndexCollection + rebuildSuffix} {
+		if count, err := countDocuments(client, name); err != nil || count != 0 {
+			t.Fatalf("expected %s to be empty after the swap, got %d documents (err: %v)", name, count, err)
+		}
+	}
+	assertBookIndexesPresent(t, client)
+}
+
 func fetchExistingBook(client Client, bookID models.BookID) (bson.M, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
