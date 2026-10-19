@@ -4,9 +4,9 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"strings"
-	"syscall"
 
 	"boogle-engine/internal/models"
 )
@@ -23,15 +23,18 @@ const (
 // writers — goroutines inside this process or a second process — never interleave
 // partial lines.
 func appendLine(path string, line string) error {
-	file, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, filePermissions)
+	file, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY, filePermissions)
 	if err != nil {
 		return fmt.Errorf("open %s: %w", path, err)
 	}
 	defer file.Close()
-	if err := lock(file, syscall.LOCK_EX); err != nil {
+	if err := lockExclusive(file); err != nil {
 		return err
 	}
 	defer unlock(file)
+	if _, err := file.Seek(0, io.SeekEnd); err != nil {
+		return fmt.Errorf("seek %s: %w", path, err)
+	}
 	if _, err := file.WriteString(line + "\n"); err != nil {
 		return fmt.Errorf("append to %s: %w", path, err)
 	}
@@ -89,7 +92,7 @@ func readLines(path string) ([]string, error) {
 		return nil, fmt.Errorf("open %s: %w", path, err)
 	}
 	defer file.Close()
-	if err := lock(file, syscall.LOCK_SH); err != nil {
+	if err := lockShared(file); err != nil {
 		return nil, err
 	}
 	defer unlock(file)
@@ -116,16 +119,4 @@ func sanitizeReason(reason string) string {
 		return "unknown"
 	}
 	return sanitized
-}
-
-func lock(file *os.File, mode int) error {
-	if err := syscall.Flock(int(file.Fd()), mode); err != nil {
-		return fmt.Errorf("lock %s: %w", file.Name(), err)
-	}
-	return nil
-}
-
-// unlock releases the flock; the deferred file.Close would release it anyway.
-func unlock(file *os.File) {
-	_ = syscall.Flock(int(file.Fd()), syscall.LOCK_UN)
 }

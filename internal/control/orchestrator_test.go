@@ -17,6 +17,10 @@ type fakeIngestion struct {
 	respond func(context.Context, models.BookID) (models.IngestionResult, error)
 }
 
+// fakeServiceLatency is the wait every successful fake answer performs, so measured step
+// durations are never zero on hosts whose clock only advances in millisecond steps.
+const fakeServiceLatency = 5 * time.Millisecond
+
 func newFakeIngestion(respond func(context.Context, models.BookID) (models.IngestionResult, error)) *fakeIngestion {
 	return &fakeIngestion{calls: map[models.BookID]int{}, respond: respond}
 }
@@ -57,11 +61,17 @@ func (fake *fakeIndexing) callCount(bookID models.BookID) int {
 	return fake.calls[bookID]
 }
 
+// downloadedAnswer answers like the real Ingestion Service, waiting fakeServiceLatency
+// so the ingestion step measures a positive duration.
 func downloadedAnswer(_ context.Context, bookID models.BookID) (models.IngestionResult, error) {
+	time.Sleep(fakeServiceLatency)
 	return models.IngestionResult{BookID: bookID, Status: models.StatusDownloaded}, nil
 }
 
+// updatedAnswer answers like the real Indexing Service, waiting fakeServiceLatency
+// so the indexing step measures a positive duration.
 func updatedAnswer(_ context.Context, bookID models.BookID) (models.IndexUpdateResult, error) {
+	time.Sleep(fakeServiceLatency)
 	return models.IndexUpdateResult{BookID: bookID, Index: "updated"}, nil
 }
 
