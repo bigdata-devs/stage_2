@@ -1,6 +1,8 @@
 // Command search is the entry point of the Boogle Engine Search Service. It serves the
-// front-end-facing GET /search endpoint and its interactive OpenAPI documentation. Until the
-// MongoDB datamart is ready, searches are answered by api.StubEngine's sample catalog.
+// front-end-facing GET /search endpoint, the optional catalog endpoints GET /books/{book_id}
+// and GET /search/filters (both read from the MongoDB datamart), and the interactive OpenAPI
+// documentation. GET /search itself is answered by api.StubEngine's sample catalog until the
+// datamart search bridge lands.
 //
 // Usage:
 //
@@ -9,6 +11,9 @@
 //
 // Then open http://localhost:7003/swagger/index.html or call
 // http://localhost:7003/search?q=adventure&language=en
+//
+// The service refuses to start when the datamart is unreachable (fail-fast); MONGO_URI and
+// MONGO_DATABASE select the cluster and database, as in the other services.
 //
 // After changing any swag annotation, regenerate the specification in api/search with:
 //
@@ -21,6 +26,7 @@ import (
 	"context"
 	"errors"
 	"flag"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -32,6 +38,7 @@ import (
 
 	_ "boogle-engine/api/search"
 	"boogle-engine/internal/api"
+	"boogle-engine/internal/mongodb"
 )
 
 const (
@@ -62,19 +69,55 @@ func main() {
 	}
 }
 
-// run wires the service together and serves requests until Ctrl+C or SIGTERM.
+// run wires the service together and serves requests until Ctrl+C or SIGTERM. The datamart
+// connection is opened first and fails fast, because the catalog endpoints cannot serve without
+// it; the search engine is still the offline stub until the datamart search bridge lands.
 func run(arguments []string) error {
 	address, err := parseAddress(arguments)
 	if err != nil {
 		return err
 	}
+	client, err := connectDatamart()
+	if err != nil {
+		return err
+	}
+	defer closeDatamart(client)
 	searchHandler, err := api.NewSearchHandler(api.NewStubEngine())
+	if err != nil {
+		return err
+	}
+	catalogHandler, err := buildCatalogHandler(client)
 	if err != nil {
 		return err
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-	return serve(ctx, newServer(address, newRouter(searchHandler)))
+	return serve(ctx, newServer(address, newRouter(searchHandler, catalogHandler)))
+}
+
+// connectDatamart opens the MongoDB pool described by MONGO_URI and MONGO_DATABASE and creates
+// the query indexes once; both are idempotent, so every start-up may call them.
+func connectDatamart() (mongodb.Client, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), mongodb.DefaultConnectTimeout)
+	defer cancel()
+	client, err := mongodb.Connect(ctx, mongodb.ConfigFromEnvironment(), mongodb.DefaultConnectTimeout)
+	if err != nil {
+		return mongodb.Client{}, err
+	}
+	if err := client.EnsureIndexes(ctx); err != nil {
+		if closeErr := client.Close(context.Background()); closeErr != nil {
+			slog.Error("close datamart after failed index setup", "error", closeErr)
+		}
+		return mongodb.Client{}, fmt.Errorf("ensure datamart indexes: %w", err)
+	}
+	return client, nil
+}
+
+// closeDatamart releases the MongoDB pool when the service shuts down.
+func closeDatamart(client mongodb.Client) {
+	if err := client.Close(context.Background()); err != nil {
+		slog.Error("close datamart", "error", err)
+	}
 }
 
 func parseAddress(arguments []string) (string, error) {
@@ -88,9 +131,10 @@ func parseAddress(arguments []string) (string, error) {
 
 // newRouter maps every route of the service using the Go 1.22 "METHOD /path" patterns, so
 // other methods on /search are answered with 405 Method Not Allowed.
-func newRouter(searchHandler api.SearchHandler) *http.ServeMux {
+func newRouter(searchHandler api.SearchHandler, catalogHandler api.CatalogHandler) *http.ServeMux {
 	router := http.NewServeMux()
 	router.HandleFunc("GET /search", searchHandler.Search)
+	catalogHandler.RegisterRoutes(router)
 	router.Handle("GET /swagger/", httpSwagger.Handler(httpSwagger.URL("/swagger/doc.json")))
 	return router
 }

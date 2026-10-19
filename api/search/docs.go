@@ -15,6 +15,62 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
+        "/books/{book_id}": {
+            "get": {
+                "description": "- **Provider:** Search Service\n- **Intended consumer:** Front-end, to render the details of a book chosen from a search result.\n- **Position in the workflow:** optional detail view after GET /search; it is one of the\nvariants of the front-end contract, not a separate route family.\n\nReturns the metadata of a published book. A book that does not exist, or that is indexed\nbut still awaiting publication, is not visible and answers 404. The request has no body.\n\n**Completion and publication.** Synchronous: the response always reflects the published\nstate of the datamart at the moment it is served.\n\n**Idempotency and retries.** Read-only; repeating the request is always safe. A client\ntimeout of about 5 s is enough. Retry on timeouts and connection errors; a 404 does not\nbecome 200 until the book is ingested and indexed.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "search"
+                ],
+                "summary": "Get one book by ID",
+                "parameters": [
+                    {
+                        "minimum": 1,
+                        "type": "integer",
+                        "example": 1342,
+                        "description": "Project Gutenberg book ID (positive integer)",
+                        "name": "book_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The metadata of the published book",
+                        "schema": {
+                            "$ref": "#/definitions/api.BookResult"
+                        }
+                    },
+                    "400": {
+                        "description": "invalid_book_id: book_id is not a positive integer",
+                        "schema": {
+                            "$ref": "#/definitions/api.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "book_not_found: no published book with that ID",
+                        "schema": {
+                            "$ref": "#/definitions/api.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "internal_error: the datamart could not be read",
+                        "schema": {
+                            "$ref": "#/definitions/api.ErrorResponse"
+                        }
+                    }
+                },
+                "x-audience": "front-end",
+                "x-completion": "synchronous",
+                "x-consumers": [
+                    "Front-end"
+                ],
+                "x-idempotent": true,
+                "x-provider": "Search Service"
+            }
+        },
         "/search": {
             "get": {
                 "description": "Returns one page of the books that contain the keyword ` + "`" + `q` + "`" + `, optionally narrowed by author,\nlanguage and original publication year. Filters can be combined and are joined with AND.\nEmpty filter values (for example ` + "`" + `author=` + "`" + `) are treated as absent.\nOnly the filters that were applied are echoed in ` + "`" + `filters` + "`" + `; the object is ` + "`" + `{}` + "`" + ` when none were sent.\nResults are ordered by relevance, most relevant first, with ties broken by ascending ` + "`" + `book_id` + "`" + `.\n` + "`" + `total` + "`" + ` counts every match, while ` + "`" + `results` + "`" + ` holds at most ` + "`" + `limit` + "`" + ` books starting at ` + "`" + `offset` + "`" + `.\nA valid query without matches, or an ` + "`" + `offset` + "`" + ` past the last match, returns 200 with ` + "`" + `results: []` + "`" + `.",
@@ -104,6 +160,39 @@ const docTemplate = `{
                 "x-idempotent": true,
                 "x-provider": "Search Service"
             }
+        },
+        "/search/filters": {
+            "get": {
+                "description": "- **Provider:** Search Service\n- **Intended consumer:** Front-end, to populate the language and year choices of its search form.\n\nReturns the distinct ISO 639 language codes (a book written in several languages contributes\nevery one of its codes) and the distinct original publication years of the published books,\nboth sorted ascending. Books without a known language or year do not contribute a value, so\nevery returned value can be sent back to GET /search and actually match results. The request\nhas no body; the slices are empty arrays, never null, when no books are published.\n\n**Completion and publication.** Synchronous and read-only; it reflects the published state\nof the datamart when it is served.\n\n**Idempotency and retries.** Safe to repeat; retry on timeouts and connection errors.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "search"
+                ],
+                "summary": "List the available search filters",
+                "responses": {
+                    "200": {
+                        "description": "Distinct filter values of the published books",
+                        "schema": {
+                            "$ref": "#/definitions/api.FilterValuesResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "internal_error: the datamart could not be read",
+                        "schema": {
+                            "$ref": "#/definitions/api.ErrorResponse"
+                        }
+                    }
+                },
+                "x-audience": "front-end",
+                "x-completion": "synchronous",
+                "x-consumers": [
+                    "Front-end"
+                ],
+                "x-idempotent": true,
+                "x-provider": "Search Service"
+            }
         }
     },
     "definitions": {
@@ -144,6 +233,35 @@ const docTemplate = `{
                 "message": {
                     "type": "string",
                     "example": "query parameter \"limit\" must be an integer between 1 and 100"
+                }
+            }
+        },
+        "api.FilterValuesResponse": {
+            "type": "object",
+            "properties": {
+                "languages": {
+                    "description": "ISO 639 language codes of the published books, sorted ascending; never null",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "example": [
+                        "en",
+                        "es",
+                        "fr"
+                    ]
+                },
+                "years": {
+                    "description": "Original publication years of the published books, sorted ascending; never null",
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    },
+                    "example": [
+                        1719,
+                        1813,
+                        1851
+                    ]
                 }
             }
         },
