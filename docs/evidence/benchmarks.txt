@@ -1,0 +1,46 @@
+goos: windows
+goarch: amd64
+pkg: boogle-engine/internal/mongodb
+cpu: Intel(R) Core(TM) i7-14700HX
+BenchmarkPostingsForTerms-28             	    2787	    431481 ns/op	   55941 B/op	    1973 allocs/op
+BenchmarkPostingsForTerms-28             	    2372	    491148 ns/op	   55957 B/op	    1973 allocs/op
+BenchmarkPostingsForTerms-28             	    2714	    445801 ns/op	   55944 B/op	    1973 allocs/op
+BenchmarkPostingsForTerms-28             	    2800	    440524 ns/op	   55932 B/op	    1973 allocs/op
+BenchmarkPostingsForTerms-28             	    2908	    419844 ns/op	   55935 B/op	    1973 allocs/op
+BenchmarkPostingsForTerms-28             	    2300	    442109 ns/op	   55946 B/op	    1973 allocs/op
+BenchmarkPostingsForTerms-28             	    2592	    466376 ns/op	   55930 B/op	    1973 allocs/op
+BenchmarkPostingsForTerms-28             	    2751	    431691 ns/op	   55939 B/op	    1973 allocs/op
+BenchmarkPostingsForTerms-28             	    2379	    446072 ns/op	   55937 B/op	    1973 allocs/op
+BenchmarkPostingsForTerms-28             	    2718	    446659 ns/op	   55948 B/op	    1973 allocs/op
+BenchmarkSearchBooksWithoutFilters-28    	     154	   7699697 ns/op	   30954 B/op	     729 allocs/op
+BenchmarkSearchBooksWithoutFilters-28    	     153	   7774259 ns/op	   30859 B/op	     728 allocs/op
+BenchmarkSearchBooksWithoutFilters-28    	     154	   7736707 ns/op	   30890 B/op	     728 allocs/op
+BenchmarkSearchBooksWithoutFilters-28    	     154	   7720998 ns/op	   30856 B/op	     728 allocs/op
+BenchmarkSearchBooksWithoutFilters-28    	     153	   7730280 ns/op	   30868 B/op	     728 allocs/op
+BenchmarkSearchBooksWithoutFilters-28    	     153	   7729885 ns/op	   30856 B/op	     728 allocs/op
+BenchmarkSearchBooksWithoutFilters-28    	     156	   7701818 ns/op	   30856 B/op	     728 allocs/op
+BenchmarkSearchBooksWithoutFilters-28    	     153	   7738637 ns/op	   30883 B/op	     728 allocs/op
+BenchmarkSearchBooksWithoutFilters-28    	     156	   7651004 ns/op	   30874 B/op	     728 allocs/op
+BenchmarkSearchBooksWithoutFilters-28    	     151	   7797209 ns/op	   30903 B/op	     728 allocs/op
+BenchmarkSearchBooksWithAllFilters-28    	      84	  12642319 ns/op	   31562 B/op	     633 allocs/op
+BenchmarkSearchBooksWithAllFilters-28    	      91	  12571540 ns/op	   31547 B/op	     633 allocs/op
+BenchmarkSearchBooksWithAllFilters-28    	      94	  12515017 ns/op	   31572 B/op	     633 allocs/op
+BenchmarkSearchBooksWithAllFilters-28    	      96	  12765112 ns/op	   31587 B/op	     633 allocs/op
+BenchmarkSearchBooksWithAllFilters-28    	      96	  12516996 ns/op	   31703 B/op	     633 allocs/op
+BenchmarkSearchBooksWithAllFilters-28    	      93	  12413524 ns/op	   31727 B/op	     633 allocs/op
+BenchmarkSearchBooksWithAllFilters-28    	      92	  12557553 ns/op	   31580 B/op	     633 allocs/op
+BenchmarkSearchBooksWithAllFilters-28    	      94	  12500668 ns/op	   31701 B/op	     633 allocs/op
+BenchmarkSearchBooksWithAllFilters-28    	      94	  12621776 ns/op	   31557 B/op	     633 allocs/op
+BenchmarkSearchBooksWithAllFilters-28    	      94	  12512543 ns/op	   31555 B/op	     633 allocs/op
+BenchmarkIndexBook-28                    	     643	   1873437 ns/op	   36456 B/op	     480 allocs/op
+BenchmarkIndexBook-28                    	     642	   1866339 ns/op	   36450 B/op	     480 allocs/op
+BenchmarkIndexBook-28                    	     637	   1877561 ns/op	   36466 B/op	     480 allocs/op
+BenchmarkIndexBook-28                    	     642	   1855672 ns/op	   36461 B/op	     480 allocs/op
+BenchmarkIndexBook-28                    	     626	   1911375 ns/op	   36482 B/op	     480 allocs/op
+BenchmarkIndexBook-28                    	     642	   2074427 ns/op	   36460 B/op	     480 allocs/op
+BenchmarkIndexBook-28                    	     638	   1987453 ns/op	   36464 B/op	     480 allocs/op
+BenchmarkIndexBook-28                    	     644	   1866702 ns/op	   36473 B/op	     480 allocs/op
+BenchmarkIndexBook-28                    	     644	   1851187 ns/op	   36451 B/op	     480 allocs/op
+BenchmarkIndexBook-28                    	     579	   2114666 ns/op	   36437 B/op	     480 allocs/op
+PASS
+ok  	boogle-engine/internal/mongodb	72.029s

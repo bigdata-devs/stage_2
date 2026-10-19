@@ -1,0 +1,215 @@
+basePath: /
+definitions:
+  api.ErrorResponse:
+    properties:
+      error:
+        example: invalid_parameter
+        type: string
+      message:
+        example: query parameter "limit" must be an integer between 1 and 100
+        type: string
+    type: object
+  api.IndexStatusResponse:
+    properties:
+      books_indexed:
+        description: Books in the published metadata catalog
+        example: 1200
+        type: integer
+      index_size_MB:
+        description: 'Rough estimate in MiB: size of the stored index data (datamart
+          document bytes)'
+        example: 42.7
+        type: number
+      last_update:
+        description: UTC time of the last successful update or rebuild; at startup,
+          when the empty index was published
+        example: "2025-10-08T14:05:00Z"
+        format: date-time
+        type: string
+    type: object
+  api.IndexUpdateResponse:
+    properties:
+      book_id:
+        example: 1342
+        type: integer
+      index:
+        enum:
+        - updated
+        example: updated
+        type: string
+    type: object
+  api.RebuildResponse:
+    properties:
+      books_processed:
+        description: Books of the datalake that the published index was rebuilt from
+        example: 1000
+        type: integer
+      elapsed_time:
+        description: Duration of the rebuild in Go duration syntax (time.ParseDuration),
+          rounded to milliseconds
+        example: 35.2s
+        type: string
+    type: object
+info:
+  contact: {}
+  description: |-
+    Internal API of the Boogle Engine Indexing Service. Provider: Indexing Service.
+    Intended consumer: the Control Module, which orchestrates ingestion, indexing and publication.
+    It is not part of the front-end contract.
+  title: Boogle Engine Indexing API
+  version: 1.0.0
+paths:
+  /index/rebuild:
+    post:
+      description: |-
+        - **Provider:** Indexing Service
+        - **Intended consumer:** Control Module (internal, administrative): after the service restarts, or to re-index
+        every book after the tokenizer or the metadata parser changes
+
+        Builds a brand-new metadata catalog and inverted index from every complete book in the datalake, written to
+        fresh datamart collections. Books still being ingested are not included. The request has no body.
+
+        **Completion and publication.** Synchronous and atomic. The new index is built aside while the previous one keeps
+        answering, and replaces it in a single step once every book is indexed: a 200 response means the new index is
+        published. If the rebuild fails or is interrupted, it is discarded and the previous index stays published
+        unchanged; a half-built index is never visible.
+
+        **Idempotency and consistency.** Repeating it over the same datalake produces the same index. Only one rebuild runs
+        at a time: another request meanwhile gets `409 rebuild_in_progress`. POST /index/update calls during a rebuild are
+        not blocked: they are recorded and replayed on the rebuilt index after the swap, so the published result never loses them.
+
+        **Timeouts and retries expected of the caller.** The duration grows with the datalake (the assignment's reference
+        is about 35 s per 1000 books) and is capped by the service's rebuild budget (`-rebuild-timeout`, 10 minutes by
+        default). Keep the connection open with a client timeout above that budget: disconnecting abandons the rebuild.
+        - `409 rebuild_in_progress`: do not start another one; wait and poll GET /index/status until `last_update` changes.
+        - `503 rebuild_interrupted` and `500 internal_error`: the previous index is still published; retry later with backoff.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: The rebuilt index is published
+          schema:
+            $ref: '#/definitions/api.RebuildResponse'
+        "409":
+          description: 'rebuild_in_progress: another rebuild is running'
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "500":
+          description: 'internal_error: the datalake could not be listed or a book
+            could not be indexed'
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "503":
+          description: 'rebuild_interrupted: the rebuild budget ran out or the caller
+            disconnected'
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+      summary: Rebuild the whole index from the datalake
+      tags:
+      - indexing
+      x-audience: internal
+      x-completion: synchronous
+      x-consumers:
+      - Control Module
+      x-idempotent: true
+      x-provider: Indexing Service
+  /index/status:
+    get:
+      description: |-
+        - **Provider:** Indexing Service
+        - **Intended consumer:** Control Module (internal, operational): to follow indexing progress, detect the end of a
+        rebuild and record memory use during benchmarks
+
+        **Fields.** `books_indexed` counts the published books of the metadata datamart. `last_update` is the UTC time of the
+        last successful update or rebuild (at startup, the time the adapter was created). `index_size_MB` is a rough
+        estimate of the stored index data: the document bytes of the MongoDB datamart.
+
+        **Consistency.** Describes the published index only; a running rebuild shows up when it is published.
+
+        **Idempotency, timeouts and retries.** Read-only, cheap and safe to poll at any time; a client timeout of about
+        5 s is enough. Retry on timeouts and connection errors.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Statistics of the published index
+          schema:
+            $ref: '#/definitions/api.IndexStatusResponse'
+      summary: Report indexing statistics
+      tags:
+      - indexing
+      x-audience: internal
+      x-completion: synchronous
+      x-consumers:
+      - Control Module
+      x-idempotent: true
+      x-provider: Indexing Service
+  /index/update/{book_id}:
+    post:
+      description: |-
+        - **Provider:** Indexing Service
+        - **Intended consumer:** Control Module (internal API, not exposed to the front-end)
+        - **Position in the workflow:** second step of a book's lifecycle. Call it once POST /ingest/{book_id} has returned
+        200 (or GET /ingest/status/{book_id} answers `available`); the datalake only exposes completely written books.
+
+        Reads the book from the datalake, extracts its metadata (title, author, language, publication and release years)
+        and adds its body terms to the inverted index. The request has no body.
+
+        **Completion and publication.** Synchronous: a 200 response means the work has fully completed and the book's
+        metadata record and postings are in the published index, visible to every request that starts afterwards. If a
+        rebuild is running, the book is recorded and replayed on the rebuilt index right after it is published, so the
+        rebuild cannot lose it.
+
+        **Idempotency and consistency.** Safe to repeat: re-indexing a book that is already indexed replaces its metadata
+        record and adds no duplicate postings, so the index ends up exactly as after the first call. Updates of different
+        books run in parallel; concurrent updates of the same book are harmless.
+
+        **Timeouts and retries expected of the caller.** One update reads one book from local disk and usually takes
+        milliseconds (about a second for the largest books); a client timeout of 30 s is ample and an update is never
+        blocked by a running rebuild.
+        - Client timeout, connection error or `500 internal_error`: retry the same request with exponential backoff.
+        - `404 book_not_found`: the book is not completely ingested. Ingest it first, then retry; repeating alone will not help.
+        - The index is stored in the MongoDB datamart, so indexed books stay searchable across service restarts.
+      parameters:
+      - description: Project Gutenberg book ID (positive integer)
+        example: 1342
+        in: path
+        minimum: 1
+        name: book_id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: The book is in the published index
+          schema:
+            $ref: '#/definitions/api.IndexUpdateResponse'
+        "400":
+          description: 'invalid_book_id: book_id is not a positive integer'
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "404":
+          description: 'book_not_found: the datalake holds no complete copy of the
+            book'
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "500":
+          description: 'internal_error: the book could not be read or indexed'
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+      summary: Index one book
+      tags:
+      - indexing
+      x-audience: internal
+      x-completion: synchronous
+      x-consumers:
+      - Control Module
+      x-idempotent: true
+      x-provider: Indexing Service
+schemes:
+- http
+swagger: "2.0"
+tags:
+- description: 'Internal API. Provider: Indexing Service. Consumer: Control Module.'
+  name: indexing

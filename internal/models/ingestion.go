@@ -22,3 +22,10 @@ type IngestionResult struct {
 	Path   string          `json:"path,omitempty"`
 	Err    error           `json:"-"`
 }
+
+// IngestionList reports every complete book of the datalake, as GET /ingest/list answers it.
+// Books holds no nil slice: an empty datalake serializes as [].
+type IngestionList struct {
+	Count int      `json:"count"`
+	Books []BookID `json:"books"`
+}
