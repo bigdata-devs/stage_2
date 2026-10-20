@@ -1,0 +1,112 @@
+# Local deployment of the whole Boogle Engine: MongoDB plus the three services
+# (long-running) and the Control Module (on demand, behind the "tools" profile).
+# Containers carry code only; every dataset lives in a named volume, so a
+# recreated container never loses the datalake, the control state or the datamart.
+name: boogle-engine
+
+services:
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    ports:
+      - "${MONGO_PORT:-27017}:27017"
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 5s
+      timeout: 5s
+      retries: 24
+      start_period: 15s
+
+  ingestion:
+    build:
+      context: .
+      args:
+        SERVICE: ingestion
+    image: boogle-engine/ingestion:latest
+    restart: unless-stopped
+    ports:
+      - "${INGESTION_PORT:-7001}:7001"
+    command: ["-port", "7001", "-datalake", "/data/datalake"]
+    volumes:
+      - datalake:/data/datalake
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:7001/ingest/list"]
+      interval: 5s
+      timeout: 5s
+      retries: 24
+      start_period: 10s
+
+  indexing:
+    build:
+      context: .
+      args:
+        SERVICE: indexing
+    image: boogle-engine/indexing:latest
+    restart: unless-stopped
+    ports:
+      - "${INDEXING_PORT:-7002}:7002"
+    command: ["-addr", ":7002", "-datalake", "/data/datalake"]
+    environment:
+      MONGO_URI: "mongodb://mongo:27017"
+      MONGO_DATABASE: "boogle"
+    volumes:
+      - datalake:/data/datalake
+    depends_on:
+      mongo:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:7002/index/status"]
+      interval: 5s
+      timeout: 5s
+      retries: 24
+      start_period: 10s
+
+  search:
+    build:
+      context: .
+      args:
+        SERVICE: search
+    image: boogle-engine/search:latest
+    restart: unless-stopped
+    ports:
+      - "${SEARCH_PORT:-7003}:7003"
+    command: ["-addr", ":7003"]
+    environment:
+      MONGO_URI: "mongodb://mongo:27017"
+      MONGO_DATABASE: "boogle"
+    depends_on:
+      mongo:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:7003/search/filters"]
+      interval: 5s
+      timeout: 5s
+      retries: 24
+      start_period: 10s
+
+  control:
+    build:
+      context: .
+      args:
+        SERVICE: control
+    image: boogle-engine/control:latest
+    profiles: ["tools"]
+    command: ["-discover"]
+    environment:
+      INGESTION_URL: "http://ingestion:7001"
+      INDEXING_URL: "http://indexing:7002"
+      CONTROL_STATE_DIR: "/data/control"
+    volumes:
+      - control-state:/data/control
+    depends_on:
+      ingestion:
+        condition: service_healthy
+      indexing:
+        condition: service_healthy
+
+volumes:
+  datalake:
+  control-state:
+  mongo-data:

@@ -1,0 +1,299 @@
+== building images and starting the stack ==
+time="2026-10-20T18:11:33+01:00" level=warning msg="Docker Compose is configured to build using Bake, but buildx isn't installed"
+#0 building with "default" instance using docker driver
+
+#1 [search internal] load build definition from Dockerfile
+#1 transferring dockerfile: 698B 0.1s done
+#1 DONE 0.1s
+
+#2 [ingestion internal] load build definition from Dockerfile
+#2 transferring dockerfile: 698B 0.0s done
+#2 DONE 0.1s
+
+#3 [indexing internal] load build definition from Dockerfile
+#3 transferring dockerfile: 698B 0.0s done
+#3 DONE 0.1s
+
+#4 [indexing] resolve image config for docker-image://docker.io/docker/dockerfile:1
+#4 DONE 1.0s
+
+#5 [indexing] docker-image://docker.io/docker/dockerfile:1@sha256:4edf897a3ffa55b89f906fc8cc78afdb3f1834cc9c7083565e611a8a7d5fe99e
+#5 resolve docker.io/docker/dockerfile:1@sha256:4edf897a3ffa55b89f906fc8cc78afdb3f1834cc9c7083565e611a8a7d5fe99e 0.1s done
+#5 resolve docker.io/docker/dockerfile:1@sha256:4edf897a3ffa55b89f906fc8cc78afdb3f1834cc9c7083565e611a8a7d5fe99e 0.1s done
+#5 CACHED
+
+#6 [ingestion internal] load metadata for docker.io/library/golang:1.25-alpine
+#6 DONE 0.8s
+
+#7 [ingestion internal] load metadata for docker.io/library/alpine:3.21
+#7 DONE 0.8s
+
+#8 [indexing internal] load .dockerignore
+#8 transferring context: 0.1s
+#8 transferring context: 2B 0.1s done
+#8 DONE 0.1s
+
+#9 [ingestion internal] load .dockerignore
+#9 transferring context: 2B 0.1s done
+#9 DONE 0.1s
+
+#10 [search internal] load .dockerignore
+#10 transferring context: 2B 0.1s done
+#10 DONE 0.2s
+
+#11 [ingestion builder 1/6] FROM docker.io/library/golang:1.25-alpine@sha256:1ae0735f00daffa3aaf1363a5184c0d2dc55c78e3db4ec70241cdac97bf84b59
+#11 resolve docker.io/library/golang:1.25-alpine@sha256:1ae0735f00daffa3aaf1363a5184c0d2dc55c78e3db4ec70241cdac97bf84b59 0.1s done
+#11 DONE 0.1s
+
+#12 [indexing stage-1 1/3] FROM docker.io/library/alpine:3.21@sha256:ce64758a109eb420d874a118f87920e625e12d3634e03b4a5573fd9f6e5d3507
+#12 resolve docker.io/library/alpine:3.21@sha256:ce64758a109eb420d874a118f87920e625e12d3634e03b4a5573fd9f6e5d3507 0.1s done
+#12 DONE 0.1s
+
+#13 [search internal] load build context
+#13 transferring context: 30.39kB 1.2s done
+#13 DONE 1.2s
+
+#14 [indexing internal] load build context
+#14 transferring context: 30.39kB 1.2s done
+#14 DONE 1.2s
+
+#15 [search builder 3/6] COPY go.mod go.sum ./
+#15 CACHED
+
+#16 [search builder 4/6] RUN go mod download
+#16 CACHED
+
+#17 [indexing builder 3/6] COPY go.mod go.sum ./
+#17 CACHED
+
+#18 [indexing builder 2/6] WORKDIR /src
+#18 CACHED
+
+#19 [indexing builder 4/6] RUN go mod download
+#19 CACHED
+
+#20 [indexing builder 5/6] COPY . .
+#20 DONE 0.2s
+
+#21 [search builder 5/6] COPY . .
+#21 DONE 0.2s
+
+#22 [indexing builder 6/6] RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/boogle ./cmd/indexing
+#22 ...
+
+#23 [ingestion internal] load build context
+#23 transferring context: 31.05kB 3.5s done
+#23 DONE 3.5s
+
+#18 [ingestion builder 2/6] WORKDIR /src
+#18 CACHED
+
+#24 [ingestion builder 3/6] COPY go.mod go.sum ./
+#24 CACHED
+
+#25 [ingestion builder 4/6] RUN go mod download
+#25 CACHED
+
+#26 [ingestion builder 5/6] COPY . .
+#26 DONE 0.2s
+
+#27 [search builder 6/6] RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/boogle ./cmd/search
+#27 ...
+
+#28 [ingestion builder 6/6] RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/boogle ./cmd/ingestion
+#28 DONE 30.4s
+
+#27 [search builder 6/6] RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/boogle ./cmd/search
+#27 ...
+
+#29 [ingestion stage-1 2/3] RUN apk add --no-cache ca-certificates     && adduser -D -H -u 10001 boogle     && mkdir -p /data/datalake /data/control     && chown -R boogle:boogle /data
+#29 CACHED
+
+#30 [ingestion stage-1 3/3] COPY --from=builder /out/boogle /usr/local/bin/boogle
+#30 CACHED
+
+#31 [ingestion] exporting to image
+#31 exporting layers done
+#31 exporting manifest sha256:c6811dbbb5cc6c3244f231d9fb2c680746caa33ae641b77b49bc9903880e89c4 done
+#31 exporting config sha256:2a8d7371728402fcdb5069c5577ed766ae59192f71895e308310aea7f0522618 done
+#31 exporting attestation manifest sha256:9f4d1bba5ba8f9f851ec9b4b0e8b08fa6fa0a9c41b25f82663521bef9ae6f2a6
+#31 exporting attestation manifest sha256:9f4d1bba5ba8f9f851ec9b4b0e8b08fa6fa0a9c41b25f82663521bef9ae6f2a6 0.1s done
+#31 exporting manifest list sha256:4e3bea8fe3c17623ca85bbbef90b0b1e9609b9292e14d6296ad67ab48eb261a2 0.0s done
+#31 naming to docker.io/boogle-engine/ingestion:latest done
+#31 unpacking to docker.io/boogle-engine/ingestion:latest 0.0s done
+#31 DONE 0.2s
+
+#27 [search builder 6/6] RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/boogle ./cmd/search
+#27 ...
+
+#32 [ingestion] resolving provenance for metadata file
+#32 DONE 0.0s
+
+#27 [search builder 6/6] RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/boogle ./cmd/search
+#27 ...
+
+#22 [indexing builder 6/6] RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/boogle ./cmd/indexing
+#22 DONE 37.9s
+
+#29 [indexing stage-1 2/3] RUN apk add --no-cache ca-certificates     && adduser -D -H -u 10001 boogle     && mkdir -p /data/datalake /data/control     && chown -R boogle:boogle /data
+#29 CACHED
+
+#33 [indexing stage-1 3/3] COPY --from=builder /out/boogle /usr/local/bin/boogle
+#33 CACHED
+
+#27 [search builder 6/6] RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/boogle ./cmd/search
+#27 ...
+
+#34 [indexing] exporting to image
+#34 exporting layers done
+#34 exporting manifest sha256:a31097964181b558cb0ffee364a5af521859d720ba8b6d4e7bae020f55eb038b done
+#34 exporting config sha256:a4ac115507e9531b918e5e171885bfcc5d587c1d2c9874780cdd4a1db8af04d6 done
+#34 exporting attestation manifest sha256:364ba409753afa944caaa5077920cdce91a288f142c373824121ccfa852a0a6b 0.0s done
+#34 exporting manifest list sha256:6d57b2872f6f082fdcdf9c945f1ac63d5660b0b362bd7a5de9f2dcb1ee56a0b2 0.0s done
+#34 naming to docker.io/boogle-engine/indexing:latest
+#34 naming to docker.io/boogle-engine/indexing:latest done
+#34 unpacking to docker.io/boogle-engine/indexing:latest 0.0s done
+#34 DONE 0.1s
+
+#27 [search builder 6/6] RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/boogle ./cmd/search
+#27 DONE 38.3s
+
+#35 [indexing] resolving provenance for metadata file
+#35 DONE 0.0s
+
+#29 [search stage-1 2/3] RUN apk add --no-cache ca-certificates     && adduser -D -H -u 10001 boogle     && mkdir -p /data/datalake /data/control     && chown -R boogle:boogle /data
+#29 CACHED
+
+#36 [search stage-1 3/3] COPY --from=builder /out/boogle /usr/local/bin/boogle
+#36 CACHED
+
+#37 [search] exporting to image
+#37 exporting layers done
+#37 exporting manifest sha256:30e3a307a5dc69ea54ca05962adca33bfdfacb6bd64a00152928638c26ba9315 done
+#37 exporting config sha256:d489759ae4d6ef5b3c38ed9d2ca4c71ac299203e770158cd0da68e08bbcbe628 done
+#37 exporting attestation manifest sha256:2897eae2a92b878d63d5139a795abef9973003d36ce58fd1562d612a243eb710 0.0s done
+#37 exporting manifest list sha256:c572dca3214797c63c1be6f98f8aced10281a8ffd101ac2cfeae76fac0a12ad1 0.0s done
+#37 naming to docker.io/boogle-engine/search:latest
+#37 naming to docker.io/boogle-engine/search:latest done
+#37 unpacking to docker.io/boogle-engine/search:latest done
+#37 DONE 0.1s
+
+#38 [search] resolving provenance for metadata file
+#38 DONE 0.0s
+ indexing  Built
+ ingestion  Built
+ search  Built
+ Network boogle-engine_default  Creating
+ Network boogle-engine_default  Created
+ Volume boogle-engine_mongo-data  Creating
+ Volume boogle-engine_mongo-data  Created
+ Volume boogle-engine_datalake  Creating
+ Volume boogle-engine_datalake  Created
+ Container boogle-engine-ingestion-1  Creating
+ Container boogle-engine-mongo-1  Creating
+ Container boogle-engine-ingestion-1  Created
+ Container boogle-engine-mongo-1  Created
+ Container boogle-engine-search-1  Creating
+ Container boogle-engine-indexing-1  Creating
+ Container boogle-engine-indexing-1  Created
+ Container boogle-engine-search-1  Created
+ Container boogle-engine-ingestion-1  Starting
+ Container boogle-engine-mongo-1  Starting
+ Container boogle-engine-ingestion-1  Started
+ Container boogle-engine-mongo-1  Started
+ Container boogle-engine-mongo-1  Waiting
+ Container boogle-engine-mongo-1  Waiting
+ Container boogle-engine-mongo-1  Healthy
+ Container boogle-engine-search-1  Starting
+ Container boogle-engine-mongo-1  Healthy
+ Container boogle-engine-indexing-1  Starting
+ Container boogle-engine-indexing-1  Started
+ Container boogle-engine-search-1  Started
+NAME                        IMAGE                            COMMAND                  SERVICE     CREATED          STATUS                            PORTS
+boogle-engine-indexing-1    boogle-engine/indexing:latest    "/usr/local/bin/boog…"   indexing    10 seconds ago   Up 3 seconds (health: starting)   0.0.0.0:7002->7002/tcp, [::]:7002->7002/tcp
+boogle-engine-ingestion-1   boogle-engine/ingestion:latest   "/usr/local/bin/boog…"   ingestion   11 seconds ago   Up 10 seconds (healthy)           0.0.0.0:7001->7001/tcp, [::]:7001->7001/tcp
+boogle-engine-mongo-1       mongo:7                          "docker-entrypoint.s…"   mongo       11 seconds ago   Up 10 seconds (healthy)           0.0.0.0:27017->27017/tcp, [::]:27017->27017/tcp
+boogle-engine-search-1      boogle-engine/search:latest      "/usr/local/bin/boog…"   search      10 seconds ago   Up 3 seconds (health: starting)   0.0.0.0:7003->7003/tcp, [::]:7003->7003/tcp
+PASS: mongo, ingestion, indexing and search are up and healthy
+== orchestration of two real books from inside the compose network ==
+PASS: books 1342 and 84 ingested, indexed and published (datalake=2, datamart=2)
+== replayed run skips finished books ==
+PASS: replayed run skips both books (idempotent, no duplicates)
+== front-facing search answers from the datamart ==
+PASS: search API answers /search, /search/filters, /books/1342 and swagger
+== failure recovery: the ingestion container dies ==
+ Container boogle-engine-ingestion-1  Stopping
+ Container boogle-engine-ingestion-1  Stopped
+PASS: control refuses to claim books while ingestion is down (fail fast)
+ Container boogle-engine-ingestion-1  Starting
+ Container boogle-engine-ingestion-1  Started
+PASS: ingestion relaunched, book 5 indexed: the pipeline survived the outage
+== named volumes survive container recreation ==
+ Container boogle-engine-search-1  Stopping
+ Container boogle-engine-ingestion-1  Stopping
+ Container boogle-engine-indexing-1  Stopping
+ Container boogle-engine-ingestion-1  Stopped
+ Container boogle-engine-ingestion-1  Removing
+ Container boogle-engine-ingestion-1  Removed
+ Container boogle-engine-search-1  Stopped
+ Container boogle-engine-search-1  Removing
+ Container boogle-engine-search-1  Removed
+ Container boogle-engine-indexing-1  Stopped
+ Container boogle-engine-indexing-1  Removing
+ Container boogle-engine-indexing-1  Removed
+ Container boogle-engine-mongo-1  Stopping
+ Container boogle-engine-mongo-1  Stopped
+ Container boogle-engine-mongo-1  Removing
+ Container boogle-engine-mongo-1  Removed
+ Network boogle-engine_default  Removing
+ Network boogle-engine_default  Removed
+ Network boogle-engine_default  Creating
+ Network boogle-engine_default  Created
+ Container boogle-engine-ingestion-1  Creating
+ Container boogle-engine-mongo-1  Creating
+ Container boogle-engine-ingestion-1  Created
+ Container boogle-engine-mongo-1  Created
+ Container boogle-engine-indexing-1  Creating
+ Container boogle-engine-search-1  Creating
+ Container boogle-engine-indexing-1  Created
+ Container boogle-engine-search-1  Created
+ Container boogle-engine-ingestion-1  Starting
+ Container boogle-engine-mongo-1  Starting
+ Container boogle-engine-mongo-1  Started
+ Container boogle-engine-mongo-1  Waiting
+ Container boogle-engine-mongo-1  Waiting
+ Container boogle-engine-ingestion-1  Started
+ Container boogle-engine-mongo-1  Healthy
+ Container boogle-engine-mongo-1  Healthy
+ Container boogle-engine-search-1  Starting
+ Container boogle-engine-indexing-1  Starting
+ Container boogle-engine-indexing-1  Started
+ Container boogle-engine-search-1  Started
+PASS: containers recreated, datalake and datamart intact, control state resumed
+== teardown ==
+ Container boogle-engine-search-1  Stopping
+ Container boogle-engine-indexing-1  Stopping
+ Container boogle-engine-ingestion-1  Stopping
+ Container boogle-engine-search-1  Stopped
+ Container boogle-engine-search-1  Removing
+ Container boogle-engine-indexing-1  Stopped
+ Container boogle-engine-indexing-1  Removing
+ Container boogle-engine-search-1  Removed
+ Container boogle-engine-indexing-1  Removed
+ Container boogle-engine-mongo-1  Stopping
+ Container boogle-engine-ingestion-1  Stopped
+ Container boogle-engine-ingestion-1  Removing
+ Container boogle-engine-ingestion-1  Removed
+ Container boogle-engine-mongo-1  Stopped
+ Container boogle-engine-mongo-1  Removing
+ Container boogle-engine-mongo-1  Removed
+ Volume boogle-engine_datalake  Removing
+ Volume boogle-engine_mongo-data  Removing
+ Volume boogle-engine_control-state  Removing
+ Network boogle-engine_default  Removing
+ Volume boogle-engine_mongo-data  Removed
+ Volume boogle-engine_datalake  Removed
+ Volume boogle-engine_control-state  Removed
+ Network boogle-engine_default  Removed
+PASS: stack removed with its volumes
+ALL COMPOSE E2E CHECKS PASSED
