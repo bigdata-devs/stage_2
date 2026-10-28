@@ -11,6 +11,7 @@
 //
 //	go run ./cmd/indexing
 //	go run ./cmd/indexing -addr :7002 -datalake datalake -rebuild-timeout 10m
+//	go run ./cmd/indexing -max-concurrent-updates 16
 //	go run ./cmd/indexing -pprof :7012      # exposes /debug/pprof/ on a separate port
 //
 // Then call it from the Control Module or by hand:
@@ -52,8 +53,9 @@ import (
 )
 
 const (
-	defaultAddress        = ":7002"
-	defaultRebuildTimeout = 10 * time.Minute
+	defaultAddress              = ":7002"
+	defaultRebuildTimeout       = 10 * time.Minute
+	defaultMaxConcurrentUpdates = 8
 	// responseMargin keeps the server write deadline above the rebuild budget, so the response
 	// of a rebuild that ends right at its deadline is never cut off.
 	responseMargin      = 10 * time.Second
@@ -62,11 +64,12 @@ const (
 
 // serviceConfig gathers every setting of the Indexing Service.
 type serviceConfig struct {
-	address        string
-	datalakeDir    string
-	batchSize      int
-	rebuildTimeout time.Duration
-	pprofAddress   string
+	address              string
+	datalakeDir          string
+	batchSize            int
+	rebuildTimeout       time.Duration
+	maxConcurrentUpdates int
+	pprofAddress         string
 }
 
 // main starts the Indexing Service. The annotations below are the general information of the
@@ -176,7 +179,11 @@ func buildIndexingHandler(config serviceConfig, client mongodb.Client) (api.Inde
 	if err != nil {
 		return api.IndexingHandler{}, err
 	}
-	return api.NewIndexingHandler(NewDatamartIndex(lake, client), config.rebuildTimeout)
+	index, err := NewDatamartIndex(lake, client, config.maxConcurrentUpdates)
+	if err != nil {
+		return api.IndexingHandler{}, err
+	}
+	return api.NewIndexingHandler(index, config.rebuildTimeout)
 }
 
 func parseConfig(arguments []string) (serviceConfig, error) {
@@ -194,6 +201,7 @@ func registerFlags(flags *flag.FlagSet) *serviceConfig {
 	flags.StringVar(&config.datalakeDir, "datalake", "datalake", "root folder of the datalake")
 	flags.IntVar(&config.batchSize, "batch-size", datalake.DefaultBatchSize, "book IDs per batch folder")
 	flags.DurationVar(&config.rebuildTimeout, "rebuild-timeout", defaultRebuildTimeout, "maximum duration of one full rebuild")
+	flags.IntVar(&config.maxConcurrentUpdates, "max-concurrent-updates", defaultMaxConcurrentUpdates, "maximum number of POST /index/update requests indexed at the same time")
 	flags.StringVar(&config.pprofAddress, "pprof", "", "host:port the net/http/pprof profiles are served on (empty disables profiling)")
 	return config
 }
@@ -224,6 +232,7 @@ func logStartup(config serviceConfig, client mongodb.Client) {
 		"address", config.address,
 		"datalake", config.datalakeDir,
 		"rebuild_timeout", config.rebuildTimeout,
+		"max_concurrent_updates", config.maxConcurrentUpdates,
 		"datamart", client.Describe(),
 		"docs", "/swagger/index.html",
 	)

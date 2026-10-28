@@ -2,6 +2,7 @@ package mongodb
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -9,6 +10,19 @@ import (
 
 	"boogle-engine/internal/models"
 )
+
+// booksOf feeds the given books to Rebuild in order.
+func booksOf(books ...models.IndexBookInput) NextBook {
+	position := 0
+	return func(context.Context) (models.IndexBookInput, bool, error) {
+		if position >= len(books) {
+			return models.IndexBookInput{}, false, nil
+		}
+		book := books[position]
+		position++
+		return book, true, nil
+	}
+}
 
 func TestRebuildSwapsInNewDatamart(t *testing.T) {
 	client := liveClient(t)
@@ -21,10 +35,10 @@ func TestRebuildSwapsInNewDatamart(t *testing.T) {
 		}
 	}
 
-	result, err := indexer.Rebuild(context.Background(), []models.IndexBookInput{
+	result, err := indexer.Rebuild(context.Background(), booksOf(
 		sampleInput(3, "fresh", "fresh"),
 		sampleInput(4, "fresh"),
-	})
+	))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -43,6 +57,37 @@ func TestRebuildSwapsInNewDatamart(t *testing.T) {
 		t.Fatalf("expected rebuilt book published, got %q", status)
 	}
 	assertBookIndexesPresent(t, client)
+	assertPostingIndexPresent(t, client)
+}
+
+func TestRebuildStopsWhenTheStreamFails(t *testing.T) {
+	client := liveClient(t)
+	resetDatamart(t, client)
+	indexer := NewBookIndexer(client)
+	if err := indexer.IndexBook(context.Background(), sampleInput(1, "kept")); err != nil {
+		t.Fatalf("seed book: %v", err)
+	}
+	calls := 0
+	next := func(context.Context) (models.IndexBookInput, bool, error) {
+		calls++
+		if calls == 2 {
+			return models.IndexBookInput{}, false, errors.New("datalake read failed")
+		}
+		return sampleInput(9, "partial"), true, nil
+	}
+
+	if _, err := indexer.Rebuild(context.Background(), next); err == nil {
+		t.Fatal("expected the failing stream to fail the rebuild")
+	}
+
+	// The half-built collections are never published: the previous index still answers.
+	if _, err := fetchExistingBook(client, 1); err != nil {
+		t.Fatalf("previous book disappeared after a failed rebuild: %v", err)
+	}
+	assertPostings(t, fetchPostings(t, client, "kept"), []models.Posting{{BookID: 1, TF: 1}})
+	if _, err := fetchExistingBook(client, 9); err == nil {
+		t.Fatal("a book of the failed rebuild is visible in the published datamart")
+	}
 }
 
 func TestRebuildLeavesNoTemporaryCollections(t *testing.T) {
@@ -50,9 +95,9 @@ func TestRebuildLeavesNoTemporaryCollections(t *testing.T) {
 	resetDatamart(t, client)
 	indexer := NewBookIndexer(client)
 
-	if _, err := indexer.Rebuild(context.Background(), []models.IndexBookInput{
+	if _, err := indexer.Rebuild(context.Background(), booksOf(
 		sampleInput(8, "solitude"),
-	}); err != nil {
+	)); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -77,7 +122,7 @@ func TestRebuildIsIdempotent(t *testing.T) {
 	}
 
 	for run := 1; run <= 2; run++ {
-		if _, err := indexer.Rebuild(context.Background(), books); err != nil {
+		if _, err := indexer.Rebuild(context.Background(), booksOf(books...)); err != nil {
 			t.Fatalf("run %d: unexpected error: %v", run, err)
 		}
 	}
@@ -97,7 +142,7 @@ func TestRebuildWithNoBooksClearsTheDatamart(t *testing.T) {
 		t.Fatalf("seed book: %v", err)
 	}
 
-	result, err := indexer.Rebuild(context.Background(), []models.IndexBookInput{})
+	result, err := indexer.Rebuild(context.Background(), booksOf())
 	if err != nil {
 		t.Fatalf("rebuild of an empty datalake: %v", err)
 	}
@@ -140,4 +185,31 @@ func assertBookIndexesPresent(t *testing.T, client Client) {
 	if count != len(bookFilterIndexes) {
 		t.Fatalf("expected %d book indexes after rebuild, got %d", len(bookFilterIndexes), count)
 	}
+}
+
+func assertPostingIndexPresent(t *testing.T, client Client) {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	cursor, err := client.Database().Collection(InvertedIndexCollection).Indexes().List(ctx)
+	if err != nil {
+		t.Fatalf("list posting indexes: %v", err)
+	}
+	defer func() {
+		if err := cursor.Close(ctx); err != nil {
+			t.Errorf("close index cursor: %v", err)
+		}
+	}()
+	for cursor.Next(ctx) {
+		var document struct {
+			Name string `bson:"name"`
+		}
+		if err := cursor.Decode(&document); err != nil {
+			t.Fatalf("decode index: %v", err)
+		}
+		if document.Name != "_id_" {
+			return
+		}
+	}
+	t.Fatal("the rebuilt postings collection has no posting index")
 }

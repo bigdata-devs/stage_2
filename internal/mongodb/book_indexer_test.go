@@ -2,10 +2,12 @@ package mongodb
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
 	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
 
 	"boogle-engine/internal/models"
 )
@@ -37,6 +39,7 @@ func resetDatamart(t testing.TB, client Client) {
 	collections := []string{
 		BooksCollection,
 		InvertedIndexCollection,
+		RebuildLocksCollection,
 	}
 	for _, name := range collections {
 		if err := client.Database().Collection(name).Drop(ctx); err != nil {
@@ -54,6 +57,9 @@ func fetchPostings(t *testing.T, client Client, term string) []models.Posting {
 	}
 	err := client.Database().Collection(InvertedIndexCollection).
 		FindOne(ctx, bson.D{{Key: "_id", Value: term}}).Decode(&document)
+	if errors.Is(err, mongo.ErrNoDocuments) {
+		return nil
+	}
 	if err != nil {
 		t.Fatalf("fetch postings for %q: %v", term, err)
 	}
@@ -144,6 +150,22 @@ func TestIndexBookUpdatesTermFrequencyWithoutDuplicating(t *testing.T) {
 	}
 
 	assertPostings(t, fetchPostings(t, client, "island"), []models.Posting{{BookID: 5, TF: 5}})
+}
+
+func TestIndexBookForgetsTermsTheNewVersionDrops(t *testing.T) {
+	client := liveClient(t)
+	resetDatamart(t, client)
+	indexer := NewBookIndexer(client)
+
+	if err := indexer.IndexBook(context.Background(), sampleInput(4, "island", "island", "wreck")); err != nil {
+		t.Fatalf("first version: unexpected error: %v", err)
+	}
+	if err := indexer.IndexBook(context.Background(), sampleInput(4, "island")); err != nil {
+		t.Fatalf("second version: unexpected error: %v", err)
+	}
+
+	assertPostings(t, fetchPostings(t, client, "island"), []models.Posting{{BookID: 4, TF: 1}})
+	assertPostings(t, fetchPostings(t, client, "wreck"), nil)
 }
 
 func TestIndexBookKeepsPostingsSortedAcrossBooks(t *testing.T) {

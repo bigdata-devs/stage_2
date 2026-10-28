@@ -24,14 +24,22 @@ type RebuildResult struct {
 	Elapsed        time.Duration
 }
 
-// Rebuild replaces the whole datamart with the given books. It writes them into temporary
-// collections, creates the query indexes there, and only then renames both into place, so search
-// never observes a half-built index. Each rename is atomic, but the two renames are not a single
-// transaction: for the few milliseconds between them a reader can pair new postings with old
-// metadata. That window is negligible on the single-machine Stage 2 host; a Stage 3 cluster should
-// replace the renames with a version pointer search resolves before querying. Rebuild is meant for
-// offline, one-at-a-time use, so it does not guard against two rebuilds racing.
-func (indexer BookIndexer) Rebuild(ctx context.Context, books []models.IndexBookInput) (RebuildResult, error) {
+// NextBook returns the next book of the source, or false once it is exhausted. Rebuild calls it
+// once per book, so the caller can read and tokenize the datalake lazily and the rebuild never
+// holds more than one book in memory, however large the datalake grows.
+type NextBook func(ctx context.Context) (models.IndexBookInput, bool, error)
+
+// Rebuild replaces the whole datamart with the books that next yields. It writes them into
+// temporary collections as they arrive, creates the query indexes there, and only then renames
+// both into place, so search never observes a half-built index. Each rename is atomic, but the
+// two renames are not a single transaction: for the few milliseconds between them a reader can
+// pair new postings with old metadata. That window is negligible on the single-machine Stage 2
+// host; a Stage 3 cluster should replace the renames with a version pointer search resolves
+// before querying.
+//
+// Rebuild does not guard against two rebuilds racing: the Indexing Service serializes them with
+// Client.AcquireRebuildLock, which holds across every replica sharing the datamart.
+func (indexer BookIndexer) Rebuild(ctx context.Context, next NextBook) (RebuildResult, error) {
 	started := time.Now()
 	temporaryBooks := indexer.client.database.Collection(BooksCollection + rebuildSuffix)
 	temporaryIndex := indexer.client.database.Collection(InvertedIndexCollection + rebuildSuffix)
@@ -42,22 +50,37 @@ func (indexer BookIndexer) Rebuild(ctx context.Context, books []models.IndexBook
 		return RebuildResult{}, err
 	}
 
-	for _, book := range books {
+	processed := 0
+	for {
+		if err := ctx.Err(); err != nil {
+			return RebuildResult{}, err
+		}
+		book, found, err := next(ctx)
+		if err != nil {
+			return RebuildResult{}, fmt.Errorf("read next book for rebuild: %w", err)
+		}
+		if !found {
+			break
+		}
 		if err := writeMetadata(ctx, temporaryBooks, book.Metadata, StatusPublished); err != nil {
 			return RebuildResult{}, fmt.Errorf("rebuild metadata for book %d: %w", book.Metadata.BookID, err)
 		}
 		if err := upsertPostings(ctx, temporaryIndex, book.Metadata.BookID, termFrequencies(book.Tokens)); err != nil {
 			return RebuildResult{}, fmt.Errorf("rebuild postings for book %d: %w", book.Metadata.BookID, err)
 		}
+		processed++
 	}
 
 	if _, err := createBookIndexes(ctx, temporaryBooks); err != nil {
 		return RebuildResult{}, fmt.Errorf("index rebuilt books: %w", err)
 	}
+	if _, err := createPostingIndexes(ctx, temporaryIndex); err != nil {
+		return RebuildResult{}, fmt.Errorf("index rebuilt postings: %w", err)
+	}
 	if err := indexer.publishRebuild(ctx, temporaryBooks, temporaryIndex); err != nil {
 		return RebuildResult{}, err
 	}
-	return RebuildResult{BooksProcessed: len(books), Elapsed: time.Since(started)}, nil
+	return RebuildResult{BooksProcessed: processed, Elapsed: time.Since(started)}, nil
 }
 
 // publishRebuild swaps the temporary collections over the live ones, index first so that a reader
