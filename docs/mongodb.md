@@ -11,7 +11,7 @@ Stage 2 moves the Stage 1 datamarts into the service architecture:
 - §2 of the assignment: the Indexing Service must *"store optimized structures in the datamarts"*.
 - §3.2.2: `POST /index/update/{book_id}` must *"update both metadata tables and the inverted index **stored in the datamart**"*.
 
-Today `cmd/indexing` runs `indexer.PublishedIndex`, an **in-memory** index: the Search Service is a different process and cannot see a single posting it holds. The datamart closes that gap — it is the shared store both services speak to:
+At handoff `cmd/indexing` ran `indexer.PublishedIndex`, an **in-memory** index: the Search Service is a different process and cannot see a single posting it holds. That type was removed after the review, once the datamart bridge replaced it. The datamart closes that gap — it is the shared store both services speak to:
 
 ```
                  writes (idempotent, 3-step)                    reads (one aggregation)
@@ -34,7 +34,7 @@ Nothing else is configured in code; ports and datalake paths keep using the exis
 docker run -d --name boogle-mongo -p 27017:27017 mongo:7
 ```
 
-Both services call `client.EnsureIndexes(ctx)` at start-up (idempotent), which creates the filter indexes on the books collection: compound `{author, language, publication_year}` plus `{language}` and `{publication_year}`.
+Both services call `client.EnsureIndexes(ctx)` at start-up (idempotent), which creates the filter indexes on the books collection — compound `{author, language, publication_year}` plus `{language}` and `{publication_year}` — and the multikey `postings.book_id` index that lets the write path drop a book's previous postings in one bounded update.
 
 ## Data model
 
@@ -42,8 +42,9 @@ Both services call `client.EnsureIndexes(ctx)` at start-up (idempotent), which c
 |---|---|---|
 | `books` | `{_id: <book_id>, title, author, language, publication_year, release_year, status}` | One metadata record per book. `status` is `pending` while a book is being indexed and `published` once complete; **search only ever returns `published` books**. |
 | `inverted_index` | `{_id: <term>, postings: [{book_id, tf}, …]}` | One document per normalized term, posting list sorted by `book_id` without duplicates. |
+| `locks` | `{_id: "rebuild", owner, expires_at}` | Single lease document that serializes rebuilds across every replica sharing the datamart. |
 
-The book `_id` doubles as the uniqueness constraint, so re-indexing the same book replaces its record instead of stacking copies.
+The book `_id` doubles as the uniqueness constraint, so re-indexing the same book replaces its record instead of stacking copies. A re-index also drops the book's postings from every term the new version no longer contains; the resulting empty term documents never match a search and the next rebuild discards them. `publication_year` is the original publication year, falling back to the Gutenberg release year when the header omits it, so the year filter still reaches those books.
 
 ## Package tour — `internal/mongodb`
 
@@ -51,8 +52,9 @@ The book `_id` doubles as the uniqueness constraint, so re-indexing the same boo
 |---|---|
 | `ConfigFromEnvironment()`, `Connect`, `Client`, `Client.Close` | Pool of connections; one `Client` per process is enough (safe for concurrent use). |
 | `Client.EnsureIndexes(ctx)` | Creates the filter indexes; call once per start-up. |
-| `NewBookIndexer(client).IndexBook(ctx, models.IndexBookInput{Metadata, Tokens})` | Writes one book in three ordered steps — mark `pending`, upsert postings with tf computed internally, mark `published`. Idempotent and concurrency-safe; a crash mid-way leaves the book invisible, never half-indexed. |
-| `BookIndexer.Rebuild(ctx, []models.IndexBookInput)` | Writes both collections aside (`*_rebuild`), creates their indexes, then atomically renames them into place. Search keeps reading the previous complete datamart until the swap. |
+| `NewBookIndexer(client).IndexBook(ctx, models.IndexBookInput{Metadata, Tokens})` | Writes one book in four ordered steps — mark `pending`, drop the previous version's postings, upsert the current postings with tf computed internally, mark `published`. Idempotent and concurrency-safe; a crash mid-way leaves the book invisible, never half-indexed. |
+| `BookIndexer.Rebuild(ctx, mongodb.NextBook)` | Pulls one book at a time from the caller's stream, writes both collections aside (`*_rebuild`), creates their indexes, then atomically renames them into place. Search keeps reading the previous complete datamart until the swap, and memory holds one book, not the whole datalake. |
+| `Client.AcquireRebuildLock(ctx)` | Claims the cluster-wide rebuild lease (`locks` collection); returns `ErrRebuildLocked` while another replica holds it, takes over an expired lease, renews it in the background and deletes it on `Release`. |
 | `NewDatamartReader(client).PostingsForTerms(ctx, terms)` | Raw posting lists for the normalized terms present in the index, ordered by term. |
 | `DatamartReader.BooksByID(ctx, ids)` | Metadata for the given IDs ordered by book ID; absent books are omitted. |
 | `DatamartReader.SearchBooks(ctx, mongodb.SearchRequest)` | The search query — see below. |
@@ -64,7 +66,7 @@ type SearchRequest struct {
     Term     string // normalized exactly as the indexer stores it; matched verbatim
     Author   string // "" = no filter; case-insensitive substring of the author
     Language string // "" = no filter; matches any code of the comma list ("en,fr"), case-insensitive, spaces trimmed
-    Year     int    // 0 = no filter; otherwise exact publication_year
+    Year     int    // 0 = no filter; otherwise exact publication_year (original year, or the release year when the header has no original date)
     Offset   int    // >= 0
     Limit    int    // >= 1
 }
@@ -79,6 +81,14 @@ type SearchRequest struct {
 ## Bridge A — Indexing Service (implements `api.BookIndex`)
 
 **File: `cmd/indexing/datamart_index.go`** (new file, whole package `main`):
+
+> **After the Index Lead's review** the adapter changed in four ways that the code block below,
+> kept as the original handoff, does not show: `IndexBook` now takes the request
+> `context.Context` and waits for one of `-max-concurrent-updates` slots (8 by default) before
+> reading the book; the rebuild pulls books through `mongodb.NextBook`, reading and tokenizing one
+> book at a time; `Rebuild` claims `Client.AcquireRebuildLock` before building, so replicas sharing
+> the datamart cannot rebuild concurrently; and the constructor validates its concurrency cap and
+> returns an error. The semantic tables in this document describe the current behavior.
 
 ```go
 package main
@@ -468,10 +478,13 @@ func closeDatamart(client mongodb.Client) {
 
 | Concern | Behavior |
 |---|---|
-| Idempotency | Re-indexing a book replaces its metadata record and converges to identical postings; repeated rebuilds over the same datalake produce equivalent collections. |
+| Idempotency | Re-indexing a book replaces its metadata record, drops its postings from terms the new version no longer contains, and converges to identical postings; repeated rebuilds over the same datalake produce equivalent collections. |
 | Partial writes | A book becomes searchable only in the final `published` step of `IndexBook`; readers filter on `status` as well, so even a raw reader never sees a half-written book. |
 | Rebuild atomicity | Temporary collections + `renameCollection` (admin database, `dropTarget`); search reads either the old or the new complete datamart. The two renames are not one transaction — on the single-machine Stage 2 host the sub-millisecond window pairs new postings with previous metadata and resolves on the next request; Stage 3 should replace it with a version pointer. |
-| Concurrent rebuild | One at a time (`ErrRebuildInProgress` → HTTP 409); updates during a rebuild are recorded and replayed after the swap. |
+| Rebuild memory | The rebuild streams the datalake one book at a time through `NextBook`; it never materializes every token stream, so its footprint does not grow with the datalake. |
+| Concurrent rebuild | One at a time across replicas (`locks` lease, renewed every 30 s and expiring 2 min after a crash; `ErrRebuildInProgress` → HTTP 409); updates during a rebuild are recorded by the rebuilding process and replayed after the swap. A deployment with several replicas should route updates to the rebuild owner, or retry them after the 200, because the replay bookkeeping is per process. |
+| Update concurrency | `POST /index/update` waits for one of `-max-concurrent-updates` slots (8 by default) and passes the request context to the datamart writes; a caller that disconnects cancels its own update and frees its slot. |
+| Year filter | `publication_year` is the original publication year, or the Gutenberg release year when the header has no original date; both are 0 only when neither is readable, and search ignores books with year 0. |
 | Concurrency | One `Client` per process; `BookIndexer` and `DatamartReader` hold no mutable state, so handlers and workers share them freely. |
 | Failure of the datamart | Writers return wrapped errors (→ HTTP 500 with the documented JSON body); `Stats` reports zeros and logs instead of failing `GET /index/status`. |
 | Stage 3 readiness | Every address/name comes from `MONGO_URI`/`MONGO_DATABASE`; no local path or port is hard-coded in the package. |

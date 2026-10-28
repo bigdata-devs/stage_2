@@ -18,7 +18,7 @@ import (
 )
 
 // indexingFixture is an Indexing API wired like cmd/indexing: a real datalake in a temporary
-// folder and a real in-memory published index.
+// folder and an index the tests can inspect through GET /index/status.
 type indexingFixture struct {
 	lake   datalake.Datalake
 	router *http.ServeMux
@@ -33,11 +33,50 @@ func newIndexingFixture(t *testing.T, storedBookIDs ...models.BookID) indexingFi
 	for _, bookID := range storedBookIDs {
 		storeSampleBook(t, lake, bookID)
 	}
-	published, err := indexer.NewPublishedIndex(lake, 2)
-	if err != nil {
-		t.Fatalf("indexer.NewPublishedIndex: %v", err)
+	return indexingFixture{lake: lake, router: newIndexingRouter(t, newFakeIndex(lake), time.Minute)}
+}
+
+// fakeIndex is the BookIndex the API tests drive. It keeps the set of indexed books over the
+// fixture's datalake: enough for the handler contract (counters and datalake errors) without a
+// live datamart, since the MongoDB adapter is covered by cmd/indexing and internal/mongodb tests.
+type fakeIndex struct {
+	lake  datalake.Datalake
+	mutex sync.Mutex
+	books map[models.BookID]bool
+}
+
+func newFakeIndex(lake datalake.Datalake) *fakeIndex {
+	return &fakeIndex{lake: lake, books: map[models.BookID]bool{}}
+}
+
+func (index *fakeIndex) IndexBook(_ context.Context, bookID models.BookID) error {
+	if _, err := index.lake.ReadBook(bookID); err != nil {
+		return err
 	}
-	return indexingFixture{lake: lake, router: newIndexingRouter(t, published, time.Minute)}
+	index.mutex.Lock()
+	defer index.mutex.Unlock()
+	index.books[bookID] = true
+	return nil
+}
+
+func (index *fakeIndex) Rebuild(_ context.Context) (indexer.RebuildReport, error) {
+	bookIDs, err := index.lake.ListBookIDs()
+	if err != nil {
+		return indexer.RebuildReport{}, err
+	}
+	index.mutex.Lock()
+	defer index.mutex.Unlock()
+	index.books = map[models.BookID]bool{}
+	for _, bookID := range bookIDs {
+		index.books[bookID] = true
+	}
+	return indexer.RebuildReport{BooksProcessed: len(bookIDs)}, nil
+}
+
+func (index *fakeIndex) Stats() indexer.IndexStats {
+	index.mutex.Lock()
+	defer index.mutex.Unlock()
+	return indexer.IndexStats{BooksIndexed: len(index.books), LastUpdate: time.Now()}
 }
 
 func storeSampleBook(t *testing.T, lake datalake.Datalake, bookID models.BookID) {
@@ -178,7 +217,7 @@ type scriptedIndex struct {
 	stats          indexer.IndexStats
 }
 
-func (index scriptedIndex) IndexBook(models.BookID) error {
+func (index scriptedIndex) IndexBook(context.Context, models.BookID) error {
 	return index.indexErr
 }
 

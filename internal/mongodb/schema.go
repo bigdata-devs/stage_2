@@ -46,6 +46,13 @@ var bookFilterIndexes = []mongo.IndexModel{
 	{Keys: bson.D{{Key: "publication_year", Value: 1}}},
 }
 
+// postingIndexes back the write path's removal of a book's previous postings, which filters the
+// multikey postings.book_id field. They are created on start-up and on every rebuild's temporary
+// collection, and travel with the collection when the rebuild swaps it into place.
+var postingIndexes = []mongo.IndexModel{
+	{Keys: bson.D{{Key: "postings.book_id", Value: 1}}},
+}
+
 // EnsureIndexes creates every index the datamart queries rely on. It is idempotent: MongoDB
 // keeps an index whose name and key already exist, so services call it at each start-up.
 func (client Client) EnsureIndexes(ctx context.Context) error {
@@ -53,7 +60,11 @@ func (client Client) EnsureIndexes(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("ensure book indexes: %w", err)
 	}
-	slog.Info("mongodb indexes ready", "created", created)
+	postingIndexesCreated, err := createPostingIndexes(ctx, client.database.Collection(InvertedIndexCollection))
+	if err != nil {
+		return fmt.Errorf("ensure posting indexes: %w", err)
+	}
+	slog.Info("mongodb indexes ready", "created", created, "posting_indexes_created", postingIndexesCreated)
 	return nil
 }
 
@@ -61,4 +72,9 @@ func (client Client) EnsureIndexes(ctx context.Context) error {
 // MongoDB assigned. A rebuild runs it on its temporary collection before swapping it into place.
 func createBookIndexes(ctx context.Context, books *mongo.Collection) ([]string, error) {
 	return books.Indexes().CreateMany(ctx, bookFilterIndexes)
+}
+
+// createPostingIndexes creates the write-path indexes on the given inverted index collection.
+func createPostingIndexes(ctx context.Context, postings *mongo.Collection) ([]string, error) {
+	return postings.Indexes().CreateMany(ctx, postingIndexes)
 }

@@ -52,11 +52,22 @@ func resetDatamart(t *testing.T, client mongodb.Client) {
 		mongodb.InvertedIndexCollection,
 		mongodb.BooksCollection + "_rebuild",
 		mongodb.InvertedIndexCollection + "_rebuild",
+		mongodb.RebuildLocksCollection,
 	} {
 		if err := client.Database().Collection(collection).Drop(ctx); err != nil {
 			t.Errorf("drop collection %s: %v", collection, err)
 		}
 	}
+}
+
+// newDatamartIndex builds the adapter the tests drive, with a small concurrency cap.
+func newDatamartIndex(t *testing.T, lake datalake.Datalake, client mongodb.Client) *DatamartIndex {
+	t.Helper()
+	index, err := NewDatamartIndex(lake, client, 4)
+	if err != nil {
+		t.Fatalf("NewDatamartIndex: %v", err)
+	}
+	return index
 }
 
 // sampleBook builds a datalake book whose body always contains the given term.
@@ -101,9 +112,9 @@ func publishedCount(t *testing.T, client mongodb.Client) int {
 func TestDatamartIndexPublishesBook(t *testing.T) {
 	client := datamartTestStart(t)
 	lake := storeBooks(t, sampleBook(1342, "Pride and Prejudice", "curiosity"))
-	index := NewDatamartIndex(lake, client)
+	index := newDatamartIndex(t, lake, client)
 
-	if err := index.IndexBook(1342); err != nil {
+	if err := index.IndexBook(context.Background(), 1342); err != nil {
 		t.Fatalf("index book: %v", err)
 	}
 
@@ -125,10 +136,10 @@ func TestDatamartIndexPublishesBook(t *testing.T) {
 func TestDatamartIndexIsIdempotent(t *testing.T) {
 	client := datamartTestStart(t)
 	lake := storeBooks(t, sampleBook(42, "Sample", "curiosity"))
-	index := NewDatamartIndex(lake, client)
+	index := newDatamartIndex(t, lake, client)
 
 	for run := range 3 {
-		if err := index.IndexBook(42); err != nil {
+		if err := index.IndexBook(context.Background(), 42); err != nil {
 			t.Fatalf("index book, run %d: %v", run, err)
 		}
 	}
@@ -154,11 +165,11 @@ func TestDatamartIndexKeepsDataAcrossInstances(t *testing.T) {
 	client := datamartTestStart(t)
 	lake := storeBooks(t, sampleBook(7, "Sample", "curiosity"))
 
-	if err := NewDatamartIndex(lake, client).IndexBook(7); err != nil {
+	if err := newDatamartIndex(t, lake, client).IndexBook(context.Background(), 7); err != nil {
 		t.Fatalf("index book: %v", err)
 	}
 	// A second adapter models a service restart: the datamart still holds the book.
-	restarted := NewDatamartIndex(lake, client)
+	restarted := newDatamartIndex(t, lake, client)
 	if count := restarted.Stats().BooksIndexed; count != 1 {
 		t.Errorf("books_indexed after restart = %d, want 1", count)
 	}
@@ -167,9 +178,9 @@ func TestDatamartIndexKeepsDataAcrossInstances(t *testing.T) {
 func TestDatamartIndexMissingBookFails(t *testing.T) {
 	client := datamartTestStart(t)
 	lake := storeBooks(t)
-	index := NewDatamartIndex(lake, client)
+	index := newDatamartIndex(t, lake, client)
 
-	err := index.IndexBook(999)
+	err := index.IndexBook(context.Background(), 999)
 	if !errors.Is(err, datalake.ErrBookNotFound) {
 		t.Fatalf("IndexBook of a missing book = %v, want datalake.ErrBookNotFound", err)
 	}
@@ -184,7 +195,7 @@ func TestRebuildPublishesEveryBookOfTheDatalake(t *testing.T) {
 		sampleBook(1, "First", "alpha"),
 		sampleBook(2, "Second", "beta"),
 	)
-	index := NewDatamartIndex(lake, client)
+	index := newDatamartIndex(t, lake, client)
 
 	report, err := index.Rebuild(context.Background())
 	if err != nil {
@@ -204,8 +215,8 @@ func TestRebuildPublishesEveryBookOfTheDatalake(t *testing.T) {
 func TestRebuildReplacesPreviousContent(t *testing.T) {
 	client := datamartTestStart(t)
 	lake := storeBooks(t, sampleBook(1, "Only", "alpha"))
-	index := NewDatamartIndex(lake, client)
-	if err := index.IndexBook(1); err != nil {
+	index := newDatamartIndex(t, lake, client)
+	if err := index.IndexBook(context.Background(), 1); err != nil {
 		t.Fatalf("index book: %v", err)
 	}
 	// The datalake loses the book between the update and the rebuild: the rebuild builds from
@@ -232,7 +243,7 @@ func TestRebuildReplacesPreviousContent(t *testing.T) {
 func TestRebuildRejectsASecondConcurrentRebuild(t *testing.T) {
 	client := datamartTestStart(t)
 	lake := storeBooks(t, sampleBook(1, "Sample", "alpha"))
-	index := NewDatamartIndex(lake, client)
+	index := newDatamartIndex(t, lake, client)
 	index.rebuilding.Store(true)
 	t.Cleanup(func() { index.rebuilding.Store(false) })
 
@@ -242,13 +253,64 @@ func TestRebuildRejectsASecondConcurrentRebuild(t *testing.T) {
 	}
 }
 
+func TestNewDatamartIndexRejectsANonPositiveConcurrency(t *testing.T) {
+	lake := storeBooks(t, sampleBook(1, "Sample", "alpha"))
+	if _, err := NewDatamartIndex(lake, mongodb.Client{}, 0); err == nil {
+		t.Error("a zero max concurrent updates was accepted")
+	}
+}
+
+func TestIndexBookGivesUpItsSlotWhenTheCallerDisconnects(t *testing.T) {
+	lake := storeBooks(t, sampleBook(3, "Sample", "alpha"))
+	index, err := NewDatamartIndex(lake, mongodb.Client{}, 1)
+	if err != nil {
+		t.Fatalf("NewDatamartIndex: %v", err)
+	}
+	index.updateSlots <- struct{}{}
+	defer func() { <-index.updateSlots }()
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	err = index.IndexBook(ctx, 3)
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("IndexBook with a full queue and a cancelled caller = %v, want context.Canceled", err)
+	}
+	if len(index.updateSlots) != 1 {
+		t.Errorf("slots in use = %d, want the caller's slot never taken", len(index.updateSlots))
+	}
+}
+
+func TestRebuildRejectsWhileAnotherReplicaHoldsTheLock(t *testing.T) {
+	client := datamartTestStart(t)
+	lake := storeBooks(t, sampleBook(1, "Sample", "alpha"))
+	index := newDatamartIndex(t, lake, client)
+	lock, err := client.AcquireRebuildLock(context.Background())
+	if err != nil {
+		t.Fatalf("acquire the datamart rebuild lock: %v", err)
+	}
+
+	if _, err := index.Rebuild(context.Background()); !errors.Is(err, indexer.ErrRebuildInProgress) {
+		t.Fatalf("Rebuild while another replica holds the lease = %v, want indexer.ErrRebuildInProgress", err)
+	}
+	if index.rebuilding.Load() {
+		t.Error("the local rebuild flag stayed set after the lease was refused")
+	}
+
+	if err := lock.Release(); err != nil {
+		t.Fatalf("release the datamart rebuild lock: %v", err)
+	}
+	if _, err := index.Rebuild(context.Background()); err != nil {
+		t.Fatalf("Rebuild after the lease was released: %v", err)
+	}
+}
+
 func TestUpdatesDuringARebuildAreRecordedAndCleared(t *testing.T) {
 	client := datamartTestStart(t)
 	lake := storeBooks(t, sampleBook(1, "Sample", "alpha"))
-	index := NewDatamartIndex(lake, client)
+	index := newDatamartIndex(t, lake, client)
 
 	index.rebuilding.Store(true)
-	if err := index.IndexBook(1); err != nil {
+	if err := index.IndexBook(context.Background(), 1); err != nil {
 		t.Fatalf("index book during rebuild: %v", err)
 	}
 	index.pendingMutex.Lock()

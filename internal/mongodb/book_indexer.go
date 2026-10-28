@@ -28,14 +28,17 @@ func NewBookIndexer(client Client) BookIndexer {
 	return BookIndexer{client: client}
 }
 
-// IndexBook stores one book in three ordered steps: it marks the metadata pending, upserts every
-// term posting, and finally publishes the metadata. Search only returns published books, so a
-// crash at any step leaves the book invisible rather than half-indexed, and a retry converges to
-// the same state.
+// IndexBook stores one book in four ordered steps: it marks the metadata pending, drops the
+// postings of the previous version, upserts every current term posting, and finally publishes the
+// metadata. Search only returns published books, so a crash at any step leaves the book invisible
+// rather than half-indexed, and a retry converges to the same state.
 func (indexer BookIndexer) IndexBook(ctx context.Context, input models.IndexBookInput) error {
 	bookID := input.Metadata.BookID
 	if err := writeMetadata(ctx, indexer.books(), input.Metadata, StatusPending); err != nil {
 		return fmt.Errorf("mark book %d pending: %w", bookID, err)
+	}
+	if err := removeBookPostings(ctx, indexer.index(), bookID); err != nil {
+		return fmt.Errorf("drop previous postings of book %d: %w", bookID, err)
 	}
 	if err := upsertPostings(ctx, indexer.index(), bookID, termFrequencies(input.Tokens)); err != nil {
 		return fmt.Errorf("upsert postings for book %d: %w", bookID, err)
@@ -69,6 +72,17 @@ func publishMetadata(ctx context.Context, collection *mongo.Collection, bookID m
 	_, err := collection.UpdateOne(ctx,
 		bson.D{{Key: "_id", Value: bookID}},
 		bson.D{{Key: "$set", Value: bson.D{{Key: "status", Value: StatusPublished}}}})
+	return err
+}
+
+// removeBookPostings drops a book's entry from every term it was recorded under, so a re-index
+// forgets terms the new version no longer contains. It is bounded by the multikey index on
+// postings.book_id. Term documents left with an empty posting list never match a search and the
+// next rebuild discards them.
+func removeBookPostings(ctx context.Context, collection *mongo.Collection, bookID models.BookID) error {
+	_, err := collection.UpdateMany(ctx,
+		bson.D{{Key: "postings.book_id", Value: bookID}},
+		bson.D{{Key: "$pull", Value: bson.D{{Key: "postings", Value: bson.D{{Key: "book_id", Value: bookID}}}}}})
 	return err
 }
 

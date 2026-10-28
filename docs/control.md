@@ -38,6 +38,29 @@ Book selection requires `-ids` and/or `-from`/`-to`, or the `-discover` flag.
 Flags override environment variables; both endpoints are configurable so no
 `localhost` address is hard-coded.
 
+## Run the whole stack with Docker Compose
+
+`docker-compose.yml` deploys MongoDB, the three services and (on demand) the
+Control Module on any machine with Docker:
+
+```bash
+docker compose up -d --build                                     # mongo + ingestion + indexing + search
+docker compose --profile tools run --rm control -discover        # orchestrate the whole datalake
+docker compose --profile tools run --rm control -ids 1342,84     # or an explicit selection
+```
+
+The services reach each other by container name (`http://ingestion:7001`,
+`http://indexing:7002`) through the environment variables of the compose file —
+the same configurability that keeps `localhost` out of the code. Host ports come
+from `.env` (copy `.env.example`); the Swagger UIs and the internal status routes
+stay reachable on `localhost:7001..7003`.
+
+Containers carry code only: the datalake, the control state files and the
+MongoDB datamart live in the named volumes `datalake`, `control-state` and
+`mongo-data`. Recreating or killing a container therefore never loses pipeline
+state, and a restarted Control Module resumes from `/data/control` exactly as
+described in the failure-semantics section below.
+
 ## Orchestration flow
 
 For every candidate book, one worker:

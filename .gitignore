@@ -2,6 +2,9 @@
 /AGENTS.md
 stage_2_service_oriented_architecture.md
 
+# Local deployment overrides (copy .env.example to .env)
+.env
+
 # Runtime data produced by the services (leading slash: only the root folders)
 /datalake/
 /datamarts/

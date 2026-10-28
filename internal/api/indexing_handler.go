@@ -27,9 +27,9 @@ const bytesPerMegabyte = 1 << 20
 var ErrMissingIndex = errors.New("indexing handler needs a book index")
 
 // BookIndex is the searchable index that the Indexing API maintains. The service wires the
-// MongoDB datamart adapter to it; indexer.PublishedIndex is its in-memory counterpart.
+// MongoDB datamart adapter to it.
 type BookIndex interface {
-	IndexBook(bookID models.BookID) error
+	IndexBook(ctx context.Context, bookID models.BookID) error
 	Rebuild(ctx context.Context) (indexer.RebuildReport, error)
 	Stats() indexer.IndexStats
 }
@@ -106,12 +106,13 @@ func (handler IndexingHandler) RegisterRoutes(router *http.ServeMux) {
 //	@Description	rebuild cannot lose it.
 //	@Description
 //	@Description	**Idempotency and consistency.** Safe to repeat: re-indexing a book that is already indexed replaces its metadata
-//	@Description	record and adds no duplicate postings, so the index ends up exactly as after the first call. Updates of different
-//	@Description	books run in parallel; concurrent updates of the same book are harmless.
+//	@Description	record and its postings (terms the book no longer contains stop returning it), so the index ends up exactly as
+//	@Description	after the first call. Updates of different books run in parallel, bounded by the service's
+//	@Description	`-max-concurrent-updates`; concurrent updates of the same book are harmless.
 //	@Description
 //	@Description	**Timeouts and retries expected of the caller.** One update reads one book from local disk and usually takes
 //	@Description	milliseconds (about a second for the largest books); a client timeout of 30 s is ample and an update is never
-//	@Description	blocked by a running rebuild.
+//	@Description	blocked by a running rebuild. A caller that disconnects cancels its own update only.
 //	@Description	- Client timeout, connection error or `500 internal_error`: retry the same request with exponential backoff.
 //	@Description	- `404 book_not_found`: the book is not completely ingested. Ingest it first, then retry; repeating alone will not help.
 //	@Description	- The index is stored in the MongoDB datamart, so indexed books stay searchable across service restarts.
@@ -134,7 +135,7 @@ func (handler IndexingHandler) UpdateBook(writer http.ResponseWriter, request *h
 		writeInvalidBookID(writer, err)
 		return
 	}
-	if err := handler.index.IndexBook(bookID); err != nil {
+	if err := handler.index.IndexBook(request.Context(), bookID); err != nil {
 		writeIndexingFailure(writer, bookID, err)
 		return
 	}
@@ -157,8 +158,9 @@ func (handler IndexingHandler) UpdateBook(writer http.ResponseWriter, request *h
 //	@Description	unchanged; a half-built index is never visible.
 //	@Description
 //	@Description	**Idempotency and consistency.** Repeating it over the same datalake produces the same index. Only one rebuild runs
-//	@Description	at a time: another request meanwhile gets `409 rebuild_in_progress`. POST /index/update calls during a rebuild are
-//	@Description	not blocked: they are recorded and replayed on the rebuilt index after the swap, so the published result never loses them.
+//	@Description	at a time across the service replicas (a lease in the datamart serializes them): another request meanwhile gets
+//	@Description	`409 rebuild_in_progress`. POST /index/update calls during a rebuild are not blocked: they are recorded and replayed
+//	@Description	on the rebuilt index after the swap, so the published result never loses them.
 //	@Description
 //	@Description	**Timeouts and retries expected of the caller.** The duration grows with the datalake (the assignment's reference
 //	@Description	is about 35 s per 1000 books) and is capped by the service's rebuild budget (`-rebuild-timeout`, 10 minutes by
