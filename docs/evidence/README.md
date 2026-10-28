@@ -15,6 +15,7 @@ Service bridge, catalog endpoints, load benchmark).
 | [`indexing_benchmark_2026-10-19T19-07-00-230Z.json`](indexing_benchmark_2026-10-19T19-07-00-230Z.json) | The complete k6 summary of that run (every metric, check and threshold), for plotting. |
 | [`indexing_benchmark_run.log`](indexing_benchmark_run.log) | Console transcript of the same run, including the threshold report. |
 | [`indexing_resources.csv`](indexing_resources.csv) | 1-second samples of the Indexing Service (CPU %, working set, private memory, threads) and of MongoDB in Docker (CPU %, memory) taken while k6 drove the load. |
+| [`microbenchmarks.txt`](microbenchmarks.txt) | **2026-10-28.** Raw `testing.B` output of `ProcessText`, `ExtractMetadata` and `SplitBookText` over the 20 real books with `-cpu 1,2,4,8` (review feedback). |
 
 ## Environment
 
@@ -122,3 +123,25 @@ BASE_URL=http://localhost:7015 HOLD_DURATION=15s k6 run test/load/indexing_bench
 k6 writes `<stamp>.csv` and `<stamp>.json` into `test/load/results/` (create the folder first)
 and prints the table above. A k6 exit code of `99` only means a threshold was crossed — read the
 "Thresholds" block of the log to see which.
+
+## Microbenchmarks of the text pipeline (review feedback)
+
+`internal/indexer/benchmark_test.go` measures the three per-book primitives of indexing on the
+same 20-book corpus, cycling it once per iteration with one cursor per goroutine and `SetBytes`
+sized to the average item. `SplitBookText` rebuilds the raw Gutenberg layout around the stored
+header and body, because the datalake keeps them already split.
+
+```bash
+go test ./internal/indexer -run '^$' -bench . -benchmem -cpu 1,2,4,8 -benchtime=500ms
+```
+
+| Benchmark | 1 worker | 8 workers | Speed-up | Allocations |
+|---|---:|---:|---:|---:|
+| `ProcessText` (body) | 21.6 ms/op, 22.7 MB/s | 5.2 ms/op, 94.0 MB/s | 4.1× | 10.4 MB, 23 allocs |
+| `ExtractMetadata` (header) | 64 µs/op, 13.1 MB/s | 11 µs/op, 76.3 MB/s | 5.8× | 3.5 kB, 46 allocs |
+| `SplitBookText` (raw book) | 0.88 ms/op, 560 MB/s | 0.12 ms/op, 4.2 GB/s | 7.5× | 0 kB, 0 allocs |
+
+Run on 2026-10-28 on the Index Lead's machine (i7-1355U, 12 logical CPUs). Tokenization dominates
+the CPU cost and allocates ~10 MB per average book, which is why the rebuild now streams one book
+at a time instead of collecting every token stream first; header parsing and marker splitting are
+negligible. Raw output in [`microbenchmarks.txt`](microbenchmarks.txt).

@@ -1,0 +1,45 @@
+Microbenchmarks of the Indexing Service text pipeline
+======================================================
+
+Command (repository root, MongoDB not needed):
+
+    go test ./internal/indexer -run '^$' -bench . -benchmem -cpu 1,2,4,8 -benchtime=500ms
+
+Corpus: the 20 real Project Gutenberg books stored under datalake/ (9,829,441 body bytes),
+loaded once before the timer starts. Every benchmark cycles the whole corpus, with one corpus
+cursor per goroutine, so each -cpu value measures aggregate throughput and not shared state
+contention. SetBytes reports the average book size: body for ProcessText, header for
+ExtractMetadata, and the reconstructed raw plain-text book for SplitBookText (the datalake keeps
+header and body already split, so the raw layout is rebuilt around the real content).
+
+Date: 2026-10-28
+Machine: 13th Gen Intel(R) Core(TM) i7-1355U (12 logical CPUs), Windows, Go 1.27, amd64.
+
+goos: windows
+goarch: amd64
+pkg: boogle-engine/internal/indexer
+cpu: 13th Gen Intel(R) Core(TM) i7-1355U
+BenchmarkProcessText         	      88	  21635101 ns/op	  22.72 MB/s	10709995 B/op	      23 allocs/op
+BenchmarkProcessText-2       	      88	  13961019 ns/op	  35.20 MB/s	10452323 B/op	      23 allocs/op
+BenchmarkProcessText-4       	      74	   7911296 ns/op	  62.12 MB/s	10236966 B/op	      23 allocs/op
+BenchmarkProcessText-8       	     142	   5227886 ns/op	  94.01 MB/s	10411272 B/op	      23 allocs/op
+BenchmarkExtractMetadata     	    8004	     64068 ns/op	  13.14 MB/s	    3485 B/op	      46 allocs/op
+BenchmarkExtractMetadata-2   	   18490	     31909 ns/op	  26.39 MB/s	    3485 B/op	      46 allocs/op
+BenchmarkExtractMetadata-4   	   36661	     16841 ns/op	  50.00 MB/s	    3495 B/op	      46 allocs/op
+BenchmarkExtractMetadata-8   	   61622	     11042 ns/op	  76.25 MB/s	    3517 B/op	      46 allocs/op
+BenchmarkSplitBookText       	     700	    879865 ns/op	 559.68 MB/s	       0 B/op	       0 allocs/op
+BenchmarkSplitBookText-2     	    1351	    436949 ns/op	1127.01 MB/s	       0 B/op	       0 allocs/op
+BenchmarkSplitBookText-4     	    3042	    219316 ns/op	2245.37 MB/s	       0 B/op	       0 allocs/op
+BenchmarkSplitBookText-8     	    6118	    117132 ns/op	4204.19 MB/s	       0 B/op	       0 allocs/op
+PASS
+ok  	boogle-engine/internal/indexer	14.350s
+
+Reading of the numbers
+----------------------
+
+- ProcessText (tokenize + stop-word/numeral filtering) is the dominant per-book CPU cost:
+  about 21.6 ms per average book on one core, dropping to 5.2 ms with 8 workers (4.1x), and
+  ~10.4 MB of allocations per book, which is why the rebuild streams one book at a time.
+- ExtractMetadata (header parsing) is negligible: ~64 us on one core, ~11 us at 8 workers.
+- SplitBookText (Stage 1 marker split + trim) is I/O-bound in practice: ~0.9 ms on one core,
+  zero allocations, ~4.2 GB/s at 8 workers; the ingestion path is not the bottleneck.
