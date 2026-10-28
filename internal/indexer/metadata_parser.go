@@ -38,16 +38,30 @@ type headerFields map[string][]string
 // ExtractMetadata ports extract_metadata: it returns the title, the authors joined with "; ",
 // the language codes, the original publication year and the Gutenberg release year of a header.
 // Missing text fields become UnknownValue and missing years become 0.
+//
+// When the header has no "Original Publication" year (common in Gutenberg books), the publication
+// year falls back to the release year, so the year filter still reaches those books. The release
+// year is always reported as parsed.
 func ExtractMetadata(bookID models.BookID, header string) models.BookMetadata {
 	fields := parseHeaderFields(header)
+	releaseYear := firstYear(fields["release date"])
 	return models.BookMetadata{
 		BookID:          bookID,
 		Title:           firstValueOrUnknown(fields["title"]),
 		Author:          joinedValuesOrUnknown(fields["author"]),
 		Language:        NormalizeLanguage(strings.Join(fields["language"], ", ")),
-		PublicationYear: firstYear(fields["original publication"]),
-		ReleaseYear:     firstYear(fields["release date"]),
+		PublicationYear: publicationYear(fields["original publication"], releaseYear),
+		ReleaseYear:     releaseYear,
 	}
+}
+
+// publicationYear prefers the original publication year and falls back to the Gutenberg release
+// year when the header does not provide a readable one.
+func publicationYear(originalPublication []string, releaseYear int) int {
+	if year := firstYear(originalPublication); year != 0 {
+		return year
+	}
+	return releaseYear
 }
 
 // NormalizeLanguage maps language names to ISO 639 codes: "English" -> "en" and

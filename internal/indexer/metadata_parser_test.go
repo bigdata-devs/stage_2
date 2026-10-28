@@ -45,7 +45,7 @@ func TestExtractMetadataNormalizesFields(t *testing.T) {
 		Title:           "The Works of Edgar Allan Poe Volume 1",
 		Author:          "Edgar Allan Poe",
 		Language:        "en",
-		PublicationYear: 0,
+		PublicationYear: 2000,
 		ReleaseYear:     2000,
 	}
 	if metadata := ExtractMetadata(2147, gutenbergHeader); metadata != expected {
@@ -65,6 +65,17 @@ func TestExtractMetadataReadsPublicationAndReleaseYears(t *testing.T) {
 	}
 	if metadata.ReleaseYear != 2007 {
 		t.Errorf("expected release year 2007, got %d", metadata.ReleaseYear)
+	}
+}
+
+func TestExtractMetadataFallsBackToTheReleaseYear(t *testing.T) {
+	header := "Title: The Works of Edgar Allan Poe\nRelease date: April 1, 2000 [eBook #2147]\n"
+	metadata := ExtractMetadata(2147, header)
+	if metadata.PublicationYear != 2000 {
+		t.Errorf("publication year without an original date = %d, want the release year 2000", metadata.PublicationYear)
+	}
+	if metadata.ReleaseYear != 2000 {
+		t.Errorf("release year = %d, want 2000", metadata.ReleaseYear)
 	}
 }
 
