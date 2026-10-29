@@ -80,6 +80,90 @@ The Control Module is the only writer of the state files. Services must stay
 idempotent: replayed `POST /ingest` calls answer `available`, replayed
 `POST /index/update` calls never create duplicate postings.
 
+## Run the whole stack with Docker Compose
+
+The repository includes a `docker-compose.yml` that deploys the whole system:
+MongoDB, ingestion, indexing, and search services, plus the control module for
+orchestration.
+
+```bash
+# Build and start all services
+docker compose up --build -d
+
+# Check service health
+docker compose ps
+
+# Run a control module task
+docker compose run --rm control -ids 1342,84
+
+# View logs
+docker compose logs -f ingestion indexing search
+
+# Stop all services
+docker compose down
+```
+
+### Replica Configuration (for benchmarking)
+
+To test horizontal scaling of the search service, use the replica override file:
+
+```bash
+# Start with 2 search replicas + nginx load balancer
+docker compose -f docker-compose.yml -f docker-compose.replicas.yml up --build -d
+
+# The nginx load balancer will be available at http://localhost:7003
+# Individual search instances are not directly exposed
+```
+
+The `docker-compose.replicas.yml` file:
+- Scales the search service to 2 replicas
+- Adds an nginx reverse proxy as a load balancer on port 7003
+- Distributes requests across search replicas using round-robin
+
+### Resource Limits (for benchmarking)
+
+The `docker-compose.yml` includes commented resource limits for each service. To
+enable them, uncomment the `deploy.resources.limits` section for the service you
+want to constrain:
+
+```yaml
+services:
+  ingestion:
+    # ... other config ...
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+  
+  indexing:
+    # ... other config ...
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 1G
+  
+  search:
+    # ... other config ...
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+  
+  mongo:
+    # ... other config ...
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+```
+
+These limits help simulate production constraints and measure performance under
+resource constraints. Adjust the values based on your benchmarking needs.
+
 ## Control state files
 
 | File | Format | Meaning |

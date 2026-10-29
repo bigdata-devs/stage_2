@@ -18,6 +18,12 @@ services:
       timeout: 5s
       retries: 24
       start_period: 15s
+    # Uncomment for benchmark runs:
+    # deploy:
+    #   resources:
+    #     limits:
+    #       cpus: '2.0'
+    #       memory: 2G
 
   ingestion:
     build:
@@ -37,6 +43,12 @@ services:
       timeout: 5s
       retries: 24
       start_period: 10s
+    # Uncomment for benchmark runs:
+    # deploy:
+    #   resources:
+    #     limits:
+    #       cpus: '1.0'
+    #       memory: 512M
 
   indexing:
     build:
@@ -62,6 +74,12 @@ services:
       timeout: 5s
       retries: 24
       start_period: 10s
+    # Uncomment for benchmark runs:
+    # deploy:
+    #   resources:
+    #     limits:
+    #       cpus: '2.0'
+    #       memory: 1G
 
   search:
     build:
