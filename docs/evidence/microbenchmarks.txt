@@ -1,3 +1,4 @@
+# PROVISIONAL — development-host numbers pending the official session; see docs/evidence/benchmark_protocol.md. Do not cite in the report.
 Microbenchmarks of the Indexing Service text pipeline
 ======================================================
 

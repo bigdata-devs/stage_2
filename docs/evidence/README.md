@@ -4,11 +4,19 @@ Captured on 2026-10-18 from branch `feature/mongodb-datamart` (HEAD `6cc1e85`), 
 2026-10-19 from branch `feature/indexing-service` with the Index Lead deliverables (Indexing
 Service bridge, catalog endpoints, load benchmark).
 
+> **PROVISIONAL — every timing number in this folder.** The Go benchmark files and the k6 runs
+> were captured on development machines while the code was still moving; the banners at the top
+> of the benchmark files repeat the warning. None of it may be cited in the report: the official
+> session on the Stage-1 host, run per [`benchmark_protocol.md`](benchmark_protocol.md), replaces
+> the numbers in one atomic commit and drops the banners.
+
 | File | Contents |
 |---|---|
 | [`tests.txt`](tests.txt) | Verbose run of the full `internal/mongodb` suite: **34 PASS** (30 tests + 4 subtests), **0 skipped, 0 failed**, `go test -v -count=1 ./internal/mongodb/` against the live `mongo:7` container. |
 | [`benchmarks.txt`](benchmarks.txt) | Raw `go test -run '^$' -bench . -benchmem -benchtime 1s -count 10 ./internal/mongodb/` output: four benchmarks × ten samples (300-book corpus, one second or more per sample). |
 | [`benchstat.txt`](benchstat.txt) | The same run aggregated with `benchstat` (medians with 95 % confidence intervals, plus `B/op` and `allocs/op`). |
+| [`benchstat.csv`](benchstat.csv) | The same aggregated table in machine-readable CSV (`benchstat -format csv`), the format §6.3 asks for. |
+| [`benchmark_protocol.md`](benchmark_protocol.md) | Runbook of the official benchmark session: host record to fill in, preconditions, exact commands, replica experiment and the atomic replacement checklist. |
 | [`demo.md`](demo.md) | End-to-end transcript: datalake → Indexing Service → datamart → Search Service, with the literal request/response bodies of §1–§4. |
 | [`catalog_smoke.md`](catalog_smoke.md) | **2026-10-19.** HTTP transcript of the optional catalog endpoints (`GET /books/{book_id}`, `GET /search/filters`) plus the fail-fast start-up against an unreachable datamart. |
 | [`indexing_benchmark_2026-10-19T19-07-00-230Z.csv`](indexing_benchmark_2026-10-19T19-07-00-230Z.csv) | **2026-10-19.** k6 steady-state table per concurrency level: books indexed per second, latency percentiles, error rate. |
@@ -22,6 +30,8 @@ Service bridge, catalog endpoints, load benchmark).
 - Windows 11, Go `go1.27.0` (module targets `go1.25.0`), `goarch=amd64`
 - MongoDB `7.0.45` in Docker (`boogle-mongo-test`, port `27017`, database `boogle`)
 - CPU: Intel Core i7-14700HX (benchmarks report `GOMAXPROCS=28`)
+- RAM: 32 GB physical (31.7 GB usable); the Docker Desktop VM that runs MongoDB is capped at ≈16 GB and 28 CPUs, which bounds what the database can use
+- Storage: Samsung MZAL81T0HFLB NVMe SSD, 954 GB (the machine's only internal drive)
 - k6 `v2.2.0` (winget `GrafanaLabs.k6`) for the load benchmark
 
 ## Reproducing
@@ -33,6 +43,8 @@ gofmt -l . && go vet ./... && go test ./...                 # repository verific
 go test -v -count=1 ./internal/mongodb/ > docs/evidence/tests.txt   # §tests
 go test -run '^$' -bench . -benchmem -benchtime 1s -count 10 ./internal/mongodb/   # §benchmarks
 go run golang.org/x/perf/cmd/benchstat@latest <benchmarks-output>                  # §benchstat
+go run golang.org/x/perf/cmd/benchstat@latest -format csv <benchmarks-output> > docs/evidence/benchstat.csv  # §benchstat CSV
+# PowerShell: wrap the whole command in cmd /c "..." so ">" writes bytes, not UTF-16
 ```
 
 The demo additionally needs the two bridge files and the wiring from

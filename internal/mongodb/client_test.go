@@ -2,20 +2,36 @@ package mongodb
 
 import (
 	"context"
+	"fmt"
+	"os"
 	"testing"
 	"time"
 )
 
-// These tests exercise a live server. They skip automatically when none is reachable, so the
-// suite stays green on machines without MongoDB (the same policy as the Stage 1 Python tests).
+// These tests exercise a live server. TestMain probes availability once for the whole package,
+// so the suite stays green and skips fast on machines without MongoDB (the same policy as the
+// Stage 1 Python tests).
+
+var (
+	liveMongoConfig    Config
+	liveMongoAvailable bool
+)
+
+func TestMain(m *testing.M) {
+	liveMongoConfig = ConfigFromEnvironment()
+	liveMongoAvailable = Available(context.Background(), liveMongoConfig)
+	if !liveMongoAvailable {
+		fmt.Fprintf(os.Stderr, "no MongoDB reachable at %s; the live tests of this package will skip (set MONGO_URI or start a server)\n", liveMongoConfig.URI)
+	}
+	os.Exit(m.Run())
+}
 
 func liveConfig(t testing.TB) Config {
 	t.Helper()
-	config := ConfigFromEnvironment()
-	if !Available(context.Background(), config) {
-		t.Skipf("no MongoDB reachable at %s; set MONGO_URI or start a server", config.URI)
+	if !liveMongoAvailable {
+		t.Skipf("no MongoDB reachable at %s; set MONGO_URI or start a server", liveMongoConfig.URI)
 	}
-	return config
+	return liveMongoConfig
 }
 
 func TestConnectAndCloseRoundTrip(t *testing.T) {

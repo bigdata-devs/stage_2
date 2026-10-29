@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -14,19 +15,35 @@ import (
 	"boogle-engine/internal/mongodb"
 )
 
+var (
+	liveMongoConfig    mongodb.Config
+	liveMongoAvailable bool
+)
+
+// TestMain probes MongoDB once for the whole package, so the live tests skip instantly when no
+// server is reachable instead of each waiting for its own connection timeout.
+func TestMain(m *testing.M) {
+	liveMongoConfig = mongodb.ConfigFromEnvironment()
+	liveMongoAvailable = mongodb.Available(context.Background(), liveMongoConfig)
+	if !liveMongoAvailable {
+		fmt.Fprintf(os.Stderr, "MongoDB is not available at %s; the live tests of this package will skip (start it with: docker run -d --name boogle-mongo -p 27017:27017 mongo:7)\n", liveMongoConfig.URI)
+	}
+	os.Exit(m.Run())
+}
+
 // datamartTestStart connects to a live datamart dedicated to these tests. It skips the test when
-// MongoDB is not reachable and drops the collections it is about to pollute. The database name
-// is overridden so the suite never collides with the internal/mongodb tests, which the go test
-// command may run at the same time against the default database.
+// MongoDB was unreachable at start-up and drops the collections it is about to pollute. The
+// database name is overridden so the suite never collides with the internal/mongodb tests, which
+// the go test command may run at the same time against the default database.
 func datamartTestStart(t *testing.T) mongodb.Client {
 	t.Helper()
+	if !liveMongoAvailable {
+		t.Skipf("MongoDB is not available at %s; start it with: docker run -d --name boogle-mongo -p 27017:27017 mongo:7", liveMongoConfig.URI)
+	}
 	t.Setenv("MONGO_DATABASE", "boogle_indexing_bridge_test")
 	config := mongodb.ConfigFromEnvironment()
 	ctx, cancel := context.WithTimeout(context.Background(), mongodb.DefaultConnectTimeout)
 	defer cancel()
-	if !mongodb.Available(ctx, config) {
-		t.Skipf("MongoDB is not available at %s; start it with: docker run -d --name boogle-mongo -p 27017:27017 mongo:7", config.URI)
-	}
 	client, err := mongodb.Connect(ctx, config, mongodb.DefaultConnectTimeout)
 	if err != nil {
 		t.Fatalf("connect to datamart: %v", err)
