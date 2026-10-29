@@ -1,0 +1,407 @@
+ Container boogle-engine-mongo-1  Running
+ Container boogle-engine-ingestion-1  Running
+ Container boogle-engine-indexing-1  Running
+ Container boogle-engine-mongo-1  Waiting
+ Container boogle-engine-mongo-1  Healthy
+time=2026-10-29T23:18:30.884Z level=INFO msg="[CONTROL] starting run" books=100 workers=8 state_dir=/data/control
+time=2026-10-29T23:18:30.884Z level=INFO msg="[CONTROL] processing book" book_id=301
+time=2026-10-29T23:18:30.884Z level=INFO msg="[CONTROL] processing book" book_id=302
+time=2026-10-29T23:18:30.884Z level=INFO msg="[CONTROL] processing book" book_id=303
+time=2026-10-29T23:18:30.884Z level=INFO msg="[CONTROL] processing book" book_id=304
+time=2026-10-29T23:18:30.884Z level=INFO msg="[CONTROL] processing book" book_id=305
+time=2026-10-29T23:18:30.884Z level=INFO msg="[CONTROL] processing book" book_id=306
+time=2026-10-29T23:18:30.884Z level=INFO msg="[CONTROL] processing book" book_id=307
+time=2026-10-29T23:18:30.884Z level=INFO msg="[CONTROL] processing book" book_id=308
+time=2026-10-29T23:18:31.380Z level=INFO msg="[CONTROL] ingest step finished" book_id=303 duration=495.576302ms
+time=2026-10-29T23:18:31.404Z level=INFO msg="[CONTROL] index step finished" book_id=303 duration=24.5158ms
+time=2026-10-29T23:18:31.404Z level=INFO msg="[CONTROL] book indexed" book_id=303
+time=2026-10-29T23:18:31.404Z level=INFO msg="[CONTROL] processing book" book_id=309
+time=2026-10-29T23:18:31.515Z level=INFO msg="[CONTROL] ingest step finished" book_id=301 duration=631.405702ms
+time=2026-10-29T23:18:31.979Z level=INFO msg="[CONTROL] ingest step finished" book_id=304 duration=1.094505703s
+time=2026-10-29T23:18:31.983Z level=INFO msg="[CONTROL] ingest step finished" book_id=307 duration=1.098207803s
+time=2026-10-29T23:18:31.983Z level=INFO msg="[CONTROL] ingest step finished" book_id=302 duration=1.098915803s
+time=2026-10-29T23:18:31.988Z level=INFO msg="[CONTROL] ingest step finished" book_id=306 duration=1.103545303s
+time=2026-10-29T23:18:32.015Z level=INFO msg="[CONTROL] index step finished" book_id=302 duration=31.6637ms
+time=2026-10-29T23:18:32.015Z level=INFO msg="[CONTROL] book indexed" book_id=302
+time=2026-10-29T23:18:32.015Z level=INFO msg="[CONTROL] processing book" book_id=310
+time=2026-10-29T23:18:32.142Z level=INFO msg="[CONTROL] ingest step finished" book_id=308 duration=1.258163704s
+time=2026-10-29T23:18:32.147Z level=INFO msg="[CONTROL] ingest step finished" book_id=309 duration=742.559202ms
+time=2026-10-29T23:18:32.158Z level=INFO msg="[CONTROL] ingest step finished" book_id=305 duration=1.274172504s
+time=2026-10-29T23:18:32.272Z level=INFO msg="[CONTROL] ingest step finished" book_id=310 duration=257.171401ms
+time=2026-10-29T23:18:32.799Z level=INFO msg="[CONTROL] index step finished" book_id=301 duration=1.283304104s
+time=2026-10-29T23:18:32.799Z level=INFO msg="[CONTROL] book indexed" book_id=301
+time=2026-10-29T23:18:32.799Z level=INFO msg="[CONTROL] processing book" book_id=311
+time=2026-10-29T23:18:32.992Z level=INFO msg="[CONTROL] ingest step finished" book_id=311 duration=193.4292ms
+time=2026-10-29T23:18:36.452Z level=INFO msg="[CONTROL] index step finished" book_id=304 duration=4.472850735s
+time=2026-10-29T23:18:36.452Z level=INFO msg="[CONTROL] book indexed" book_id=304
+time=2026-10-29T23:18:36.452Z level=INFO msg="[CONTROL] processing book" book_id=312
+time=2026-10-29T23:18:36.516Z level=INFO msg="[CONTROL] index step finished" book_id=309 duration=4.368581942s
+time=2026-10-29T23:18:36.516Z level=INFO msg="[CONTROL] book indexed" book_id=309
+time=2026-10-29T23:18:36.516Z level=INFO msg="[CONTROL] processing book" book_id=313
+time=2026-10-29T23:18:36.899Z level=INFO msg="[CONTROL] ingest step finished" book_id=312 duration=447.412457ms
+time=2026-10-29T23:18:36.909Z level=INFO msg="[CONTROL] ingest step finished" book_id=313 duration=392.98715ms
+time=2026-10-29T23:18:37.328Z level=INFO msg="[CONTROL] index step finished" book_id=310 duration=5.055972645s
+time=2026-10-29T23:18:37.328Z level=INFO msg="[CONTROL] book indexed" book_id=310
+time=2026-10-29T23:18:37.328Z level=INFO msg="[CONTROL] processing book" book_id=314
+time=2026-10-29T23:18:37.789Z level=INFO msg="[CONTROL] index step finished" book_id=307 duration=5.806542104s
+time=2026-10-29T23:18:37.789Z level=INFO msg="[CONTROL] book indexed" book_id=307
+time=2026-10-29T23:18:37.789Z level=INFO msg="[CONTROL] processing book" book_id=315
+time=2026-10-29T23:18:37.793Z level=INFO msg="[CONTROL] ingest step finished" book_id=314 duration=464.873359ms
+time=2026-10-29T23:18:37.972Z level=INFO msg="[CONTROL] ingest step finished" book_id=315 duration=182.770023ms
+time=2026-10-29T23:18:38.453Z level=INFO msg="[CONTROL] index step finished" book_id=311 duration=5.461277885s
+time=2026-10-29T23:18:38.454Z level=INFO msg="[CONTROL] book indexed" book_id=311
+time=2026-10-29T23:18:38.454Z level=INFO msg="[CONTROL] processing book" book_id=316
+time=2026-10-29T23:18:38.792Z level=INFO msg="[CONTROL] ingest step finished" book_id=316 duration=338.919343ms
+time=2026-10-29T23:18:38.911Z level=INFO msg="[CONTROL] index step finished" book_id=306 duration=6.923251746s
+time=2026-10-29T23:18:38.911Z level=INFO msg="[CONTROL] book indexed" book_id=306
+time=2026-10-29T23:18:38.911Z level=INFO msg="[CONTROL] processing book" book_id=317
+time=2026-10-29T23:18:39.099Z level=INFO msg="[CONTROL] ingest step finished" book_id=317 duration=187.987724ms
+time=2026-10-29T23:18:39.400Z level=INFO msg="[CONTROL] index step finished" book_id=308 duration=7.257562907s
+time=2026-10-29T23:18:39.400Z level=INFO msg="[CONTROL] book indexed" book_id=308
+time=2026-10-29T23:18:39.400Z level=INFO msg="[CONTROL] processing book" book_id=318
+time=2026-10-29T23:18:39.720Z level=INFO msg="[CONTROL] ingest step finished" book_id=318 duration=319.80544ms
+time=2026-10-29T23:18:39.869Z level=INFO msg="[CONTROL] index step finished" book_id=313 duration=2.960307557s
+time=2026-10-29T23:18:39.870Z level=INFO msg="[CONTROL] book indexed" book_id=313
+time=2026-10-29T23:18:39.870Z level=INFO msg="[CONTROL] processing book" book_id=319
+time=2026-10-29T23:18:40.067Z level=INFO msg="[CONTROL] ingest step finished" book_id=319 duration=197.612199ms
+time=2026-10-29T23:18:40.675Z level=INFO msg="[CONTROL] index step finished" book_id=312 duration=3.775844453s
+time=2026-10-29T23:18:40.675Z level=INFO msg="[CONTROL] book indexed" book_id=312
+time=2026-10-29T23:18:40.675Z level=INFO msg="[CONTROL] processing book" book_id=320
+time=2026-10-29T23:18:40.705Z level=INFO msg="[CONTROL] index step finished" book_id=305 duration=8.546429943s
+time=2026-10-29T23:18:40.705Z level=INFO msg="[CONTROL] book indexed" book_id=305
+time=2026-10-29T23:18:40.705Z level=INFO msg="[CONTROL] processing book" book_id=321
+time=2026-10-29T23:18:40.852Z level=INFO msg="[CONTROL] ingest step finished" book_id=320 duration=176.688198ms
+time=2026-10-29T23:18:41.004Z level=INFO msg="[CONTROL] ingest step finished" book_id=321 duration=299.281298ms
+time=2026-10-29T23:18:41.836Z level=INFO msg="[CONTROL] index step finished" book_id=320 duration=984.657423ms
+time=2026-10-29T23:18:41.837Z level=INFO msg="[CONTROL] book indexed" book_id=320
+time=2026-10-29T23:18:41.837Z level=INFO msg="[CONTROL] processing book" book_id=322
+time=2026-10-29T23:18:42.189Z level=INFO msg="[CONTROL] index step finished" book_id=315 duration=4.217186105s
+time=2026-10-29T23:18:42.189Z level=INFO msg="[CONTROL] index step finished" book_id=317 duration=3.090122162s
+time=2026-10-29T23:18:42.189Z level=INFO msg="[CONTROL] book indexed" book_id=315
+time=2026-10-29T23:18:42.189Z level=INFO msg="[CONTROL] book indexed" book_id=317
+time=2026-10-29T23:18:42.189Z level=INFO msg="[CONTROL] processing book" book_id=323
+time=2026-10-29T23:18:42.189Z level=INFO msg="[CONTROL] processing book" book_id=324
+time=2026-10-29T23:18:42.312Z level=INFO msg="[CONTROL] ingest step finished" book_id=322 duration=475.168655ms
+time=2026-10-29T23:18:42.470Z level=INFO msg="[CONTROL] ingest step finished" book_id=324 duration=280.038673ms
+time=2026-10-29T23:18:42.485Z level=INFO msg="[CONTROL] ingest step finished" book_id=323 duration=295.141872ms
+time=2026-10-29T23:18:44.180Z level=INFO msg="[CONTROL] index step finished" book_id=314 duration=6.386698036s
+time=2026-10-29T23:18:44.180Z level=INFO msg="[CONTROL] book indexed" book_id=314
+time=2026-10-29T23:18:44.180Z level=INFO msg="[CONTROL] processing book" book_id=325
+time=2026-10-29T23:18:44.866Z level=INFO msg="[CONTROL] ingest step finished" book_id=325 duration=686.498334ms
+time=2026-10-29T23:18:45.781Z level=INFO msg="[CONTROL] index step finished" book_id=316 duration=6.988010756s
+time=2026-10-29T23:18:45.781Z level=INFO msg="[CONTROL] book indexed" book_id=316
+time=2026-10-29T23:18:45.781Z level=INFO msg="[CONTROL] processing book" book_id=326
+time=2026-10-29T23:18:46.374Z level=INFO msg="[CONTROL] ingest step finished" book_id=326 duration=593.508143ms
+time=2026-10-29T23:18:46.695Z level=INFO msg="[CONTROL] index step finished" book_id=324 duration=4.224668194s
+time=2026-10-29T23:18:46.696Z level=INFO msg="[CONTROL] book indexed" book_id=324
+time=2026-10-29T23:18:46.696Z level=INFO msg="[CONTROL] processing book" book_id=327
+time=2026-10-29T23:18:46.832Z level=INFO msg="[CONTROL] index step finished" book_id=321 duration=5.827173444s
+time=2026-10-29T23:18:46.832Z level=INFO msg="[CONTROL] book indexed" book_id=321
+time=2026-10-29T23:18:46.832Z level=INFO msg="[CONTROL] processing book" book_id=328
+time=2026-10-29T23:18:46.874Z level=INFO msg="[CONTROL] ingest step finished" book_id=327 duration=178.479482ms
+time=2026-10-29T23:18:47.019Z level=INFO msg="[CONTROL] ingest step finished" book_id=328 duration=186.934782ms
+time=2026-10-29T23:18:47.045Z level=INFO msg="[CONTROL] index step finished" book_id=318 duration=7.324799817s
+time=2026-10-29T23:18:47.045Z level=INFO msg="[CONTROL] book indexed" book_id=318
+time=2026-10-29T23:18:47.045Z level=INFO msg="[CONTROL] processing book" book_id=329
+time=2026-10-29T23:18:47.233Z level=INFO msg="[CONTROL] ingest step finished" book_id=329 duration=187.656682ms
+time=2026-10-29T23:18:48.993Z level=INFO msg="[CONTROL] index step finished" book_id=319 duration=8.925538928s
+time=2026-10-29T23:18:48.993Z level=INFO msg="[CONTROL] book indexed" book_id=319
+time=2026-10-29T23:18:48.993Z level=INFO msg="[CONTROL] processing book" book_id=330
+time=2026-10-29T23:18:49.130Z level=INFO msg="[CONTROL] index step finished" book_id=323 duration=6.645794764s
+time=2026-10-29T23:18:49.131Z level=INFO msg="[CONTROL] book indexed" book_id=323
+time=2026-10-29T23:18:49.131Z level=INFO msg="[CONTROL] processing book" book_id=331
+time=2026-10-29T23:18:49.690Z level=INFO msg="[CONTROL] ingest step finished" book_id=330 duration=697.228666ms
+time=2026-10-29T23:18:49.853Z level=INFO msg="[CONTROL] ingest step finished" book_id=331 duration=722.305768ms
+time=2026-10-29T23:18:51.610Z level=INFO msg="[CONTROL] index step finished" book_id=327 duration=4.736145676s
+time=2026-10-29T23:18:51.610Z level=INFO msg="[CONTROL] book indexed" book_id=327
+time=2026-10-29T23:18:51.610Z level=INFO msg="[CONTROL] processing book" book_id=332
+time=2026-10-29T23:18:51.650Z level=INFO msg="[CONTROL] index step finished" book_id=322 duration=9.338289334s
+time=2026-10-29T23:18:51.650Z level=INFO msg="[CONTROL] book indexed" book_id=322
+time=2026-10-29T23:18:51.650Z level=INFO msg="[CONTROL] processing book" book_id=333
+time=2026-10-29T23:18:51.686Z level=INFO msg="[CONTROL] index step finished" book_id=328 duration=4.667834186s
+time=2026-10-29T23:18:51.687Z level=INFO msg="[CONTROL] book indexed" book_id=328
+time=2026-10-29T23:18:51.687Z level=INFO msg="[CONTROL] processing book" book_id=334
+time=2026-10-29T23:18:52.220Z level=INFO msg="[CONTROL] ingest step finished" book_id=333 duration=570.208175ms
+time=2026-10-29T23:18:52.221Z level=INFO msg="[CONTROL] ingest step finished" book_id=332 duration=610.119873ms
+time=2026-10-29T23:18:52.226Z level=INFO msg="[CONTROL] ingest step finished" book_id=334 duration=539.001376ms
+time=2026-10-29T23:18:52.335Z level=INFO msg="[CONTROL] index step finished" book_id=325 duration=7.46841965s
+time=2026-10-29T23:18:52.335Z level=INFO msg="[CONTROL] book indexed" book_id=325
+time=2026-10-29T23:18:52.335Z level=INFO msg="[CONTROL] processing book" book_id=335
+time=2026-10-29T23:18:52.515Z level=INFO msg="[CONTROL] ingest step finished" book_id=335 duration=180.534392ms
+time=2026-10-29T23:18:52.800Z level=INFO msg="[CONTROL] index step finished" book_id=329 duration=5.566790857s
+time=2026-10-29T23:18:52.800Z level=INFO msg="[CONTROL] book indexed" book_id=329
+time=2026-10-29T23:18:52.800Z level=INFO msg="[CONTROL] processing book" book_id=336
+time=2026-10-29T23:18:52.986Z level=INFO msg="[CONTROL] ingest step finished" book_id=336 duration=186.197892ms
+time=2026-10-29T23:18:54.525Z level=INFO msg="[CONTROL] index step finished" book_id=326 duration=8.151095797s
+time=2026-10-29T23:18:54.525Z level=INFO msg="[CONTROL] book indexed" book_id=326
+time=2026-10-29T23:18:54.525Z level=INFO msg="[CONTROL] processing book" book_id=337
+time=2026-10-29T23:18:55.148Z level=INFO msg="[CONTROL] ingest step finished" book_id=337 duration=623.040372ms
+time=2026-10-29T23:18:55.347Z level=INFO msg="[CONTROL] index step finished" book_id=330 duration=5.657183447s
+time=2026-10-29T23:18:55.348Z level=INFO msg="[CONTROL] book indexed" book_id=330
+time=2026-10-29T23:18:55.348Z level=INFO msg="[CONTROL] processing book" book_id=338
+time=2026-10-29T23:18:55.522Z level=INFO msg="[CONTROL] ingest step finished" book_id=338 duration=174.534492ms
+time=2026-10-29T23:18:55.615Z level=INFO msg="[CONTROL] index step finished" book_id=334 duration=3.389595248s
+time=2026-10-29T23:18:55.615Z level=INFO msg="[CONTROL] book indexed" book_id=334
+time=2026-10-29T23:18:55.615Z level=INFO msg="[CONTROL] processing book" book_id=339
+time=2026-10-29T23:18:55.713Z level=INFO msg="[CONTROL] index step finished" book_id=333 duration=3.492964044s
+time=2026-10-29T23:18:55.713Z level=INFO msg="[CONTROL] book indexed" book_id=333
+time=2026-10-29T23:18:55.713Z level=INFO msg="[CONTROL] processing book" book_id=340
+time=2026-10-29T23:18:55.929Z level=INFO msg="[CONTROL] ingest step finished" book_id=339 duration=313.621586ms
+time=2026-10-29T23:18:55.937Z level=INFO msg="[CONTROL] ingest step finished" book_id=340 duration=223.02029ms
+time=2026-10-29T23:18:57.990Z level=INFO msg="[CONTROL] index step finished" book_id=335 duration=5.474626078s
+time=2026-10-29T23:18:57.990Z level=INFO msg="[CONTROL] book indexed" book_id=335
+time=2026-10-29T23:18:57.990Z level=INFO msg="[CONTROL] processing book" book_id=341
+time=2026-10-29T23:18:58.416Z level=INFO msg="[CONTROL] index step finished" book_id=332 duration=6.195259856s
+time=2026-10-29T23:18:58.416Z level=INFO msg="[CONTROL] book indexed" book_id=332
+time=2026-10-29T23:18:58.416Z level=INFO msg="[CONTROL] processing book" book_id=342
+time=2026-10-29T23:18:58.450Z level=INFO msg="[CONTROL] ingest step finished" book_id=341 duration=459.51929ms
+time=2026-10-29T23:18:58.598Z level=INFO msg="[CONTROL] ingest step finished" book_id=342 duration=182.298796ms
+time=2026-10-29T23:18:58.760Z level=INFO msg="[CONTROL] index step finished" book_id=331 duration=8.907177943s
+time=2026-10-29T23:18:58.760Z level=INFO msg="[CONTROL] book indexed" book_id=331
+time=2026-10-29T23:18:58.760Z level=INFO msg="[CONTROL] processing book" book_id=343
+time=2026-10-29T23:18:58.832Z level=INFO msg="[CONTROL] index step finished" book_id=336 duration=5.845786882s
+time=2026-10-29T23:18:58.832Z level=INFO msg="[CONTROL] book indexed" book_id=336
+time=2026-10-29T23:18:58.832Z level=INFO msg="[CONTROL] processing book" book_id=344
+time=2026-10-29T23:18:58.884Z level=INFO msg="[CONTROL] index step finished" book_id=338 duration=3.361626295s
+time=2026-10-29T23:18:58.884Z level=INFO msg="[CONTROL] book indexed" book_id=338
+time=2026-10-29T23:18:58.884Z level=INFO msg="[CONTROL] processing book" book_id=345
+time=2026-10-29T23:18:58.928Z level=INFO msg="[CONTROL] ingest step finished" book_id=343 duration=168.030397ms
+time=2026-10-29T23:18:59.080Z level=INFO msg="[CONTROL] ingest step finished" book_id=344 duration=247.999495ms
+time=2026-10-29T23:18:59.218Z level=INFO msg="[CONTROL] ingest step finished" book_id=345 duration=334.207293ms
+time=2026-10-29T23:19:00.206Z level=INFO msg="[CONTROL] index step finished" book_id=340 duration=4.269363386s
+time=2026-10-29T23:19:00.206Z level=INFO msg="[CONTROL] book indexed" book_id=340
+time=2026-10-29T23:19:00.206Z level=INFO msg="[CONTROL] processing book" book_id=346
+time=2026-10-29T23:19:00.547Z level=INFO msg="[CONTROL] ingest step finished" book_id=346 duration=341.238893ms
+time=2026-10-29T23:19:01.791Z level=INFO msg="[CONTROL] index step finished" book_id=343 duration=2.862815242s
+time=2026-10-29T23:19:01.791Z level=INFO msg="[CONTROL] book indexed" book_id=343
+time=2026-10-29T23:19:01.791Z level=INFO msg="[CONTROL] processing book" book_id=347
+time=2026-10-29T23:19:01.889Z level=INFO msg="[CONTROL] index step finished" book_id=337 duration=6.740500317s
+time=2026-10-29T23:19:01.889Z level=INFO msg="[CONTROL] book indexed" book_id=337
+time=2026-10-29T23:19:01.889Z level=INFO msg="[CONTROL] processing book" book_id=348
+time=2026-10-29T23:19:02.395Z level=INFO msg="[CONTROL] ingest step finished" book_id=347 duration=604.199688ms
+time=2026-10-29T23:19:02.419Z level=INFO msg="[CONTROL] index step finished" book_id=339 duration=6.489585342s
+time=2026-10-29T23:19:02.419Z level=INFO msg="[CONTROL] book indexed" book_id=339
+time=2026-10-29T23:19:02.419Z level=INFO msg="[CONTROL] processing book" book_id=349
+time=2026-10-29T23:19:02.547Z level=INFO msg="[CONTROL] ingest step finished" book_id=348 duration=657.440987ms
+time=2026-10-29T23:19:02.697Z level=INFO msg="[CONTROL] ingest step finished" book_id=349 duration=278.690794ms
+time=2026-10-29T23:19:03.382Z level=INFO msg="[CONTROL] index step finished" book_id=341 duration=4.932612101s
+time=2026-10-29T23:19:03.382Z level=INFO msg="[CONTROL] book indexed" book_id=341
+time=2026-10-29T23:19:03.383Z level=INFO msg="[CONTROL] processing book" book_id=350
+time=2026-10-29T23:19:03.575Z level=INFO msg="[CONTROL] index step finished" book_id=342 duration=4.9762948s
+time=2026-10-29T23:19:03.575Z level=INFO msg="[CONTROL] book indexed" book_id=342
+time=2026-10-29T23:19:03.575Z level=INFO msg="[CONTROL] processing book" book_id=351
+time=2026-10-29T23:19:03.721Z level=INFO msg="[CONTROL] ingest step finished" book_id=350 duration=338.104793ms
+time=2026-10-29T23:19:04.055Z level=INFO msg="[CONTROL] ingest step finished" book_id=351 duration=480.559491ms
+time=2026-10-29T23:19:07.985Z level=INFO msg="[CONTROL] index step finished" book_id=344 duration=8.90522452s
+time=2026-10-29T23:19:07.985Z level=INFO msg="[CONTROL] book indexed" book_id=344
+time=2026-10-29T23:19:07.985Z level=INFO msg="[CONTROL] processing book" book_id=352
+time=2026-10-29T23:19:08.391Z level=INFO msg="[CONTROL] index step finished" book_id=347 duration=5.995839579s
+time=2026-10-29T23:19:08.391Z level=INFO msg="[CONTROL] book indexed" book_id=347
+time=2026-10-29T23:19:08.391Z level=INFO msg="[CONTROL] processing book" book_id=353
+time=2026-10-29T23:19:08.584Z level=INFO msg="[CONTROL] ingest step finished" book_id=352 duration=598.628988ms
+time=2026-10-29T23:19:08.598Z level=INFO msg="[CONTROL] ingest step finished" book_id=353 duration=206.540996ms
+time=2026-10-29T23:19:08.964Z level=INFO msg="[CONTROL] index step finished" book_id=345 duration=9.745432704s
+time=2026-10-29T23:19:08.964Z level=INFO msg="[CONTROL] book indexed" book_id=345
+time=2026-10-29T23:19:08.964Z level=INFO msg="[CONTROL] processing book" book_id=354
+time=2026-10-29T23:19:09.286Z level=INFO msg="[CONTROL] ingest step finished" book_id=354 duration=321.895793ms
+time=2026-10-29T23:19:09.990Z level=INFO msg="[CONTROL] index step finished" book_id=346 duration=9.44230391s
+time=2026-10-29T23:19:09.990Z level=INFO msg="[CONTROL] book indexed" book_id=346
+time=2026-10-29T23:19:09.990Z level=INFO msg="[CONTROL] processing book" book_id=355
+time=2026-10-29T23:19:10.168Z level=INFO msg="[CONTROL] ingest step finished" book_id=355 duration=177.895996ms
+time=2026-10-29T23:19:10.580Z level=INFO msg="[CONTROL] index step finished" book_id=348 duration=8.033044638s
+time=2026-10-29T23:19:10.580Z level=INFO msg="[CONTROL] book indexed" book_id=348
+time=2026-10-29T23:19:10.580Z level=INFO msg="[CONTROL] processing book" book_id=356
+time=2026-10-29T23:19:10.964Z level=INFO msg="[CONTROL] ingest step finished" book_id=356 duration=384.462092ms
+time=2026-10-29T23:19:11.765Z level=INFO msg="[CONTROL] index step finished" book_id=349 duration=9.067367717s
+time=2026-10-29T23:19:11.765Z level=INFO msg="[CONTROL] book indexed" book_id=349
+time=2026-10-29T23:19:11.765Z level=INFO msg="[CONTROL] processing book" book_id=357
+time=2026-10-29T23:19:12.092Z level=INFO msg="[CONTROL] ingest step finished" book_id=357 duration=326.955394ms
+time=2026-10-29T23:19:13.246Z level=INFO msg="[CONTROL] index step finished" book_id=350 duration=9.525218237s
+time=2026-10-29T23:19:13.246Z level=INFO msg="[CONTROL] book indexed" book_id=350
+time=2026-10-29T23:19:13.246Z level=INFO msg="[CONTROL] processing book" book_id=358
+time=2026-10-29T23:19:13.742Z level=INFO msg="[CONTROL] ingest step finished" book_id=358 duration=495.661686ms
+time=2026-10-29T23:19:14.299Z level=INFO msg="[CONTROL] index step finished" book_id=355 duration=4.131134951s
+time=2026-10-29T23:19:14.299Z level=INFO msg="[CONTROL] book indexed" book_id=355
+time=2026-10-29T23:19:14.299Z level=INFO msg="[CONTROL] processing book" book_id=359
+time=2026-10-29T23:19:14.480Z level=INFO msg="[CONTROL] index step finished" book_id=353 duration=5.88197615s
+time=2026-10-29T23:19:14.480Z level=INFO msg="[CONTROL] book indexed" book_id=353
+time=2026-10-29T23:19:14.480Z level=INFO msg="[CONTROL] processing book" book_id=360
+time=2026-10-29T23:19:14.903Z level=INFO msg="[CONTROL] ingest step finished" book_id=359 duration=604.144205ms
+time=2026-10-29T23:19:15.190Z level=INFO msg="[CONTROL] ingest step finished" book_id=360 duration=710.290324ms
+time=2026-10-29T23:19:15.513Z level=INFO msg="[CONTROL] index step finished" book_id=352 duration=6.929349231s
+time=2026-10-29T23:19:15.513Z level=INFO msg="[CONTROL] book indexed" book_id=352
+time=2026-10-29T23:19:15.513Z level=INFO msg="[CONTROL] processing book" book_id=361
+time=2026-10-29T23:19:15.643Z level=INFO msg="[CONTROL] index step finished" book_id=351 duration=11.587632161s
+time=2026-10-29T23:19:15.643Z level=INFO msg="[CONTROL] book indexed" book_id=351
+time=2026-10-29T23:19:15.643Z level=INFO msg="[CONTROL] processing book" book_id=362
+time=2026-10-29T23:19:15.719Z level=INFO msg="[CONTROL] ingest step finished" book_id=361 duration=206.085736ms
+time=2026-10-29T23:19:15.862Z level=INFO msg="[CONTROL] ingest step finished" book_id=362 duration=218.664638ms
+time=2026-10-29T23:19:16.531Z level=INFO msg="[CONTROL] index step finished" book_id=357 duration=4.439128778s
+time=2026-10-29T23:19:16.531Z level=INFO msg="[CONTROL] book indexed" book_id=357
+time=2026-10-29T23:19:16.531Z level=INFO msg="[CONTROL] processing book" book_id=363
+time=2026-10-29T23:19:16.720Z level=INFO msg="[CONTROL] ingest step finished" book_id=363 duration=188.699433ms
+time=2026-10-29T23:19:17.246Z level=INFO msg="[CONTROL] index step finished" book_id=356 duration=6.281251281s
+time=2026-10-29T23:19:17.246Z level=INFO msg="[CONTROL] book indexed" book_id=356
+time=2026-10-29T23:19:17.246Z level=INFO msg="[CONTROL] processing book" book_id=364
+time=2026-10-29T23:19:17.714Z level=INFO msg="[CONTROL] ingest step finished" book_id=364 duration=468.378182ms
+time=2026-10-29T23:19:17.841Z level=INFO msg="[CONTROL] index step finished" book_id=354 duration=8.555093051s
+time=2026-10-29T23:19:17.841Z level=INFO msg="[CONTROL] book indexed" book_id=354
+time=2026-10-29T23:19:17.841Z level=INFO msg="[CONTROL] processing book" book_id=365
+time=2026-10-29T23:19:18.030Z level=INFO msg="[CONTROL] ingest step finished" book_id=365 duration=189.559433ms
+time=2026-10-29T23:19:18.502Z level=INFO msg="[CONTROL] index step finished" book_id=358 duration=4.759933831s
+time=2026-10-29T23:19:18.502Z level=INFO msg="[CONTROL] book indexed" book_id=358
+time=2026-10-29T23:19:18.502Z level=INFO msg="[CONTROL] processing book" book_id=366
+time=2026-10-29T23:19:18.689Z level=INFO msg="[CONTROL] ingest step finished" book_id=366 duration=187.550533ms
+time=2026-10-29T23:19:22.820Z level=INFO msg="[CONTROL] index step finished" book_id=362 duration=6.957975278s
+time=2026-10-29T23:19:22.820Z level=INFO msg="[CONTROL] book indexed" book_id=362
+time=2026-10-29T23:19:22.820Z level=INFO msg="[CONTROL] processing book" book_id=367
+time=2026-10-29T23:19:23.279Z level=INFO msg="[CONTROL] ingest step finished" book_id=367 duration=458.698238ms
+time=2026-10-29T23:19:23.452Z level=INFO msg="[CONTROL] index step finished" book_id=361 duration=7.731928754s
+time=2026-10-29T23:19:23.452Z level=INFO msg="[CONTROL] book indexed" book_id=361
+time=2026-10-29T23:19:23.452Z level=INFO msg="[CONTROL] processing book" book_id=368
+time=2026-10-29T23:19:23.474Z level=INFO msg="[CONTROL] index step finished" book_id=363 duration=6.753595981s
+time=2026-10-29T23:19:23.474Z level=INFO msg="[CONTROL] book indexed" book_id=363
+time=2026-10-29T23:19:23.474Z level=INFO msg="[CONTROL] processing book" book_id=369
+time=2026-10-29T23:19:23.770Z level=INFO msg="[CONTROL] ingest step finished" book_id=368 duration=317.890525ms
+time=2026-10-29T23:19:23.921Z level=INFO msg="[CONTROL] ingest step finished" book_id=369 duration=446.893437ms
+time=2026-10-29T23:19:24.141Z level=INFO msg="[CONTROL] index step finished" book_id=359 duration=9.237346253s
+time=2026-10-29T23:19:24.141Z level=INFO msg="[CONTROL] book indexed" book_id=359
+time=2026-10-29T23:19:24.141Z level=INFO msg="[CONTROL] processing book" book_id=370
+time=2026-10-29T23:19:24.476Z level=INFO msg="[CONTROL] ingest step finished" book_id=370 duration=335.672627ms
+time=2026-10-29T23:19:24.746Z level=INFO msg="[CONTROL] index step finished" book_id=365 duration=6.715621556s
+time=2026-10-29T23:19:24.746Z level=INFO msg="[CONTROL] book indexed" book_id=365
+time=2026-10-29T23:19:24.746Z level=INFO msg="[CONTROL] processing book" book_id=371
+time=2026-10-29T23:19:24.946Z level=INFO msg="[CONTROL] ingest step finished" book_id=371 duration=199.518916ms
+time=2026-10-29T23:19:25.172Z level=INFO msg="[CONTROL] index step finished" book_id=366 duration=6.482125475s
+time=2026-10-29T23:19:25.172Z level=INFO msg="[CONTROL] book indexed" book_id=366
+time=2026-10-29T23:19:25.172Z level=INFO msg="[CONTROL] processing book" book_id=372
+time=2026-10-29T23:19:25.521Z level=INFO msg="[CONTROL] ingest step finished" book_id=372 duration=348.828829ms
+time=2026-10-29T23:19:25.822Z level=INFO msg="[CONTROL] index step finished" book_id=360 duration=10.631101139s
+time=2026-10-29T23:19:25.822Z level=INFO msg="[CONTROL] book indexed" book_id=360
+time=2026-10-29T23:19:25.822Z level=INFO msg="[CONTROL] processing book" book_id=373
+time=2026-10-29T23:19:26.160Z level=INFO msg="[CONTROL] ingest step finished" book_id=373 duration=338.684328ms
+time=2026-10-29T23:19:26.457Z level=INFO msg="[CONTROL] index step finished" book_id=364 duration=8.74258225s
+time=2026-10-29T23:19:26.457Z level=INFO msg="[CONTROL] book indexed" book_id=364
+time=2026-10-29T23:19:26.457Z level=INFO msg="[CONTROL] processing book" book_id=374
+time=2026-10-29T23:19:26.641Z level=INFO msg="[CONTROL] ingest step finished" book_id=374 duration=183.973315ms
+time=2026-10-29T23:19:29.886Z level=INFO msg="[CONTROL] index step finished" book_id=367 duration=6.607072034s
+time=2026-10-29T23:19:29.886Z level=INFO msg="[CONTROL] book indexed" book_id=367
+time=2026-10-29T23:19:29.886Z level=INFO msg="[CONTROL] processing book" book_id=375
+time=2026-10-29T23:19:30.184Z level=INFO msg="[CONTROL] ingest step finished" book_id=375 duration=298.120523ms
+time=2026-10-29T23:19:30.527Z level=INFO msg="[CONTROL] index step finished" book_id=368 duration=6.757406144s
+time=2026-10-29T23:19:30.527Z level=INFO msg="[CONTROL] book indexed" book_id=368
+time=2026-10-29T23:19:30.527Z level=INFO msg="[CONTROL] processing book" book_id=376
+time=2026-10-29T23:19:31.163Z level=INFO msg="[CONTROL] ingest step finished" book_id=376 duration=635.686249ms
+time=2026-10-29T23:19:32.084Z level=INFO msg="[CONTROL] index step finished" book_id=369 duration=8.162845452s
+time=2026-10-29T23:19:32.084Z level=INFO msg="[CONTROL] book indexed" book_id=369
+time=2026-10-29T23:19:32.084Z level=INFO msg="[CONTROL] processing book" book_id=377
+time=2026-10-29T23:19:32.157Z level=INFO msg="[CONTROL] index step finished" book_id=371 duration=7.211167175s
+time=2026-10-29T23:19:32.157Z level=INFO msg="[CONTROL] book indexed" book_id=371
+time=2026-10-29T23:19:32.157Z level=INFO msg="[CONTROL] processing book" book_id=378
+time=2026-10-29T23:19:32.277Z level=INFO msg="[CONTROL] index step finished" book_id=375 duration=2.093093262s
+time=2026-10-29T23:19:32.277Z level=INFO msg="[CONTROL] book indexed" book_id=375
+time=2026-10-29T23:19:32.277Z level=INFO msg="[CONTROL] processing book" book_id=379
+time=2026-10-29T23:19:32.355Z level=INFO msg="[CONTROL] index step finished" book_id=370 duration=7.878275728s
+time=2026-10-29T23:19:32.355Z level=INFO msg="[CONTROL] book indexed" book_id=370
+time=2026-10-29T23:19:32.355Z level=INFO msg="[CONTROL] processing book" book_id=380
+time=2026-10-29T23:19:32.386Z level=INFO msg="[CONTROL] ingest step finished" book_id=377 duration=302.330524ms
+time=2026-10-29T23:19:32.834Z level=INFO msg="[CONTROL] ingest step finished" book_id=378 duration=676.500753ms
+time=2026-10-29T23:19:32.858Z level=INFO msg="[CONTROL] ingest step finished" book_id=379 duration=580.487345ms
+time=2026-10-29T23:19:32.858Z level=INFO msg="[CONTROL] ingest step finished" book_id=380 duration=503.022939ms
+time=2026-10-29T23:19:33.374Z level=INFO msg="[CONTROL] index step finished" book_id=374 duration=6.732732531s
+time=2026-10-29T23:19:33.374Z level=INFO msg="[CONTROL] book indexed" book_id=374
+time=2026-10-29T23:19:33.374Z level=INFO msg="[CONTROL] processing book" book_id=381
+time=2026-10-29T23:19:33.575Z level=INFO msg="[CONTROL] ingest step finished" book_id=381 duration=201.403916ms
+time=2026-10-29T23:19:34.555Z level=INFO msg="[CONTROL] index step finished" book_id=372 duration=9.034508314s
+time=2026-10-29T23:19:34.555Z level=INFO msg="[CONTROL] book indexed" book_id=372
+time=2026-10-29T23:19:34.555Z level=INFO msg="[CONTROL] processing book" book_id=382
+time=2026-10-29T23:19:34.866Z level=INFO msg="[CONTROL] ingest step finished" book_id=382 duration=311.142024ms
+time=2026-10-29T23:19:34.897Z level=INFO msg="[CONTROL] index step finished" book_id=377 duration=2.510722995s
+time=2026-10-29T23:19:34.897Z level=INFO msg="[CONTROL] book indexed" book_id=377
+time=2026-10-29T23:19:34.897Z level=INFO msg="[CONTROL] processing book" book_id=383
+time=2026-10-29T23:19:35.071Z level=INFO msg="[CONTROL] ingest step finished" book_id=383 duration=173.717813ms
+time=2026-10-29T23:19:37.173Z level=INFO msg="[CONTROL] index step finished" book_id=373 duration=11.012495864s
+time=2026-10-29T23:19:37.173Z level=INFO msg="[CONTROL] book indexed" book_id=373
+time=2026-10-29T23:19:37.173Z level=INFO msg="[CONTROL] processing book" book_id=384
+time=2026-10-29T23:19:37.872Z level=INFO msg="[CONTROL] ingest step finished" book_id=384 duration=698.79561ms
+time=2026-10-29T23:19:38.503Z level=INFO msg="[CONTROL] index step finished" book_id=376 duration=7.339139183s
+time=2026-10-29T23:19:38.503Z level=INFO msg="[CONTROL] book indexed" book_id=376
+time=2026-10-29T23:19:38.503Z level=INFO msg="[CONTROL] processing book" book_id=385
+time=2026-10-29T23:19:38.832Z level=INFO msg="[CONTROL] ingest step finished" book_id=385 duration=328.960505ms
+time=2026-10-29T23:19:39.694Z level=INFO msg="[CONTROL] index step finished" book_id=383 duration=4.622972597s
+time=2026-10-29T23:19:39.694Z level=INFO msg="[CONTROL] book indexed" book_id=383
+time=2026-10-29T23:19:39.694Z level=INFO msg="[CONTROL] processing book" book_id=386
+time=2026-10-29T23:19:40.159Z level=INFO msg="[CONTROL] ingest step finished" book_id=386 duration=465.244106ms
+time=2026-10-29T23:19:40.772Z level=INFO msg="[CONTROL] index step finished" book_id=378 duration=7.938001584s
+time=2026-10-29T23:19:40.772Z level=INFO msg="[CONTROL] book indexed" book_id=378
+time=2026-10-29T23:19:40.772Z level=INFO msg="[CONTROL] processing book" book_id=387
+time=2026-10-29T23:19:41.045Z level=INFO msg="[CONTROL] index step finished" book_id=382 duration=6.178100331s
+time=2026-10-29T23:19:41.045Z level=INFO msg="[CONTROL] book indexed" book_id=382
+time=2026-10-29T23:19:41.045Z level=INFO msg="[CONTROL] processing book" book_id=388
+time=2026-10-29T23:19:41.234Z level=INFO msg="[CONTROL] ingest step finished" book_id=387 duration=462.424807ms
+time=2026-10-29T23:19:41.380Z level=INFO msg="[CONTROL] index step finished" book_id=380 duration=8.522302192s
+time=2026-10-29T23:19:41.380Z level=INFO msg="[CONTROL] book indexed" book_id=380
+time=2026-10-29T23:19:41.380Z level=INFO msg="[CONTROL] processing book" book_id=389
+time=2026-10-29T23:19:41.518Z level=INFO msg="[CONTROL] ingest step finished" book_id=388 duration=473.247007ms
+time=2026-10-29T23:19:41.562Z level=INFO msg="[CONTROL] ingest step finished" book_id=389 duration=181.594902ms
+time=2026-10-29T23:19:42.504Z level=INFO msg="[CONTROL] index step finished" book_id=379 duration=9.646221807s
+time=2026-10-29T23:19:42.504Z level=INFO msg="[CONTROL] book indexed" book_id=379
+time=2026-10-29T23:19:42.504Z level=INFO msg="[CONTROL] processing book" book_id=390
+time=2026-10-29T23:19:42.699Z level=INFO msg="[CONTROL] ingest step finished" book_id=390 duration=195.204003ms
+time=2026-10-29T23:19:43.107Z level=INFO msg="[CONTROL] index step finished" book_id=381 duration=9.531673359s
+time=2026-10-29T23:19:43.107Z level=INFO msg="[CONTROL] book indexed" book_id=381
+time=2026-10-29T23:19:43.107Z level=INFO msg="[CONTROL] processing book" book_id=391
+time=2026-10-29T23:19:43.463Z level=INFO msg="[CONTROL] ingest step finished" book_id=391 duration=355.822405ms
+time=2026-10-29T23:19:47.476Z level=INFO msg="[CONTROL] index step finished" book_id=384 duration=9.603509127s
+time=2026-10-29T23:19:47.476Z level=INFO msg="[CONTROL] book indexed" book_id=384
+time=2026-10-29T23:19:47.476Z level=INFO msg="[CONTROL] processing book" book_id=392
+time=2026-10-29T23:19:47.480Z level=INFO msg="[CONTROL] index step finished" book_id=385 duration=8.647667814s
+time=2026-10-29T23:19:47.480Z level=INFO msg="[CONTROL] book indexed" book_id=385
+time=2026-10-29T23:19:47.480Z level=INFO msg="[CONTROL] processing book" book_id=393
+time=2026-10-29T23:19:48.107Z level=INFO msg="[CONTROL] index step finished" book_id=389 duration=6.544916085s
+time=2026-10-29T23:19:48.107Z level=INFO msg="[CONTROL] book indexed" book_id=389
+time=2026-10-29T23:19:48.107Z level=INFO msg="[CONTROL] processing book" book_id=394
+time=2026-10-29T23:19:48.338Z level=INFO msg="[CONTROL] ingest step finished" book_id=393 duration=857.41331ms
+time=2026-10-29T23:19:48.362Z level=INFO msg="[CONTROL] ingest step finished" book_id=392 duration=886.187311ms
+time=2026-10-29T23:19:48.510Z level=INFO msg="[CONTROL] ingest step finished" book_id=394 duration=403.170004ms
+time=2026-10-29T23:19:49.561Z level=INFO msg="[CONTROL] index step finished" book_id=391 duration=6.097937876s
+time=2026-10-29T23:19:49.561Z level=INFO msg="[CONTROL] book indexed" book_id=391
+time=2026-10-29T23:19:49.561Z level=INFO msg="[CONTROL] processing book" book_id=395
+time=2026-10-29T23:19:49.951Z level=INFO msg="[CONTROL] ingest step finished" book_id=395 duration=390.293004ms
+time=2026-10-29T23:19:50.032Z level=INFO msg="[CONTROL] index step finished" book_id=390 duration=7.332881191s
+time=2026-10-29T23:19:50.032Z level=INFO msg="[CONTROL] book indexed" book_id=390
+time=2026-10-29T23:19:50.032Z level=INFO msg="[CONTROL] processing book" book_id=396
+time=2026-10-29T23:19:50.231Z level=INFO msg="[CONTROL] ingest step finished" book_id=396 duration=198.307603ms
+time=2026-10-29T23:19:51.165Z level=INFO msg="[CONTROL] index step finished" book_id=386 duration=11.00533074s
+time=2026-10-29T23:19:51.165Z level=INFO msg="[CONTROL] book indexed" book_id=386
+time=2026-10-29T23:19:51.165Z level=INFO msg="[CONTROL] processing book" book_id=397
+time=2026-10-29T23:19:51.483Z level=INFO msg="[CONTROL] ingest step finished" book_id=397 duration=318.009904ms
+time=2026-10-29T23:19:52.019Z level=INFO msg="[CONTROL] index step finished" book_id=396 duration=1.788549321s
+time=2026-10-29T23:19:52.020Z level=INFO msg="[CONTROL] book indexed" book_id=396
+time=2026-10-29T23:19:52.020Z level=INFO msg="[CONTROL] processing book" book_id=398
+time=2026-10-29T23:19:52.483Z level=INFO msg="[CONTROL] ingest step finished" book_id=398 duration=463.816605ms
+time=2026-10-29T23:19:53.865Z level=INFO msg="[CONTROL] index step finished" book_id=387 duration=12.630605356s
+time=2026-10-29T23:19:53.865Z level=INFO msg="[CONTROL] book indexed" book_id=387
+time=2026-10-29T23:19:53.865Z level=INFO msg="[CONTROL] processing book" book_id=399
+time=2026-10-29T23:19:54.472Z level=INFO msg="[CONTROL] ingest step finished" book_id=399 duration=606.625006ms
+time=2026-10-29T23:19:57.208Z level=INFO msg="[CONTROL] index step finished" book_id=397 duration=5.725263662s
+time=2026-10-29T23:19:57.209Z level=INFO msg="[CONTROL] book indexed" book_id=397
+time=2026-10-29T23:19:57.209Z level=INFO msg="[CONTROL] processing book" book_id=400
+time=2026-10-29T23:19:57.391Z level=INFO msg="[CONTROL] index step finished" book_id=398 duration=4.907272653s
+time=2026-10-29T23:19:57.391Z level=INFO msg="[CONTROL] book indexed" book_id=398
+time=2026-10-29T23:19:57.535Z level=INFO msg="[CONTROL] ingest step finished" book_id=400 duration=326.701704ms
+time=2026-10-29T23:19:57.829Z level=INFO msg="[CONTROL] index step finished" book_id=388 duration=16.311362094s
+time=2026-10-29T23:19:57.829Z level=INFO msg="[CONTROL] book indexed" book_id=388
+time=2026-10-29T23:19:58.802Z level=INFO msg="[CONTROL] index step finished" book_id=393 duration=10.464330817s
+time=2026-10-29T23:19:58.802Z level=INFO msg="[CONTROL] book indexed" book_id=393
+time=2026-10-29T23:19:59.473Z level=INFO msg="[CONTROL] index step finished" book_id=395 duration=9.521318605s
+time=2026-10-29T23:19:59.473Z level=INFO msg="[CONTROL] book indexed" book_id=395
+time=2026-10-29T23:19:59.526Z level=INFO msg="[CONTROL] index step finished" book_id=394 duration=11.015451523s
+time=2026-10-29T23:19:59.526Z level=INFO msg="[CONTROL] book indexed" book_id=394
+time=2026-10-29T23:19:59.588Z level=INFO msg="[CONTROL] index step finished" book_id=392 duration=11.225968524s
+time=2026-10-29T23:19:59.588Z level=INFO msg="[CONTROL] book indexed" book_id=392
+time=2026-10-29T23:20:01.216Z level=INFO msg="[CONTROL] index step finished" book_id=400 duration=3.680664738s
+time=2026-10-29T23:20:01.216Z level=INFO msg="[CONTROL] book indexed" book_id=400
+time=2026-10-29T23:20:01.780Z level=INFO msg="[CONTROL] index step finished" book_id=399 duration=7.307765479s
+time=2026-10-29T23:20:01.780Z level=INFO msg="[CONTROL] book indexed" book_id=399
+time=2026-10-29T23:20:01.780Z level=INFO msg="[CONTROL] run finished" indexed=100 skipped=0 failed=0 pending=0 elapsed=1m30.896s books_per_second=1.10 ingest_step_total=43.281s ingest_step_avg=433ms index_step_total=11m5.228s index_step_avg=6.652s
