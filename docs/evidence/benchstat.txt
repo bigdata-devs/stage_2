@@ -1,3 +1,4 @@
+# PROVISIONAL — development-host numbers pending the official session; see docs/evidence/benchmark_protocol.md. Do not cite in the report.
 goos: windows
 goarch: amd64
 pkg: boogle-engine/internal/mongodb

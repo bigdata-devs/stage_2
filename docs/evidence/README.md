@@ -4,6 +4,12 @@ Captured on 2026-10-18 from branch `feature/mongodb-datamart` (HEAD `6cc1e85`), 
 2026-10-19 from branch `feature/indexing-service` with the Index Lead deliverables (Indexing
 Service bridge, catalog endpoints, load benchmark).
 
+> **PROVISIONAL — every timing number in this folder.** The Go benchmark files and the k6 runs
+> were captured on development machines while the code was still moving; the banners at the top
+> of the benchmark files repeat the warning. None of it may be cited in the report: the official
+> session on the Stage-1 host, run per [`benchmark_protocol.md`](benchmark_protocol.md), replaces
+> the numbers in one atomic commit and drops the banners.
+
 | File | Contents |
 |---|---|
 | [`tests.txt`](tests.txt) | Verbose run of the full `internal/mongodb` suite: **34 PASS** (30 tests + 4 subtests), **0 skipped, 0 failed**, `go test -v -count=1 ./internal/mongodb/` against the live `mongo:7` container. |
