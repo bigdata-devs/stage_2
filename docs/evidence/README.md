@@ -10,6 +10,7 @@ Service bridge, catalog endpoints, load benchmark).
 | [`benchmarks.txt`](benchmarks.txt) | Raw `go test -run '^$' -bench . -benchmem -benchtime 1s -count 10 ./internal/mongodb/` output: four benchmarks × ten samples (300-book corpus, one second or more per sample). |
 | [`benchstat.txt`](benchstat.txt) | The same run aggregated with `benchstat` (medians with 95 % confidence intervals, plus `B/op` and `allocs/op`). |
 | [`benchstat.csv`](benchstat.csv) | The same aggregated table in machine-readable CSV (`benchstat -format csv`), the format §6.3 asks for. |
+| [`benchmark_protocol.md`](benchmark_protocol.md) | Runbook of the official benchmark session: host record to fill in, preconditions, exact commands, replica experiment and the atomic replacement checklist. |
 | [`demo.md`](demo.md) | End-to-end transcript: datalake → Indexing Service → datamart → Search Service, with the literal request/response bodies of §1–§4. |
 | [`catalog_smoke.md`](catalog_smoke.md) | **2026-10-19.** HTTP transcript of the optional catalog endpoints (`GET /books/{book_id}`, `GET /search/filters`) plus the fail-fast start-up against an unreachable datamart. |
 | [`indexing_benchmark_2026-10-19T19-07-00-230Z.csv`](indexing_benchmark_2026-10-19T19-07-00-230Z.csv) | **2026-10-19.** k6 steady-state table per concurrency level: books indexed per second, latency percentiles, error rate. |
