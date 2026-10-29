@@ -34,6 +34,8 @@ Nothing else is configured in code; ports and datalake paths keep using the exis
 docker run -d --name boogle-mongo -p 27017:27017 mongo:7
 ```
 
+**Server floor: MongoDB 5.2 or newer.** The write path's posting pipeline uses the `$sortArray` aggregation operator (introduced in 5.2). The package was developed and verified against MongoDB 7.0.45 — the version in the compose stack and behind every evidence run — and needs no newer server feature.
+
 Both services call `client.EnsureIndexes(ctx)` at start-up (idempotent), which creates the filter indexes on the books collection — compound `{author, language, publication_year}` plus `{language}` and `{publication_year}` — and the multikey `postings.book_id` index that lets the write path drop a book's previous postings in one bounded update.
 
 ## Data model
