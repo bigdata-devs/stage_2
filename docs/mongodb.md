@@ -481,6 +481,25 @@ func closeDatamart(client mongodb.Client) {
 | Failure of the datamart | Writers return wrapped errors (→ HTTP 500 with the documented JSON body); `Stats` reports zeros and logs instead of failing `GET /index/status`. |
 | Stage 3 readiness | Every address/name comes from `MONGO_URI`/`MONGO_DATABASE`; no local path or port is hard-coded in the package. |
 
+## Stage 3 layout proposal
+
+Stage 2 stores the inverted index as one document per term with the whole posting list embedded (`postings: [{book_id, tf}, ...]`). The layout suits the reference corpus and stays untouched here; two of its properties break at cluster scale, so Stage 3 should choose a replacement deliberately instead of inheriting it.
+
+- **Write amplification.** Indexing a book rewrites the posting array of each of its terms (a real book carries ≈6,600 distinct terms), so the cost of a book grows with the average posting-list length of its terms; the load benchmark already shows MongoDB near saturation at ≈6 books/s on one host ([evidence](evidence/README.md)).
+- **The 16 MB ceiling.** A BSON document is capped at 16 MB, and a posting entry costs roughly 25–30 bytes once field and array overhead is counted, so a popular term meets the ceiling at a few hundred thousand books — a crawl that keeps growing will hit it.
+
+Two candidate layouts:
+
+| | One document per `(term, book)` | Bucketed posting lists |
+|---|---|---|
+| Write | Insert or replace one small document per term of the book; no array rewrite | Rewrite one bounded bucket (e.g. ≤ 8 MB) instead of the whole list |
+| Read | Range scan on `{term, tf: -1, book_id: 1}` yields the ranked slice in index order; `total` is a count on `{term}` | Fan out over the term's buckets, merge the top-K, then count |
+| Storage | Higher per-posting overhead (a document per pair) | Close to today's layout |
+| Ceiling | None | Raised per bucket; the bucket count grows with the corpus |
+| Sharding | Hashed `(term, book_id)` spreads the writes; per-term queries scatter-gather | Term-local buckets keep a term on one shard, but hot terms concentrate there |
+
+**Recommendation:** one document per `(term, book)`. Updates stop rewriting arrays, the ranked query reads its order straight from the compound index, and the layout shards without the hot-term skew of a term-partitioned posting list. **Versioning:** the Stage 2 rebuild publishes the fresh index with an atomic collection rename, which a sharded cluster does not support; Stage 3 should write into `inverted_index_<version>` and publish the current version through a pointer document (`{_id: "current", version: ...}`) that readers resolve once per request, preserving the read-old/write-new window the rename gives today.
+
 ## Verification
 
 **Unit/integration suite** (live tests; they skip when no server is reachable — start the container first):
