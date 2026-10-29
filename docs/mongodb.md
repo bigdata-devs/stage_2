@@ -80,21 +80,15 @@ type SearchRequest struct {
 
 ## Bridge A — Indexing Service (implements `api.BookIndex`)
 
-**File: `cmd/indexing/datamart_index.go`** (new file, whole package `main`):
-
-> **After the Index Lead's review** the adapter changed in four ways that the code block below,
-> kept as the original handoff, does not show: `IndexBook` now takes the request
-> `context.Context` and waits for one of `-max-concurrent-updates` slots (8 by default) before
-> reading the book; the rebuild pulls books through `mongodb.NextBook`, reading and tokenizing one
-> book at a time; `Rebuild` claims `Client.AcquireRebuildLock` before building, so replicas sharing
-> the datamart cannot rebuild concurrently; and the constructor validates its concurrency cap and
-> returns an error. The semantic tables in this document describe the current behavior.
+**File: `cmd/indexing/datamart_index.go`** (committed bridge, whole package `main`). The listing
+below mirrors that file; when the bridge changes, update this listing in the same commit.
 
 ```go
 package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"sync"
@@ -112,15 +106,18 @@ import (
 const statsTimeout = 5 * time.Second
 
 // DatamartIndex adapts the MongoDB datamart to the api.BookIndex contract of the Indexing API.
-// One update reads one datalake book and writes it to the datamart; a rebuild builds fresh
-// collections aside and swaps them in, so search never observes a half-built index. It is safe
-// for concurrent use: a book indexed while a rebuild is under way is recorded before its write
-// and replayed on the fresh datamart afterwards, which is the promise the OpenAPI specification
-// makes for POST /index/update during a rebuild.
+// One update reads one datalake book and writes it to the datamart; a rebuild streams the datalake
+// book by book into fresh collections aside and swaps them in, so search never observes a
+// half-built index. It is safe for concurrent use: a book indexed while a rebuild is under way is
+// recorded before its write and replayed on the fresh datamart afterwards, which is the promise
+// the OpenAPI specification makes for POST /index/update during a rebuild. Rebuilds are
+// serialized across every replica sharing the datamart by a lease in MongoDB, and concurrent
+// updates are bounded by maxConcurrentUpdates.
 type DatamartIndex struct {
 	source       indexer.BookSource
 	writer       mongodb.BookIndexer
 	client       mongodb.Client
+	updateSlots  chan struct{}
 	pendingMutex sync.Mutex
 	pending      []models.BookID
 	rebuilding   atomic.Bool
@@ -128,23 +125,34 @@ type DatamartIndex struct {
 }
 
 // NewDatamartIndex wires the adapter to the datalake it indexes from and the connected datamart
-// it writes to. The datamart keeps its contents across restarts, so only the start-up timestamp
-// starts fresh.
-func NewDatamartIndex(source indexer.BookSource, client mongodb.Client) *DatamartIndex {
+// it writes to. maxConcurrentUpdates caps how many POST /index/update requests the service runs
+// at the same time. The datamart keeps its contents across restarts, so only the start-up
+// timestamp starts fresh.
+func NewDatamartIndex(source indexer.BookSource, client mongodb.Client, maxConcurrentUpdates int) (*DatamartIndex, error) {
+	if maxConcurrentUpdates < 1 {
+		return nil, fmt.Errorf("max concurrent updates must be a positive integer, got %d", maxConcurrentUpdates)
+	}
 	adapted := &DatamartIndex{
-		source:  source,
-		writer:  mongodb.NewBookIndexer(client),
-		client:  client,
-		pending: []models.BookID{},
+		source:      source,
+		writer:      mongodb.NewBookIndexer(client),
+		client:      client,
+		updateSlots: make(chan struct{}, maxConcurrentUpdates),
+		pending:     []models.BookID{},
 	}
 	adapted.markUpdated()
-	return adapted
+	return adapted, nil
 }
 
 // IndexBook reads one book from the datalake and stores its metadata and body terms in the
 // datamart. The rebuild flag is read before the write on purpose: a swap can then never overtake
-// a book already flagged for replay, so an update concurrent with a rebuild is never lost.
-func (index *DatamartIndex) IndexBook(bookID models.BookID) error {
+// a book already flagged for replay, so an update concurrent with a rebuild is never lost. The
+// request context bounds both the wait for an update slot and the datamart writes, so a caller
+// that disconnects releases its slot instead of leaving work behind.
+func (index *DatamartIndex) IndexBook(ctx context.Context, bookID models.BookID) error {
+	if err := index.acquireUpdateSlot(ctx); err != nil {
+		return fmt.Errorf("book %d: %w", bookID, err)
+	}
+	defer index.releaseUpdateSlot()
 	book, err := index.source.ReadBook(bookID)
 	if err != nil {
 		return fmt.Errorf("read book %d: %w", bookID, err)
@@ -156,18 +164,48 @@ func (index *DatamartIndex) IndexBook(bookID models.BookID) error {
 	if index.rebuilding.Load() {
 		index.recordPending(bookID)
 	}
-	if err := index.writer.IndexBook(context.Background(), input); err != nil {
+	if err := index.writer.IndexBook(ctx, input); err != nil {
 		return fmt.Errorf("index book %d in datamart: %w", bookID, err)
 	}
 	index.markUpdated()
 	return nil
 }
 
+// acquireUpdateSlot blocks until one update slot is free or ctx ends, so a burst of updates
+// queues instead of exhausting the datamart connection pool.
+func (index *DatamartIndex) acquireUpdateSlot(ctx context.Context) error {
+	select {
+	case index.updateSlots <- struct{}{}:
+		return nil
+	case <-ctx.Done():
+		return fmt.Errorf("wait for an update slot: %w", ctx.Err())
+	}
+}
+
+func (index *DatamartIndex) releaseUpdateSlot() {
+	<-index.updateSlots
+}
+
 // Rebuild reads every complete book of the datalake and swaps the freshly built collections into
-// the datamart in one step. Only one rebuild runs at a time: a second request receives
-// indexer.ErrRebuildInProgress, which the handler maps to 409. Books recorded during the rebuild
-// are replayed after the swap; a failure of that replay fails the rebuild so the caller retries.
+// the datamart in one step. Only one rebuild runs at a time across the replicas that share the
+// datamart: the request first claims the rebuild lease, and a request that finds it taken
+// receives indexer.ErrRebuildInProgress, which the handler maps to 409. Books recorded during the
+// rebuild are replayed after the swap; a failure of that replay fails the rebuild so the caller
+// retries. The lease is held until the replay finishes, so no other replica can swap a datamart
+// while this one still has books to replay.
 func (index *DatamartIndex) Rebuild(ctx context.Context) (indexer.RebuildReport, error) {
+	lock, err := index.client.AcquireRebuildLock(ctx)
+	if errors.Is(err, mongodb.ErrRebuildLocked) {
+		return indexer.RebuildReport{}, indexer.ErrRebuildInProgress
+	}
+	if err != nil {
+		return indexer.RebuildReport{}, fmt.Errorf("claim rebuild lock: %w", err)
+	}
+	defer func() {
+		if releaseErr := lock.Release(); releaseErr != nil {
+			slog.Error("[INDEXING] release rebuild lock", "error", releaseErr)
+		}
+	}()
 	if !index.rebuilding.CompareAndSwap(false, true) {
 		return indexer.RebuildReport{}, indexer.ErrRebuildInProgress
 	}
@@ -177,7 +215,7 @@ func (index *DatamartIndex) Rebuild(ctx context.Context) (indexer.RebuildReport,
 	if err != nil {
 		return indexer.RebuildReport{}, err
 	}
-	if err := index.replayPending(pending); err != nil {
+	if err := index.replayPending(ctx, pending); err != nil {
 		return indexer.RebuildReport{}, err
 	}
 	index.markUpdated()
@@ -202,21 +240,35 @@ func (index *DatamartIndex) buildFreshDatamart(ctx context.Context) (int, error)
 	if err != nil {
 		return 0, fmt.Errorf("list datalake books: %w", err)
 	}
-	books := make([]models.IndexBookInput, 0, len(bookIDs))
-	for _, bookID := range bookIDs {
+	result, err := index.writer.Rebuild(ctx, index.nextBook(bookIDs))
+	if err != nil {
+		return 0, fmt.Errorf("rebuild datamart: %w", err)
+	}
+	return result.BooksProcessed, nil
+}
+
+// nextBook reads and tokenizes one book per call, so a rebuild holds a single book in memory at a
+// time however large the datalake grows.
+func (index *DatamartIndex) nextBook(bookIDs []models.BookID) mongodb.NextBook {
+	position := 0
+	return func(ctx context.Context) (models.IndexBookInput, bool, error) {
+		if err := ctx.Err(); err != nil {
+			return models.IndexBookInput{}, false, err
+		}
+		if position >= len(bookIDs) {
+			return models.IndexBookInput{}, false, nil
+		}
+		bookID := bookIDs[position]
+		position++
 		book, err := index.source.ReadBook(bookID)
 		if err != nil {
-			return 0, fmt.Errorf("read book %d: %w", bookID, err)
+			return models.IndexBookInput{}, false, fmt.Errorf("read book %d: %w", bookID, err)
 		}
-		books = append(books, models.IndexBookInput{
+		return models.IndexBookInput{
 			Metadata: indexer.ExtractMetadata(book.ID, book.Header),
 			Tokens:   indexer.ProcessText(book.Body),
-		})
+		}, true, nil
 	}
-	if _, err := index.writer.Rebuild(ctx, books); err != nil {
-		return 0, fmt.Errorf("swap in rebuilt datamart: %w", err)
-	}
-	return len(books), nil
 }
 
 // finishRebuild lifts the rebuild flag and returns the books recorded under it. It runs after
@@ -237,9 +289,9 @@ func (index *DatamartIndex) recordPending(bookID models.BookID) {
 	index.pending = append(index.pending, bookID)
 }
 
-func (index *DatamartIndex) replayPending(pending []models.BookID) error {
+func (index *DatamartIndex) replayPending(ctx context.Context, pending []models.BookID) error {
 	for _, bookID := range pending {
-		if err := index.IndexBook(bookID); err != nil {
+		if err := index.IndexBook(ctx, bookID); err != nil {
 			return fmt.Errorf("replay book %d after rebuild: %w", bookID, err)
 		}
 	}
@@ -275,82 +327,19 @@ func (index *DatamartIndex) markUpdated() {
 
 ### Wiring — `cmd/indexing/main.go`
 
-1. **Imports:** add `"fmt"` and `"boogle-engine/internal/mongodb"`; remove `"boogle-engine/internal/indexer"` (only `NewPublishedIndex` used it — the bridge file imports it itself).
+The wiring is committed next to the bridge, and `main.go` is the source of truth. The datamart touches three places:
 
-2. **Replace `run`:**
+- **`run`** calls `connectDatamart()` before building any handler, so a datamart that cannot be reached fails the start-up instead of accepting updates it cannot store.
+- **`connectDatamart`** opens the pool from `MONGO_URI` / `MONGO_DATABASE` and calls `Client.EnsureIndexes` once at start-up (idempotent); `closeDatamart` releases the pool on shutdown.
+- **`buildIndexingHandler`** adapts the datalake with `NewDatamartIndex(lake, client, config.maxConcurrentUpdates)` — the constructor validates the cap and returns an error — and hands the adapter to `api.NewIndexingHandler(index, config.rebuildTimeout)`.
 
-```go
-// run wires the service together and serves requests until Ctrl+C or SIGTERM.
-func run(arguments []string) error {
-	config, err := parseConfig(arguments)
-	if err != nil {
-		return err
-	}
-	client, err := connectDatamart()
-	if err != nil {
-		return err
-	}
-	defer closeDatamart(client)
-	indexingHandler, err := buildIndexingHandler(config, client)
-	if err != nil {
-		return err
-	}
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
-	logStartup(config)
-	return serve(ctx, newServer(config, newRouter(indexingHandler)))
-}
-```
-
-3. **Add the two helpers:**
-
-```go
-// connectDatamart opens the MongoDB pool described by MONGO_URI and MONGO_DATABASE and creates
-// the query indexes once; both are idempotent, so every start-up may call them.
-func connectDatamart() (mongodb.Client, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), mongodb.DefaultConnectTimeout)
-	defer cancel()
-	client, err := mongodb.Connect(ctx, mongodb.ConfigFromEnvironment(), mongodb.DefaultConnectTimeout)
-	if err != nil {
-		return mongodb.Client{}, err
-	}
-	if err := client.EnsureIndexes(ctx); err != nil {
-		if closeErr := client.Close(context.Background()); closeErr != nil {
-			slog.Error("[INDEXING] close datamart after failed index setup", "error", closeErr)
-		}
-		return mongodb.Client{}, fmt.Errorf("ensure datamart indexes: %w", err)
-	}
-	return client, nil
-}
-
-// closeDatamart releases the MongoDB pool when the service shuts down.
-func closeDatamart(client mongodb.Client) {
-	if err := client.Close(context.Background()); err != nil {
-		slog.Error("[INDEXING] close datamart", "error", err)
-	}
-}
-```
-
-4. **Replace `buildIndexingHandler`:**
-
-```go
-// buildIndexingHandler performs the dependency injection: the datalake goes into the datamart
-// adapter, and the adapter goes into the HTTP handler.
-func buildIndexingHandler(config serviceConfig, client mongodb.Client) (api.IndexingHandler, error) {
-	lake, err := datalake.New(config.datalakeDir, config.batchSize)
-	if err != nil {
-		return api.IndexingHandler{}, err
-	}
-	return api.NewIndexingHandler(NewDatamartIndex(lake, client), config.rebuildTimeout)
-}
-```
+Flags: `-max-concurrent-updates` (default `8`) caps simultaneous `POST /index/update` requests; `-pprof` exposes `/debug/pprof/` on a separate port (empty disables it); `-rebuild-timeout` bounds both `POST /index/rebuild` and the HTTP write deadline. `-datalake` and `-batch-size` keep their Stage 1 meaning. The rebuild reads the datalake sequentially through `NextBook`, so the old `-workers` flag is gone.
 
 Notes:
 
 - The OpenAPI annotations and HTTP behavior are untouched; no `swag` regeneration is needed.
-- `-datalake` and `-batch-size` keep their meaning. `-workers` only fed the in-memory parallel rebuild; the datamart rebuild reads the datalake sequentially (a reference corpus rebuilds in seconds), so the flag currently affects nothing — keep it registered if the in-memory index stays as a fallback.
 - **Why record-before-write:** the rebuild flag is read *before* the datamart write. If a rebuild's swap lands between the flag check and the write, the book was already appended to the replay list and the replay runs after the swap — so an update concurrent with a rebuild cannot be dropped, which is what the `POST /index/update` annotation promises. Duplicates in the replay list are harmless: `IndexBook` is idempotent.
-- **Restart semantics differ from the in-memory index:** the datamart persists, so after a service restart the books are still searchable. `POST /index/rebuild` remains necessary after tokenizer or metadata-parser changes (and the Control Module may still call it after start-up; it is idempotent).
+- **Restart semantics:** the datamart persists, so after a service restart the books are still searchable. `POST /index/rebuild` remains necessary after tokenizer or metadata-parser changes (and the Control Module may still call it after start-up; it is idempotent).
 
 ## Bridge B — Search Service (implements `api.SearchEngine`)
 
