@@ -58,6 +58,7 @@ The book `_id` doubles as the uniqueness constraint, so re-indexing the same boo
 | `NewDatamartReader(client).PostingsForTerms(ctx, terms)` | Raw posting lists for the normalized terms present in the index, ordered by term. |
 | `DatamartReader.BooksByID(ctx, ids)` | Metadata for the given IDs ordered by book ID; absent books are omitted. |
 | `DatamartReader.SearchBooks(ctx, mongodb.SearchRequest)` | The search query — see below. |
+| `DatamartReader.PublishedBook(ctx, bookID)`, `DatamartReader.FilterOptions(ctx)` (file `catalog_reader.go`) | The catalog endpoints: one published book's metadata and the distinct language/publication-year filter values, both computed from `status = published` books only, so an unknown or still-pending book stays invisible to readers exactly like in search results. |
 
 ### `SearchRequest` semantics
 
