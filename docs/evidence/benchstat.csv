@@ -1,0 +1,27 @@
+goos: windows
+goarch: amd64
+pkg: boogle-engine/internal/mongodb
+cpu: Intel(R) Core(TM) i7-14700HX
+,docs/evidence/benchmarks.txt,
+,sec/op,CI
+PostingsForTerms-28,0.000443955,5%
+SearchBooksWithoutFilters-28,0.007730082500000001,1%
+SearchBooksWithAllFilters-28,0.0125372745,1%
+IndexBook-28,0.001875499,11%
+geomean,0.0029971657636365164,
+
+,docs/evidence/benchmarks.txt,
+,B/op,CI
+PostingsForTerms-28,55940,0%
+SearchBooksWithoutFilters-28,30871,0%
+SearchBooksWithAllFilters-28,31576,0%
+IndexBook-28,36460.5,0%
+geomean,37550.28376650122,
+
+,docs/evidence/benchmarks.txt,
+,allocs/op,CI
+PostingsForTerms-28,1973,0%
+SearchBooksWithoutFilters-28,728,0%
+SearchBooksWithAllFilters-28,633,0%
+IndexBook-28,480,0%
+geomean,812.7853235997128,

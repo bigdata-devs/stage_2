@@ -9,6 +9,7 @@ Service bridge, catalog endpoints, load benchmark).
 | [`tests.txt`](tests.txt) | Verbose run of the full `internal/mongodb` suite: **34 PASS** (30 tests + 4 subtests), **0 skipped, 0 failed**, `go test -v -count=1 ./internal/mongodb/` against the live `mongo:7` container. |
 | [`benchmarks.txt`](benchmarks.txt) | Raw `go test -run '^$' -bench . -benchmem -benchtime 1s -count 10 ./internal/mongodb/` output: four benchmarks × ten samples (300-book corpus, one second or more per sample). |
 | [`benchstat.txt`](benchstat.txt) | The same run aggregated with `benchstat` (medians with 95 % confidence intervals, plus `B/op` and `allocs/op`). |
+| [`benchstat.csv`](benchstat.csv) | The same aggregated table in machine-readable CSV (`benchstat -format csv`), the format §6.3 asks for. |
 | [`demo.md`](demo.md) | End-to-end transcript: datalake → Indexing Service → datamart → Search Service, with the literal request/response bodies of §1–§4. |
 | [`catalog_smoke.md`](catalog_smoke.md) | **2026-10-19.** HTTP transcript of the optional catalog endpoints (`GET /books/{book_id}`, `GET /search/filters`) plus the fail-fast start-up against an unreachable datamart. |
 | [`indexing_benchmark_2026-10-19T19-07-00-230Z.csv`](indexing_benchmark_2026-10-19T19-07-00-230Z.csv) | **2026-10-19.** k6 steady-state table per concurrency level: books indexed per second, latency percentiles, error rate. |
@@ -33,6 +34,8 @@ gofmt -l . && go vet ./... && go test ./...                 # repository verific
 go test -v -count=1 ./internal/mongodb/ > docs/evidence/tests.txt   # §tests
 go test -run '^$' -bench . -benchmem -benchtime 1s -count 10 ./internal/mongodb/   # §benchmarks
 go run golang.org/x/perf/cmd/benchstat@latest <benchmarks-output>                  # §benchstat
+go run golang.org/x/perf/cmd/benchstat@latest -format csv <benchmarks-output> > docs/evidence/benchstat.csv  # §benchstat CSV
+# PowerShell: wrap the whole command in cmd /c "..." so ">" writes bytes, not UTF-16
 ```
 
 The demo additionally needs the two bridge files and the wiring from
