@@ -5,8 +5,12 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"os"
+	"path/filepath"
+	"strconv"
 	"testing"
 
+	"boogle-engine/internal/indexer"
 	"boogle-engine/internal/models"
 )
 
@@ -158,4 +162,60 @@ func BenchmarkIndexBook(b *testing.B) {
 			b.Fatal(err)
 		}
 	}
+}
+
+// realBookFixtureID is the datalake book the real-book benchmark indexes: Pride and Prejudice.
+// Its tokenized body holds 6,576 distinct terms — the low end of the 6.5k–13k range a typical
+// novel produces — and it is the book every demo, k6 script and handler test already uses.
+const realBookFixtureID models.BookID = 1342
+
+// realBookInput loads the fixture book and runs it through the production pipeline: metadata
+// parsed from the Gutenberg header, tokens from the tokenizer. The benchmarks exclude this step,
+// exactly as the write path receives an already parsed book.
+func realBookInput(b *testing.B) models.IndexBookInput {
+	b.Helper()
+	directory := filepath.Join("testdata", strconv.Itoa(int(realBookFixtureID)))
+	header, err := os.ReadFile(filepath.Join(directory, "header.txt"))
+	if err != nil {
+		b.Fatalf("read fixture header: %v", err)
+	}
+	body, err := os.ReadFile(filepath.Join(directory, "body.txt"))
+	if err != nil {
+		b.Fatalf("read fixture body: %v", err)
+	}
+	tokens := indexer.ProcessText(string(body))
+	if len(tokens) == 0 {
+		b.Fatalf("fixture book %d produced no tokens", realBookFixtureID)
+	}
+	return models.IndexBookInput{
+		Metadata: indexer.ExtractMetadata(realBookFixtureID, string(header)),
+		Tokens:   tokens,
+	}
+}
+
+// BenchmarkIndexBookRealBook re-indexes a real novel on every iteration, so in steady state each
+// call rewrites one posting array per distinct term twice (drop the previous version, upsert the
+// current one). The terms/book and tokens/book metrics put numbers behind MongoDB's CPU load
+// during indexing: they are the posting arrays each IndexBook call touches.
+func BenchmarkIndexBookRealBook(b *testing.B) {
+	client := benchmarkClient(b)
+	input := realBookInput(b)
+	writer := NewBookIndexer(client)
+	ctx := context.Background()
+	if err := writer.IndexBook(ctx, input); err != nil {
+		b.Fatalf("prime fixture book: %v", err)
+	}
+	distinctTerms := make(map[string]struct{}, len(input.Tokens))
+	for _, token := range input.Tokens {
+		distinctTerms[token] = struct{}{}
+	}
+
+	b.ResetTimer()
+	for b.Loop() {
+		if err := writer.IndexBook(ctx, input); err != nil {
+			b.Fatal(err)
+		}
+	}
+	b.ReportMetric(float64(len(distinctTerms)), "terms/book")
+	b.ReportMetric(float64(len(input.Tokens)), "tokens/book")
 }
