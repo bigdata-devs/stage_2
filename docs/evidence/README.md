@@ -23,6 +23,8 @@ Service bridge, catalog endpoints, load benchmark).
 - Windows 11, Go `go1.27.0` (module targets `go1.25.0`), `goarch=amd64`
 - MongoDB `7.0.45` in Docker (`boogle-mongo-test`, port `27017`, database `boogle`)
 - CPU: Intel Core i7-14700HX (benchmarks report `GOMAXPROCS=28`)
+- RAM: 32 GB physical (31.7 GB usable); the Docker Desktop VM that runs MongoDB is capped at ≈16 GB and 28 CPUs, which bounds what the database can use
+- Storage: Samsung MZAL81T0HFLB NVMe SSD, 954 GB (the machine's only internal drive)
 - k6 `v2.2.0` (winget `GrafanaLabs.k6`) for the load benchmark
 
 ## Reproducing
