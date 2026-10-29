@@ -7,13 +7,19 @@
 //	go run ./cmd/control -ids 1342,84,11 -workers 4
 //	go run ./cmd/control -from 1 -to 500
 //	go run ./cmd/control -discover
+//	go run ./cmd/control -ids 1342,84 -retry-failed
+//	go run ./cmd/control -verify -search-url http://localhost:7003
 //
 // With -discover the candidates come from GET /ingest/list, so the module processes
 // every complete book of the datalake that is not indexed or failed yet.
 //
-// Service endpoints come from flags or the INGESTION_URL, INDEXING_URL and
-// CONTROL_STATE_DIR environment variables. Run "go run ./cmd/control -h" to list
-// every option.
+// -retry-failed re-enqueues every book recorded in failed_books.txt so the run
+// tries them again; -verify reconciles indexed_books.txt with the datamart the
+// Search Service exposes, issuing GET /books/{id} for every recorded book.
+//
+// Service endpoints come from flags or the INGESTION_URL, INDEXING_URL,
+// SEARCH_URL and CONTROL_STATE_DIR environment variables. Run "go run
+// ./cmd/control -h" to list every option.
 package main
 
 import (
@@ -36,6 +42,7 @@ import (
 const (
 	defaultIngestionURL = "http://localhost:7001"
 	defaultIndexingURL  = "http://localhost:7002"
+	defaultSearchURL    = "http://localhost:7003"
 	defaultStateDir     = "control"
 	defaultWorkers      = 4
 	// defaultIngestTimeout stays above the Ingestion Service budget (2 minutes by default),
@@ -51,6 +58,7 @@ const (
 type serviceConfig struct {
 	ingestionURL   string
 	indexingURL    string
+	searchURL      string
 	stateDir       string
 	ingestTimeout  time.Duration
 	requestTimeout time.Duration
@@ -58,6 +66,8 @@ type serviceConfig struct {
 	maxAttempts    int
 	initialBackoff time.Duration
 	discover       bool
+	retryFailed    bool
+	verify         bool
 	bookIDs        []models.BookID
 }
 
@@ -76,6 +86,10 @@ func main() {
 // run checks that both services answer, resolves the candidate books, loads the control
 // state and orchestrates every requested book. Ctrl+C or SIGTERM stops claiming new books;
 // the books already in flight run until their current step returns, and the summary is logged.
+//
+// With -verify the run skips orchestration and reconciles indexed_books.txt with the
+// datamart the Search Service exposes. With -retry-failed the run wipes failed_books.txt
+// before orchestrating, so previously failed books are tried again.
 func run(arguments []string) error {
 	config, err := parseConfig(arguments)
 	if err != nil {
@@ -83,6 +97,31 @@ func run(arguments []string) error {
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	if config.verify {
+		if config.searchURL == "" {
+			return fmt.Errorf("verify mode requires -search-url or SEARCH_URL")
+		}
+		state, err := control.LoadState(config.stateDir)
+		if err != nil {
+			return fmt.Errorf("load control state for verify: %w", err)
+		}
+		return verifyIndexed(ctx, config.searchURL, config.requestTimeout, state)
+	}
+	if config.retryFailed {
+		state, err := control.LoadState(config.stateDir)
+		if err != nil {
+			return fmt.Errorf("load control state for retry-failed: %w", err)
+		}
+		retriedIDs, err := state.WipeFailures()
+		if err != nil {
+			return fmt.Errorf("wipe failures: %w", err)
+		}
+		if len(retriedIDs) > 0 {
+			config.bookIDs = append(config.bookIDs, retriedIDs...)
+			slog.Info("[CONTROL] retry-failed: re-enqueuing previously failed books",
+				"count", len(retriedIDs))
+		}
+	}
 	ingestion := httpclient.NewIngestionClient(config.ingestionURL, config.ingestTimeout)
 	indexing := httpclient.NewIndexingClient(config.indexingURL, config.requestTimeout)
 	if err := checkServices(ctx, ingestion, indexing); err != nil {
@@ -135,6 +174,8 @@ func registerServiceFlags(flags *flag.FlagSet) *serviceConfig {
 		"base URL of the Ingestion Service (env INGESTION_URL)")
 	flags.StringVar(&config.indexingURL, "indexing-url", envOr("INDEXING_URL", defaultIndexingURL),
 		"base URL of the Indexing Service (env INDEXING_URL)")
+	flags.StringVar(&config.searchURL, "search-url", envOr("SEARCH_URL", defaultSearchURL),
+		"base URL of the Search Service (env SEARCH_URL, only used by -verify)")
 	flags.StringVar(&config.stateDir, "state-dir", envOr("CONTROL_STATE_DIR", defaultStateDir),
 		"folder of the control state files (env CONTROL_STATE_DIR)")
 	flags.DurationVar(&config.ingestTimeout, "ingest-timeout", defaultIngestTimeout,
@@ -144,6 +185,10 @@ func registerServiceFlags(flags *flag.FlagSet) *serviceConfig {
 	flags.IntVar(&config.workers, "workers", defaultWorkers, "number of concurrent pipeline workers")
 	flags.IntVar(&config.maxAttempts, "attempts", defaultAttempts, "attempts per step on transient errors")
 	flags.DurationVar(&config.initialBackoff, "backoff", defaultBackoff, "wait before the first retry (doubles each time)")
+	flags.BoolVar(&config.retryFailed, "retry-failed", false,
+		"re-enqueue every book recorded in failed_books.txt so the run tries them again")
+	flags.BoolVar(&config.verify, "verify", false,
+		"reconcile indexed_books.txt with the datamart (requires -search-url)")
 	return config
 }
 

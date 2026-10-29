@@ -11,6 +11,8 @@ go build -o bin/control ./cmd/control
 ./bin/control -ids 1342,84,11 -workers 4
 ./bin/control -from 1 -to 500
 ./bin/control -discover
+./bin/control -ids 1342,84 -retry-failed
+./bin/control -verify -search-url http://localhost:7003
 ```
 
 The module refuses to start when a required service is unreachable: it reads
@@ -24,18 +26,21 @@ deadline.
 |---|---|---|---|
 | `-ingestion-url` | `INGESTION_URL` | `http://localhost:7001` | Base URL of the Ingestion Service |
 | `-indexing-url` | `INDEXING_URL` | `http://localhost:7002` | Base URL of the Indexing Service |
+| `-search-url` | `SEARCH_URL` | `http://localhost:7003` | Base URL of the Search Service (only used by `-verify`) |
 | `-state-dir` | `CONTROL_STATE_DIR` | `control` | Folder of the control state files |
 | `-ingest-timeout` | — | `150s` | Time limit of one `POST /ingest` call, above the service download budget (2 minutes by default) |
 | `-timeout` | — | `30s` | Time limit of one indexing, status or readiness call |
 | `-workers` | — | `4` | Concurrent pipeline workers |
 | `-attempts` | — | `3` | Attempts per step on transient errors |
 | `-backoff` | — | `1s` | Wait before the first retry (doubles each time) |
+| `-retry-failed` | — | `false` | Re-enqueue every book recorded in `failed_books.txt` so the run tries them again |
+| `-verify` | — | `false` | Reconcile `indexed_books.txt` with the datamart the Search Service exposes |
 | `-ids` | — | — | Comma-separated book IDs |
 | `-from`, `-to` | — | — | Inclusive range of book IDs |
 | `-discover` | — | `false` | Add every complete book of the datalake reported by `GET /ingest/list` |
 
-Book selection requires `-ids` and/or `-from`/`-to`, or the `-discover` flag.
-Flags override environment variables; both endpoints are configurable so no
+Book selection requires `-ids` and/or `-from`/`-to`, or the `-discover` flag (except in `-verify` mode, which skips orchestration entirely).
+Flags override environment variables; all three endpoints are configurable so no
 `localhost` address is hard-coded.
 
 ## Run the whole stack with Docker Compose
@@ -100,6 +105,37 @@ idempotent service call is safe, losing a book ID would not be.
   files, so the next run replays the call; the idempotent services answer without
   duplicating anything.
 
+## Retry-failed mode
+
+The `-retry-failed` flag re-enqueues every book recorded in `failed_books.txt` so
+the run tries them again. Before orchestrating, the module atomically empties the
+failed file and adds the cleared IDs to the candidate list. A crash during the
+wipe leaves either the old content or an empty file, never a half-written one.
+
+```bash
+./bin/control -ids 1342,84,11 -retry-failed
+```
+
+Combine with any book selection flag; the re-enqueued IDs are added to the
+explicit candidates.
+
+## Verify mode
+
+The `-verify` flag skips orchestration entirely and reconciles `indexed_books.txt`
+with the datamart the Search Service exposes. For every book recorded as indexed,
+the module issues `GET /books/{id}` and reports which ones the datamart actually
+returns. A `404` means the datamart lost that record; any other non-`2xx` answer
+or transport error aborts the run because the Search Service itself is not
+reachable.
+
+```bash
+./bin/control -verify -search-url http://localhost:7003
+```
+
+The verify mode does not wait for the Ingestion or Indexing Services; it only
+contacts the Search Service. Use it after a run to confirm every indexed book is
+searchable.
+
 ## Coordination metrics
 
 Every finished step is logged with its wall-clock duration
@@ -139,3 +175,6 @@ load costs (the Go substitute for JMH).
 * `POST /index/update/{book_id}` → `200 {"book_id":1342,"index":"updated"}`;
   `404 book_not_found` is permanent (the book must be ingested first).
 * `GET /index/status` → index statistics; readiness check of the Indexing Service.
+* `GET /books/{book_id}` → book metadata from the datamart; used by `-verify` mode
+  to reconcile indexed books; `200` means the book is searchable, `404` means it
+  is missing from the datamart.

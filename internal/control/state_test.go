@@ -144,6 +144,144 @@ func TestConcurrentRecordsNeverLoseLines(t *testing.T) {
 	}
 }
 
+func TestWipeFailuresClearsAndReturnsClearedIDs(t *testing.T) {
+	state := newTestState(t)
+	if err := state.RecordFailed(1342, "network error"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if err := state.RecordFailed(84, "timeout"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if err := state.RecordFailed(5, "unavailable"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	cleared, err := state.WipeFailures()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Verify returned IDs are sorted
+	if len(cleared) != 3 {
+		t.Fatalf("expected 3 cleared IDs, got %d", len(cleared))
+	}
+	expectedOrder := []models.BookID{5, 84, 1342}
+	for i, id := range expectedOrder {
+		if cleared[i] != id {
+			t.Fatalf("expected cleared[%d] = %d, got %d", i, id, cleared[i])
+		}
+	}
+
+	// Verify in-memory state is cleared
+	if state.FailedCount() != 0 {
+		t.Fatalf("expected 0 failures after wipe, got %d", state.FailedCount())
+	}
+
+	// Verify file is empty
+	content := readControlFile(t, state.directory, failedFileName)
+	if content != "" {
+		t.Fatalf("expected empty failed_books.txt after wipe, got %q", content)
+	}
+
+	// Verify state persists after reload
+	reloaded, err := LoadState(state.directory)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if reloaded.FailedCount() != 0 {
+		t.Fatalf("expected 0 failures after reload, got %d", reloaded.FailedCount())
+	}
+}
+
+func TestWipeFailuresOnEmptyStateReturnsEmptyList(t *testing.T) {
+	state := newTestState(t)
+
+	cleared, err := state.WipeFailures()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(cleared) != 0 {
+		t.Fatalf("expected empty list, got %d IDs", len(cleared))
+	}
+
+	if state.FailedCount() != 0 {
+		t.Fatalf("expected 0 failures, got %d", state.FailedCount())
+	}
+}
+
+func TestWipeFailuresAtomicWrite(t *testing.T) {
+	state := newTestState(t)
+	if err := state.RecordFailed(1342, "error1"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Manually write to the file to verify atomic replacement
+	failedPath := filepath.Join(state.directory, failedFileName)
+	if err := os.WriteFile(failedPath, []byte("1342\terror1\n"), filePermissions); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	cleared, err := state.WipeFailures()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Should return the ID that was in memory (1342), not re-read from file
+	if len(cleared) != 1 || cleared[0] != 1342 {
+		t.Fatalf("expected [1342], got %v", cleared)
+	}
+
+	// File should be empty after atomic write
+	content := readControlFile(t, state.directory, failedFileName)
+	if content != "" {
+		t.Fatalf("expected empty file after wipe, got %q", content)
+	}
+}
+
+func TestIndexedIDsReturnsSortedCopy(t *testing.T) {
+	state := newTestState(t)
+	if err := state.RecordIndexed(1342); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if err := state.RecordIndexed(84); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if err := state.RecordIndexed(5); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	ids := state.IndexedIDs()
+
+	// Verify sorted order
+	if len(ids) != 3 {
+		t.Fatalf("expected 3 IDs, got %d", len(ids))
+	}
+	expectedOrder := []models.BookID{5, 84, 1342}
+	for i, id := range expectedOrder {
+		if ids[i] != id {
+			t.Fatalf("expected ids[%d] = %d, got %d", i, id, ids[i])
+		}
+	}
+
+	// Verify it's a copy, not a reference to internal state
+	ids[0] = 9999
+	idsAgain := state.IndexedIDs()
+	if idsAgain[0] != 5 {
+		t.Fatalf("expected IndexedIDs to return a copy, but modification affected internal state")
+	}
+}
+
+func TestIndexedIDsOnEmptyStateReturnsEmptyList(t *testing.T) {
+	state := newTestState(t)
+
+	ids := state.IndexedIDs()
+
+	if len(ids) != 0 {
+		t.Fatalf("expected empty list, got %d IDs", len(ids))
+	}
+}
+
 func readControlFile(t *testing.T, directory string, name string) string {
 	t.Helper()
 	content, err := os.ReadFile(filepath.Join(directory, name))

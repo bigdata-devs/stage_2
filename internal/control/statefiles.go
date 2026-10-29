@@ -41,6 +41,20 @@ func appendLine(path string, line string) error {
 	return nil
 }
 
+// atomicWrite replaces path with content using a temporary file and a rename, so a
+// crash never leaves a partially-written control file. The temporary file lands in
+// the same directory as the target to guarantee the rename stays on one filesystem.
+func atomicWrite(path string, content string) error {
+	tmp := path + ".tmp"
+	if err := os.WriteFile(tmp, []byte(content), filePermissions); err != nil {
+		return fmt.Errorf("write %s: %w", tmp, err)
+	}
+	if err := os.Rename(tmp, path); err != nil {
+		return fmt.Errorf("rename %s to %s: %w", tmp, path, err)
+	}
+	return nil
+}
+
 // readBookIDs loads a one-ID-per-line file into a set. A missing file counts as empty
 // and malformed lines are skipped.
 func readBookIDs(path string) (map[models.BookID]struct{}, error) {

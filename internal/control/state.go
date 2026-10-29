@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"sync"
 
 	"boogle-engine/internal/models"
@@ -145,4 +146,39 @@ func (state *ControlState) FailedCount() int {
 	state.mutex.RLock()
 	defer state.mutex.RUnlock()
 	return len(state.failed)
+}
+
+// IndexedIDs returns a sorted copy of every book ID recorded as indexed.
+func (state *ControlState) IndexedIDs() []models.BookID {
+	state.mutex.RLock()
+	defer state.mutex.RUnlock()
+	ids := make([]models.BookID, 0, len(state.indexed))
+	for bookID := range state.indexed {
+		ids = append(ids, bookID)
+	}
+	slices.Sort(ids)
+	return ids
+}
+
+// WipeFailures atomically empties failed_books.txt and clears the in-memory failed
+// set, returning the IDs that were cleared so the caller can re-enqueue them. It
+// is the backing call of the -retry-failed flag: a crash during the wipe leaves
+// either the old content or an empty file, never a half-written one.
+func (state *ControlState) WipeFailures() ([]models.BookID, error) {
+	state.mutex.Lock()
+	defer state.mutex.Unlock()
+	if len(state.failed) == 0 {
+		return []models.BookID{}, nil
+	}
+	cleared := make([]models.BookID, 0, len(state.failed))
+	for bookID := range state.failed {
+		cleared = append(cleared, bookID)
+	}
+	slices.Sort(cleared)
+	path := filepath.Join(state.directory, failedFileName)
+	if err := atomicWrite(path, ""); err != nil {
+		return nil, fmt.Errorf("wipe %s: %w", failedFileName, err)
+	}
+	state.failed = map[models.BookID]string{}
+	return cleared, nil
 }
