@@ -151,6 +151,9 @@ summary adds the coordination cost of the whole run:
 plus failed), so the report can compare ingestion cost against indexing cost per
 book and justify the worker count with `-workers`.
 
+See [Replicas and Threads Configuration](replicas_and_threads.md) for detailed
+guidance on tuning `-workers` and understanding the concurrency model.
+
 ## Tests
 
 ```bash
