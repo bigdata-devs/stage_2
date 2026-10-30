@@ -1,8 +1,8 @@
 -----------------------------------
-Books attempted:     59
-Ingested (2xx):      57
-Failed (non-2xx):    2
-Total elapsed time:  2.86 seconds
-Ingestion throughput: 19.92 books/second (2xx only)
-Status breakdown:    200:57 404:2
+Books attempted:     100
+Ingested (2xx):      99
+Failed (non-2xx):    1
+Total elapsed time:  4.64 seconds
+Ingestion throughput: 21.32 books/second (2xx only)
+Status breakdown:    200:99 404:1
 -----------------------------------

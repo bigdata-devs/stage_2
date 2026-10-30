@@ -14,8 +14,9 @@ counting **only HTTP 2xx answers as ingested**.
 
 ## Workload
 
-- Corpus: **59** Gutenberg book IDs (the default list in `ingestion_throughput.ps1`;
-  57 valid, 2 consistently answer 404 `book_unavailable` and are excluded from throughput).
+- Corpus: **100 real Gutenberg book IDs** pulled from the Gutendex catalog
+  (`https://gutendex.com`, sorted by popularity) on 2026-10-30; 99 ingest
+  successfully, 1 answers `404 book_unavailable` and is excluded from throughput.
 - Closed model: the HTTP client concurrency is `max(workers × 2, 10)` so the server
   slots are never starved.
 - Cold start: the datalake folder is deleted and recreated before every workers value,
@@ -27,12 +28,12 @@ counting **only HTTP 2xx answers as ingested**.
 
 | Workers | Ingested (2xx) | Failed (404) | Elapsed | **books/s** | CPU avg | WS max |
 |--------:|---------------:|-------------:|--------:|------------:|--------:|-------:|
-| 1 | 57 | 2 | 13.21 s | **4.31** | 0.4 % | 81 MB |
-| 2 | 57 | 2 | 7.17 s | **7.95** | 0.9 % | 31 MB |
-| 4 | 57 | 2 | 4.18 s | **13.64** | 1.0 % | 31 MB |
-| 8 | 57 | 2 | 2.86 s | **19.92** | 1.6 % | 32 MB |
+| 1 | 99 | 1 | 25.19 s | **3.93** | 0.5 % | 83 MB |
+| 2 | 99 | 1 | 12.98 s | **7.63** | 0.6 % | 37 MB |
+| 4 | 99 | 1 | 7.17 s | **13.81** | 1.1 % | 37 MB |
+| 8 | 99 | 1 | 4.64 s | **21.32** | 1.8 % | 47 MB |
 
-Speed-up from 1 → 8 workers: **≈4.6×** (sub-linear; the bottleneck is the upstream
+Speed-up from 1 → 8 workers: **≈5.4×** (sub-linear; the bottleneck is the upstream
 Gutenberg download latency, not local CPU). CPU stays under 2 % of the machine —
 the service is I/O-bound on the cold path, which is the expected shape for a
 network-bound ingestion.
@@ -53,8 +54,8 @@ Raw per-run transcripts and service logs for every workers value are under
 ```bash
 go build -o bin/ingestion.exe ./cmd/ingestion   # optional; the script builds its own
 powershell -File test/load/ingestion_throughput.ps1
-# extend the corpus toward ~100 real IDs for the full audit run:
-powershell -File test/load/ingestion_throughput.ps1 -Books "5,11,26,...,<more real IDs>"
+# the default corpus is the 100-book Gutendex list; override with -Books to test another:
+powershell -File test/load/ingestion_throughput.ps1 -Books "5,11,26,..."
 ```
 
 The script writes per-run transcripts, resource CSVs and the summary CSV into

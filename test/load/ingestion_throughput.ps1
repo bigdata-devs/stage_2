@@ -23,10 +23,9 @@
   Comma-separated server-side -workers values to benchmark. Default: 1,2,4,8.
 
 .PARAMETER Books
-  Comma-separated Gutenberg book IDs. Default: the ~45 IDs exercised by this
-  repository's own e2e tests and benchmarks. Pass a longer list (aim for ~100)
-  for the full audit run, e.g. by appending more IDs from
-  https://www.gutenberg.org/ebooks/.
+  Comma-separated Gutenberg book IDs. Default: 100 real IDs pulled from the
+  Gutendex catalog (https://gutendex.com, sorted by popularity), matching the
+  audit's "about 100 books" requirement. Override to test a custom corpus.
 
 .PARAMETER Port
   Host port for the temporary ingestion service. Default: 7016 (isolated from
@@ -52,7 +51,10 @@
 [CmdletBinding()]
 param(
     [string]$WorkersList = '1,2,4,8',
-    [string]$Books = '5,11,26,43,46,55,74,76,84,98,111,120,174,190,201,205,345,408,500,521,844,900,1010,1080,1232,1260,1342,1355,1400,1661,1952,2500,2701,4300,17489,158,215,219,236,242,253,260,276,360,434,514,574,600,613,718,1184,1322,1497,996,1001,2554,2600,2805,2852',
+    # Default corpus: 100 real Gutenberg book IDs pulled from the Gutendex catalog
+    # (https://gutendex.com, sorted by popularity) on 2026-10-30, per the audit's
+    # "about 100 books" cold-datalake requirement.
+    [string]$Books = '10,11,16,23,35,41,42,43,45,46,55,74,76,84,98,100,120,145,161,174,204,205,209,244,345,394,408,768,844,863,1080,1184,1232,1259,1260,1342,1400,1497,1513,1661,1695,1727,1952,1998,2148,2160,2465,2542,2554,2591,2600,2641,2680,2701,2852,3207,3268,3296,4085,4300,4363,5197,5200,6593,6761,7370,8492,12342,15399,16328,16389,20203,25344,26471,28054,34901,37106,37683,49008,49297,57669,58820,58866,59828,59892,61168,61262,61851,62215,62383,63469,64317,65238,67979,68283,69087,78004,78005,78009,78010',
     [int]$Port = 7016,
     [string]$OutDir = 'test/load/results',
     [int]$RequestConcurrency = 0,
@@ -185,5 +187,4 @@ $summaryRows | Format-Table -AutoSize
 $summaryCsv = Join-Path $OutDir "ingestion_throughput_summary_$stamp.csv"
 $summaryRows | Export-Csv -NoTypeInformation -Path $summaryCsv -Encoding UTF8
 Write-Host "Summary CSV: $summaryCsv"
-Write-Host 'NOTE: run this on a machine with stable network to gutenberg.org;'
-Write-Host '      extend -Books toward ~100 real IDs for the full audit evidence.'
+Write-Host 'NOTE: run this on a machine with stable network to gutenberg.org.'
