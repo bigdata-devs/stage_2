@@ -107,10 +107,13 @@ foreach ($w in $workersValues) {
     $sampler = $null
     if (-not $SkipResources) {
         $csv = Join-Path $OutDir "ingestion_resources_w${w}_$stamp.csv"
+        # Quote paths: Start-Process -ArgumentList does not escape spaces itself,
+        # and the repository may live under a path containing spaces.
+        $samplerScript = (Join-Path $PSScriptRoot 'sample_resources.ps1')
         $sampler = Start-Process powershell -PassThru -ArgumentList @(
-            '-NoProfile', '-File', (Join-Path $PSScriptRoot 'sample_resources.ps1'),
+            '-NoProfile', '-File', "`"$samplerScript`"",
             '-ProcessId', "$($svc.Id)",
-            '-OutFile', $csv
+            '-OutFile', "`"$csv`""
         )
         Write-Host "sampler PID $($sampler.Id) -> $csv"
     }
