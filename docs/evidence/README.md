@@ -25,6 +25,7 @@ Service bridge, catalog endpoints, load benchmark).
 | [`indexing_resources.csv`](indexing_resources.csv) | 1-second samples of the Indexing Service (CPU %, working set, private memory, threads) and of MongoDB in Docker (CPU %, memory) taken while k6 drove the load. |
 | [`microbenchmarks.txt`](microbenchmarks.txt) | **2026-10-28.** Raw `testing.B` output of `ProcessText`, `ExtractMetadata` and `SplitBookText` over the 20 real books with `-cpu 1,2,4,8` (review feedback). |
 | [`e2e_control_2026-10-30T10-09-40Z.txt`](e2e_control_2026-10-30T10-09-40Z.txt) | **2026-10-30.** Transcript of `scripts/e2e_control.sh` after restoring `cmd/ingestion/main.go` (RF 2): all orchestration, restart, permanent-failure and discovery checks PASS against real Gutenberg downloads. |
+| [`e2e_compose_2026-10-30T11-16-16Z.txt`](e2e_compose_2026-10-30T11-16-16Z.txt) | **2026-10-30.** Transcript of `scripts/e2e_compose.sh` on Docker Desktop 4.97 (Engine 29.9.2, WSL2): stack build, orchestration, idempotent replay, front-facing search, ingestion-container failure recovery and named-volume persistence all PASS. |
 | [`api_validation.txt`](api_validation.txt) | Historical API validation checklist of the Ingestion Service (moved from `cmd/ingestion/results/`). |
 
 ## Environment
