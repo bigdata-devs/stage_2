@@ -24,6 +24,8 @@ Service bridge, catalog endpoints, load benchmark).
 | [`indexing_benchmark_run.log`](indexing_benchmark_run.log) | Console transcript of the same run, including the threshold report. |
 | [`indexing_resources.csv`](indexing_resources.csv) | 1-second samples of the Indexing Service (CPU %, working set, private memory, threads) and of MongoDB in Docker (CPU %, memory) taken while k6 drove the load. |
 | [`microbenchmarks.txt`](microbenchmarks.txt) | **2026-10-28.** Raw `testing.B` output of `ProcessText`, `ExtractMetadata` and `SplitBookText` over the 20 real books with `-cpu 1,2,4,8` (review feedback). |
+| [`e2e_control_2026-10-30T10-09-40Z.txt`](e2e_control_2026-10-30T10-09-40Z.txt) | **2026-10-30.** Transcript of `scripts/e2e_control.sh` after restoring `cmd/ingestion/main.go` (RF 2): all orchestration, restart, permanent-failure and discovery checks PASS against real Gutenberg downloads. |
+| [`api_validation.txt`](api_validation.txt) | Historical API validation checklist of the Ingestion Service (moved from `cmd/ingestion/results/`). |
 
 ## Environment
 
@@ -114,7 +116,7 @@ go build -o bin/ingestion.exe ./cmd/ingestion
 go build -o bin/indexing.exe ./cmd/indexing
 
 # 1. corpus (once): download the 20 books with the Ingestion Service
-bin/ingestion.exe -port 7016 -datalake datalake &
+bin/ingestion.exe -addr :7016 -datalake datalake &
 for id in 11 26 43 46 74 76 84 98 201 521 844 1080 1260 1342 1355 1400 1661 17489 1952 2701; do
   curl -X POST http://localhost:7016/ingest/$id
 done

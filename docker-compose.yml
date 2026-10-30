@@ -34,7 +34,7 @@ services:
     restart: unless-stopped
     ports:
       - "${INGESTION_PORT:-7001}:7001"
-    command: ["-port", "7001", "-datalake", "/data/datalake"]
+    command: ["-addr", ":7001", "-datalake", "/data/datalake"]
     volumes:
       - datalake:/data/datalake
     healthcheck:
