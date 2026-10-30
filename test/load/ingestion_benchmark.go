@@ -1,15 +1,3 @@
-// Command ingestion_benchmark drives the Ingestion Service through HTTP and reports
-// throughput in books/s. Only 2xx answers count as ingested; every other status is
-// reported as a failure and excluded from the throughput numerator.
-//
-// Usage:
-//
-//	go run ./test/load/ingestion_benchmark.go
-//	go run ./test/load/ingestion_benchmark.go -url http://localhost:7001 -concurrency 10
-//	go run ./test/load/ingestion_benchmark.go -books 11,26,43 -out results.txt
-//
-// The runner test/load/ingestion_throughput.ps1 builds this file against a cold
-// datalake at several -workers settings and aggregates the outputs.
 package main
 
 import (
@@ -25,9 +13,7 @@ import (
 	"time"
 )
 
-// defaultBooks mirrors the small corpus used by the original throughput script;
-// the runner replaces it with the ~100-book list of the official benchmark.
-const defaultBooks = "1342,84,11,174,2701,1661,1232,98,4300,2500,55,76,120,408,844,190,205,345,500,900,111,222,333,444,555,666,777,888,999,1010"
+const defaultBooks = "10,11,16,23,35,41,42,43,45,46,55,74,76,84,98,100,120,145,161,174,204,205,209,244,345,394,408,768,844,863,1080,1184,1232,1259,1260,1342,1400,1497,1513,1661,1695,1727,1952,1998,2148,2160,2465,2542,2554,2591,2600,2641,2680,2701,2852,3207,3268,3296,4085,4300,4363,5197,5200,6593,6761,7370,8492,12342,15399,16328,16389,20203,25344,26471,28054,34901,37106,37683,49008,49297,57669,58820,58866,59828,59892,61168,61262,61851,62215,62383,63469,64317,65238,67979,68283,69087,78004,78005,78009,78010"
 
 func main() {
 	url := flag.String("url", "http://localhost:7001", "base URL of the Ingestion Service")
@@ -95,8 +81,6 @@ func main() {
 	fmt.Printf("Results saved to %s\n", *out)
 }
 
-// postBook sends one POST /ingest/{id} and returns the HTTP status code
-// (0 when the request failed at transport level).
 func postBook(client *http.Client, baseURL, bookID string) int {
 	req, err := http.NewRequest(http.MethodPost, strings.TrimRight(baseURL, "/")+"/ingest/"+bookID, http.NoBody)
 	if err != nil {
