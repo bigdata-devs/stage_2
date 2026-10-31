@@ -4,14 +4,13 @@ import (
 	"context"
 
 	"boogle-engine/internal/api"
-	"boogle-engine/internal/indexer"
 	"boogle-engine/internal/models"
 	"boogle-engine/internal/mongodb"
 )
 
 // bookSearcher is the part of mongodb.DatamartReader the engine needs. Depending on this narrow
-// interface instead of the concrete reader lets the unit tests check keyword normalization and
-// field mapping without a live MongoDB server; production always passes a DatamartReader.
+// interface instead of the concrete reader lets the unit tests check the field mapping and the
+// HTTP route without a live MongoDB server; production always passes a DatamartReader.
 type bookSearcher interface {
 	SearchBooks(ctx context.Context, request mongodb.SearchRequest) (mongodb.SearchResult, error)
 }
@@ -23,10 +22,11 @@ var (
 	_ api.SearchEngine = DatamartEngine{}
 )
 
-// DatamartEngine answers the Search API from the MongoDB datamart. It normalizes the keyword
-// with the same tokenizer the Indexing Service applies to book bodies and delegates ranking,
-// filters, pagination and the total count to one server-side aggregation. It is safe for
-// concurrent use: every request runs against a stateless reader.
+// DatamartEngine answers the Search API from the MongoDB datamart. The handler has already split
+// q into normalized terms with the tokenizer the Indexing Service applies to book bodies; the
+// engine hands them to one server-side aggregation that intersects their posting lists (AND) and
+// computes ranking, filters, pagination and the total count. It is safe for concurrent use: every
+// request runs against a stateless reader.
 type DatamartEngine struct {
 	reader bookSearcher
 }
@@ -37,18 +37,16 @@ func NewDatamartEngine(reader bookSearcher) DatamartEngine {
 	return DatamartEngine{reader: reader}
 }
 
-// Search resolves query.Term to the stored form of the inverted index: tokenizer rules decide
-// it, so "Adventure!" searches "adventure". GET /search promises one keyword, so of several
-// tokens only the first is searched, and a keyword made only of stop words matches nothing
-// because those terms are never indexed. The handler has already trimmed, lower-cased and
-// bounded every field, so they pass straight through to the datamart request.
+// Search returns the books that contain every term of query.Terms. The handler has already
+// normalized, de-duplicated and bounded the terms and trimmed, lower-cased and bounded every other
+// field, so they pass straight through to the datamart request. The handler never sends a query
+// without terms; should one arrive, it matches nothing rather than reaching the datamart.
 func (engine DatamartEngine) Search(ctx context.Context, query api.SearchQuery) (api.SearchPage, error) {
-	tokens := indexer.ProcessText(query.Term)
-	if len(tokens) == 0 {
+	if len(query.Terms) == 0 {
 		return api.SearchPage{Books: []models.BookMetadata{}}, nil
 	}
 	result, err := engine.reader.SearchBooks(ctx, mongodb.SearchRequest{
-		Term:     tokens[0],
+		Terms:    query.Terms,
 		Author:   query.Filters.Author,
 		Language: query.Filters.Language,
 		Year:     query.Filters.Year,

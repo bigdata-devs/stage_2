@@ -4,8 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -131,11 +134,12 @@ func TestSearchForwardsValidatedQueryToEngine(t *testing.T) {
 
 	want := SearchQuery{
 		Term:    "whale",
+		Terms:   []string{"whale"},
 		Filters: SearchFilters{Author: "Melville", Language: "en", Year: 1851},
 		Offset:  40,
 		Limit:   10,
 	}
-	if engine.calls != 1 || engine.receivedQuery != want {
+	if engine.calls != 1 || !reflect.DeepEqual(engine.receivedQuery, want) {
 		t.Errorf("engine got %d calls with %+v, want 1 call with %+v", engine.calls, engine.receivedQuery, want)
 	}
 }
@@ -238,5 +242,125 @@ func TestSearchEngineFailureReturnsInternalError(t *testing.T) {
 func TestNewSearchHandlerRejectsMissingEngine(t *testing.T) {
 	if _, err := NewSearchHandler(nil); !errors.Is(err, ErrMissingEngine) {
 		t.Errorf("NewSearchHandler(nil) error = %v, want ErrMissingEngine", err)
+	}
+}
+
+func TestSearchSplitsMultiWordQueryIntoDistinctTerms(t *testing.T) {
+	cases := []struct {
+		rawQ      string
+		wantTerm  string
+		wantTerms []string
+	}{
+		{rawQ: "sherlock holmes", wantTerm: "sherlock holmes", wantTerms: []string{"sherlock", "holmes"}},
+		{rawQ: "  Moby-Dick, the WHALE!  ", wantTerm: "Moby-Dick, the WHALE!", wantTerms: []string{"moby", "dick", "whale"}},
+		{rawQ: "whale Whale WHALE ship", wantTerm: "whale Whale WHALE ship", wantTerms: []string{"whale", "ship"}},
+		{rawQ: "Volume XIV of a Treasure", wantTerm: "Volume XIV of a Treasure", wantTerms: []string{"volume", "treasure"}},
+		{rawQ: "island1883treasure", wantTerm: "island1883treasure", wantTerms: []string{"island", "treasure"}},
+	}
+	for _, testCase := range cases {
+		t.Run(testCase.rawQ, func(t *testing.T) {
+			engine := &recordingEngine{}
+			recorder := performSearch(t, engine, "q="+url.QueryEscape(testCase.rawQ))
+
+			assertStatus(t, recorder, http.StatusOK)
+			if engine.receivedQuery.Term != testCase.wantTerm || !slices.Equal(engine.receivedQuery.Terms, testCase.wantTerms) {
+				t.Errorf("engine got term %q terms %q, want %q and %q",
+					engine.receivedQuery.Term, engine.receivedQuery.Terms, testCase.wantTerm, testCase.wantTerms)
+			}
+			if response := decodeBody[SearchResponse](t, recorder); response.Query != testCase.wantTerm {
+				t.Errorf("query echo = %q, want q as sent without surrounding spaces %q", response.Query, testCase.wantTerm)
+			}
+		})
+	}
+}
+
+func TestSearchRequiresEveryWordToMatch(t *testing.T) {
+	cases := []struct {
+		rawQ    string
+		wantIDs []models.BookID
+	}{
+		{rawQ: "adventures sherlock", wantIDs: []models.BookID{1661}},
+		{rawQ: "sherlock adventures", wantIDs: []models.BookID{1661}},
+		{rawQ: "adventures of huckleberry", wantIDs: []models.BookID{76}},
+		{rawQ: "adventure whale", wantIDs: []models.BookID{}},
+	}
+	for _, testCase := range cases {
+		t.Run(testCase.rawQ, func(t *testing.T) {
+			recorder := performSearch(t, NewStubEngine(), "q="+url.QueryEscape(testCase.rawQ))
+
+			assertStatus(t, recorder, http.StatusOK)
+			response := decodeBody[SearchResponse](t, recorder)
+			if response.Total != len(testCase.wantIDs) || !slices.Equal(resultIDs(response), testCase.wantIDs) {
+				t.Errorf("total = %d, IDs = %v, want %v", response.Total, resultIDs(response), testCase.wantIDs)
+			}
+		})
+	}
+}
+
+func TestSearchWithOnlyIgnoredWordsReturnsEmptyPageWithoutEngine(t *testing.T) {
+	for _, rawQ := range []string{"the", "The Of And", "XIV", "a b c", "to be or not to be"} {
+		t.Run(rawQ, func(t *testing.T) {
+			engine := &recordingEngine{err: errors.New("the engine must not be called")}
+			recorder := performSearch(t, engine, "q="+url.QueryEscape(rawQ)+"&language=fr&limit=5")
+
+			assertStatus(t, recorder, http.StatusOK)
+			want := fmt.Sprintf(`{"query":%q,"filters":{"language":"fr"},"total":0,"offset":0,"limit":5,"results":[]}`, rawQ)
+			if body := strings.TrimSpace(recorder.Body.String()); body != want {
+				t.Errorf("body = %s, want %s", body, want)
+			}
+			if engine.calls != 0 {
+				t.Errorf("engine was called %d times for a query no book can match", engine.calls)
+			}
+		})
+	}
+}
+
+func TestSearchWithoutAnyWordReturnsBadRequest(t *testing.T) {
+	for _, rawQ := range []string{"1813", "?!", "42 - 17", "¿¡", "日本語", "ÉÉÉ"} {
+		t.Run(rawQ, func(t *testing.T) {
+			engine := &recordingEngine{}
+			recorder := performSearch(t, engine, "q="+url.QueryEscape(rawQ))
+
+			assertStatus(t, recorder, http.StatusBadRequest)
+			response := decodeBody[ErrorResponse](t, recorder)
+			if response.Error != invalidParameterCode || !strings.Contains(response.Message, `"q"`) {
+				t.Errorf("error = %+v, want %s naming q", response, invalidParameterCode)
+			}
+			if engine.calls != 0 {
+				t.Errorf("engine was called %d times for an invalid request", engine.calls)
+			}
+		})
+	}
+}
+
+func TestSearchLimitsTheNumberOfDistinctTerms(t *testing.T) {
+	words := []string{"alpha", "bravo", "charlie", "delta", "echo", "foxtrot", "golf", "hotel", "india", "juliet", "kilo"}
+	atLimit := strings.Join(words[:MaxQueryTerms], " ")
+	cases := []struct {
+		name       string
+		rawQ       string
+		wantStatus int
+	}{
+		{name: "exactly the limit", rawQ: atLimit, wantStatus: http.StatusOK},
+		{name: "limit plus repeats and stop words", rawQ: atLimit + " alpha bravo the of and", wantStatus: http.StatusOK},
+		{name: "one distinct term over the limit", rawQ: atLimit + " kilo", wantStatus: http.StatusBadRequest},
+		{name: "a very long query", rawQ: strings.Repeat(atLimit+" kilo ", 10000), wantStatus: http.StatusBadRequest},
+	}
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			engine := &recordingEngine{}
+			recorder := performSearch(t, engine, "q="+url.QueryEscape(testCase.rawQ))
+
+			assertStatus(t, recorder, testCase.wantStatus)
+			if testCase.wantStatus == http.StatusBadRequest {
+				response := decodeBody[ErrorResponse](t, recorder)
+				if response.Error != invalidParameterCode || !strings.Contains(response.Message, fmt.Sprint(MaxQueryTerms)) {
+					t.Errorf("error = %+v, want %s stating the limit %d", response, invalidParameterCode, MaxQueryTerms)
+				}
+				if engine.calls != 0 {
+					t.Errorf("engine was called %d times for an invalid request", engine.calls)
+				}
+			}
+		})
 	}
 }

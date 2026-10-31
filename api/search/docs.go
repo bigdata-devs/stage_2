@@ -73,20 +73,20 @@ const docTemplate = `{
         },
         "/search": {
             "get": {
-                "description": "Returns one page of the books that contain the keyword ` + "`" + `q` + "`" + `, optionally narrowed by author,\nlanguage and original publication year. Filters can be combined and are joined with AND.\nEmpty filter values (for example ` + "`" + `author=` + "`" + `) are treated as absent.\nOnly the filters that were applied are echoed in ` + "`" + `filters` + "`" + `; the object is ` + "`" + `{}` + "`" + ` when none were sent.\nResults are ordered by relevance, most relevant first, with ties broken by ascending ` + "`" + `book_id` + "`" + `.\n` + "`" + `total` + "`" + ` counts every match, while ` + "`" + `results` + "`" + ` holds at most ` + "`" + `limit` + "`" + ` books starting at ` + "`" + `offset` + "`" + `.\nA valid query without matches, or an ` + "`" + `offset` + "`" + ` past the last match, returns 200 with ` + "`" + `results: []` + "`" + `.",
+                "description": "Returns one page of the books that contain every word of ` + "`" + `q` + "`" + `, optionally narrowed by author,\nlanguage and original publication year. Filters can be combined and are joined with AND.\n` + "`" + `q` + "`" + ` may hold several words, matched with AND: a book is returned only when it contains all of them.\nWords are split exactly like book text: runs of the letters a-z, case-insensitive, so digits, spaces\nand punctuation separate words (` + "`" + `Moby-Dick` + "`" + ` searches ` + "`" + `moby` + "`" + ` AND ` + "`" + `dick` + "`" + `). Repeated words count once.\nStop words (the, and, of...), single letters and Roman numerals are never indexed and are ignored;\na ` + "`" + `q` + "`" + ` made only of them matches nothing and returns 200 with ` + "`" + `results: []` + "`" + `.\n` + "`" + `q` + "`" + ` is rejected with 400 ` + "`" + `invalid_parameter` + "`" + ` when it contains no word at all (for example ` + "`" + `1813` + "`" + ` or ` + "`" + `?!` + "`" + `)\nor more than 10 distinct search words.\nEmpty filter values (for example ` + "`" + `author=` + "`" + `) are treated as absent.\nOnly the filters that were applied are echoed in ` + "`" + `filters` + "`" + `; the object is ` + "`" + `{}` + "`" + ` when none were sent.\nResults are ordered by relevance, most relevant first: the summed frequency of the query words in\nthe book, with ties broken by ascending ` + "`" + `book_id` + "`" + `.\n` + "`" + `total` + "`" + ` counts every match, while ` + "`" + `results` + "`" + ` holds at most ` + "`" + `limit` + "`" + ` books starting at ` + "`" + `offset` + "`" + `.\nA valid query without matches, or an ` + "`" + `offset` + "`" + ` past the last match, returns 200 with ` + "`" + `results: []` + "`" + `.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "search"
                 ],
-                "summary": "Search books by keyword",
+                "summary": "Search books by keywords",
                 "parameters": [
                     {
                         "minLength": 1,
                         "type": "string",
-                        "example": "adventure",
-                        "description": "Keyword to search for; surrounding spaces are ignored",
+                        "example": "sherlock holmes",
+                        "description": "One or more keywords, all of which a book must contain (AND); surrounding spaces are ignored",
                         "name": "q",
                         "in": "query",
                         "required": true
@@ -140,7 +140,7 @@ const docTemplate = `{
                         }
                     },
                     "400": {
-                        "description": "q is missing (missing_parameter) or a parameter is malformed (invalid_parameter)",
+                        "description": "q is missing (missing_parameter); q has no word or more than 10 distinct words, or another parameter is malformed (invalid_parameter)",
                         "schema": {
                             "$ref": "#/definitions/api.ErrorResponse"
                         }
@@ -302,9 +302,9 @@ const docTemplate = `{
                     "example": 0
                 },
                 "query": {
-                    "description": "Keyword that was searched, without surrounding spaces",
+                    "description": "Keywords exactly as sent in q, without surrounding spaces",
                     "type": "string",
-                    "example": "adventure"
+                    "example": "sherlock holmes"
                 },
                 "results": {
                     "description": "Books of the requested page; never null",

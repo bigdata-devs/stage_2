@@ -18,7 +18,7 @@ import (
 func TestSearchBooksRanksByTermFrequency(t *testing.T) {
 	reader := seededReader(t)
 
-	result, err := reader.SearchBooks(context.Background(), SearchRequest{Term: "adventure", Limit: 10})
+	result, err := reader.SearchBooks(context.Background(), SearchRequest{Terms: []string{"adventure"}, Limit: 10})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -31,7 +31,7 @@ func TestSearchBooksRanksByTermFrequency(t *testing.T) {
 func TestSearchBooksBreaksRelevanceTiesByBookID(t *testing.T) {
 	reader := seededReader(t)
 
-	result, err := reader.SearchBooks(context.Background(), SearchRequest{Term: "sea", Limit: 10})
+	result, err := reader.SearchBooks(context.Background(), SearchRequest{Terms: []string{"sea"}, Limit: 10})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -55,7 +55,7 @@ func TestSearchBooksPaginatesWithoutChangingTotal(t *testing.T) {
 
 	for _, page := range pages {
 		result, err := reader.SearchBooks(context.Background(),
-			SearchRequest{Term: "adventure", Offset: page.offset, Limit: page.limit})
+			SearchRequest{Terms: []string{"adventure"}, Offset: page.offset, Limit: page.limit})
 		if err != nil {
 			t.Fatalf("offset %d: unexpected error: %v", page.offset, err)
 		}
@@ -69,7 +69,7 @@ func TestSearchBooksPaginatesWithoutChangingTotal(t *testing.T) {
 func TestSearchBooksWithholdsPendingBooks(t *testing.T) {
 	reader := seededReader(t)
 
-	result, err := reader.SearchBooks(context.Background(), SearchRequest{Term: "castaway", Limit: 10})
+	result, err := reader.SearchBooks(context.Background(), SearchRequest{Terms: []string{"castaway"}, Limit: 10})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -91,7 +91,7 @@ func TestSearchBooksFiltersByLanguageList(t *testing.T) {
 
 	for _, testCase := range cases {
 		result, err := reader.SearchBooks(context.Background(),
-			SearchRequest{Term: "adventure", Language: testCase.language, Limit: 10})
+			SearchRequest{Terms: []string{"adventure"}, Language: testCase.language, Limit: 10})
 		if err != nil {
 			t.Fatalf("language %q: unexpected error: %v", testCase.language, err)
 		}
@@ -114,7 +114,7 @@ func TestSearchBooksFiltersByAuthorIgnoringCaseAndSubstring(t *testing.T) {
 
 	for _, testCase := range cases {
 		result, err := reader.SearchBooks(context.Background(),
-			SearchRequest{Term: "adventure", Author: testCase.author, Limit: 10})
+			SearchRequest{Terms: []string{"adventure"}, Author: testCase.author, Limit: 10})
 		if err != nil {
 			t.Fatalf("author %q: unexpected error: %v", testCase.author, err)
 		}
@@ -137,7 +137,7 @@ func TestSearchBooksFiltersByExactYear(t *testing.T) {
 
 	for _, testCase := range cases {
 		result, err := reader.SearchBooks(context.Background(),
-			SearchRequest{Term: "adventure", Year: testCase.year, Limit: 10})
+			SearchRequest{Terms: []string{"adventure"}, Year: testCase.year, Limit: 10})
 		if err != nil {
 			t.Fatalf("year %d: unexpected error: %v", testCase.year, err)
 		}
@@ -157,12 +157,12 @@ func TestSearchBooksCombinesFiltersAsConjunction(t *testing.T) {
 	}{
 		{
 			name:    "language and year keep the english book out",
-			request: SearchRequest{Term: "adventure", Author: "ane", Language: "fr", Year: 1850, Limit: 10},
+			request: SearchRequest{Terms: []string{"adventure"}, Author: "ane", Language: "fr", Year: 1850, Limit: 10},
 			want:    []models.BookID{2},
 		},
 		{
 			name:    "year keeps the french book out",
-			request: SearchRequest{Term: "adventure", Author: "ane", Language: "en", Year: 1813, Limit: 10},
+			request: SearchRequest{Terms: []string{"adventure"}, Author: "ane", Language: "en", Year: 1813, Limit: 10},
 			want:    []models.BookID{1},
 		},
 	}
@@ -179,10 +179,68 @@ func TestSearchBooksCombinesFiltersAsConjunction(t *testing.T) {
 	}
 }
 
+func TestSearchBooksRequiresEveryTerm(t *testing.T) {
+	reader := seededReader(t)
+	cases := []struct {
+		name      string
+		terms     []string
+		wantTotal int
+		wantIDs   []models.BookID
+	}{
+		{name: "two terms shared by one book", terms: []string{"adventure", "island"}, wantTotal: 1, wantIDs: []models.BookID{1}},
+		{name: "term order does not matter", terms: []string{"island", "adventure"}, wantTotal: 1, wantIDs: []models.BookID{1}},
+		{name: "a term only another book has", terms: []string{"whale", "sea"}, wantTotal: 1, wantIDs: []models.BookID{4}},
+		{name: "three terms", terms: []string{"adventure", "island", "sea"}, wantTotal: 1, wantIDs: []models.BookID{1}},
+		{name: "terms no single book shares", terms: []string{"adventure", "whale"}, wantTotal: 0, wantIDs: []models.BookID{}},
+		{name: "a term the index lacks", terms: []string{"adventure", "zzzz"}, wantTotal: 0, wantIDs: []models.BookID{}},
+		{name: "repeated term counts once", terms: []string{"adventure", "adventure"}, wantTotal: 2, wantIDs: []models.BookID{2, 1}},
+		{name: "pending book stays hidden", terms: []string{"adventure", "castaway"}, wantTotal: 0, wantIDs: []models.BookID{}},
+	}
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			result, err := reader.SearchBooks(context.Background(), SearchRequest{Terms: testCase.terms, Limit: 10})
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if result.Total != testCase.wantTotal {
+				t.Fatalf("expected total %d, got %d", testCase.wantTotal, result.Total)
+			}
+			assertBookIDs(t, result.Books, testCase.wantIDs)
+		})
+	}
+}
+
+// TestSearchBooksRanksMultiTermMatchesBySummedFrequency adds two books where the per-term order
+// and the summed order disagree, so only the documented score (sum of the terms' frequencies)
+// puts book 6 first.
+func TestSearchBooksRanksMultiTermMatchesBySummedFrequency(t *testing.T) {
+	reader := seededReader(t)
+	indexer := NewBookIndexer(reader.client)
+	for _, input := range []models.IndexBookInput{
+		metadataInput(5, "Jules Verne", "fr", 1870, "storm", "storm", "storm", "storm", "ship"),
+		metadataInput(6, "Jules Verne", "fr", 1872, "storm", "ship", "ship", "ship", "ship", "ship"),
+		metadataInput(7, "Jules Verne", "fr", 1874, "storm", "ship", "ship", "ship", "ship", "ship"),
+	} {
+		if err := indexer.IndexBook(context.Background(), input); err != nil {
+			t.Fatalf("book %d: unexpected error: %v", input.Metadata.BookID, err)
+		}
+	}
+
+	result, err := reader.SearchBooks(context.Background(), SearchRequest{Terms: []string{"storm", "ship"}, Limit: 10})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.Total != 3 {
+		t.Fatalf("expected total 3, got %d", result.Total)
+	}
+	// Scores: book 5 = 4+1 = 5, books 6 and 7 = 1+5 = 6 (tie broken by ascending ID).
+	assertBookIDs(t, result.Books, []models.BookID{6, 7, 5})
+}
+
 func TestSearchBooksWithUnknownTermReturnsEmptyList(t *testing.T) {
 	reader := seededReader(t)
 
-	result, err := reader.SearchBooks(context.Background(), SearchRequest{Term: "zzzz", Limit: 10})
+	result, err := reader.SearchBooks(context.Background(), SearchRequest{Terms: []string{"zzzz"}, Limit: 10})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -198,10 +256,11 @@ func TestSearchBooksRejectsInvalidRequests(t *testing.T) {
 		name    string
 		request SearchRequest
 	}{
-		{name: "empty term", request: SearchRequest{Limit: 10}},
-		{name: "negative offset", request: SearchRequest{Term: "adventure", Offset: -1, Limit: 10}},
-		{name: "zero limit", request: SearchRequest{Term: "adventure"}},
-		{name: "negative year", request: SearchRequest{Term: "adventure", Year: -1, Limit: 10}},
+		{name: "no terms", request: SearchRequest{Limit: 10}},
+		{name: "empty term among terms", request: SearchRequest{Terms: []string{"adventure", ""}, Limit: 10}},
+		{name: "negative offset", request: SearchRequest{Terms: []string{"adventure"}, Offset: -1, Limit: 10}},
+		{name: "zero limit", request: SearchRequest{Terms: []string{"adventure"}}},
+		{name: "negative year", request: SearchRequest{Terms: []string{"adventure"}, Year: -1, Limit: 10}},
 	}
 
 	for _, testCase := range cases {

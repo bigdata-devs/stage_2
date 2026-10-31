@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"slices"
@@ -96,8 +97,8 @@ func TestDatamartEngineAgainstLiveDatamart(t *testing.T) {
 	engine := NewDatamartEngine(mongodb.NewDatamartReader(client))
 	ctx := context.Background()
 
-	t.Run("raw keyword is normalized and ranked by term frequency", func(t *testing.T) {
-		page, err := engine.Search(ctx, api.SearchQuery{Term: "Adventure!", Limit: api.DefaultLimit})
+	t.Run("single term is ranked by term frequency", func(t *testing.T) {
+		page, err := engine.Search(ctx, api.SearchQuery{Term: "adventure", Terms: []string{"adventure"}, Limit: api.DefaultLimit})
 		if err != nil {
 			t.Fatalf("Search: %v", err)
 		}
@@ -108,7 +109,8 @@ func TestDatamartEngineAgainstLiveDatamart(t *testing.T) {
 
 	t.Run("filters combine with AND", func(t *testing.T) {
 		page, err := engine.Search(ctx, api.SearchQuery{
-			Term: "adventure", Filters: api.SearchFilters{Author: "austen", Language: "en", Year: 1813}, Limit: api.DefaultLimit,
+			Term: "adventure", Terms: []string{"adventure"},
+			Filters: api.SearchFilters{Author: "austen", Language: "en", Year: 1813}, Limit: api.DefaultLimit,
 		})
 		if err != nil {
 			t.Fatalf("Search: %v", err)
@@ -119,7 +121,7 @@ func TestDatamartEngineAgainstLiveDatamart(t *testing.T) {
 	})
 
 	t.Run("total counts every page", func(t *testing.T) {
-		page, err := engine.Search(ctx, api.SearchQuery{Term: "adventure", Offset: 1, Limit: 1})
+		page, err := engine.Search(ctx, api.SearchQuery{Term: "adventure", Terms: []string{"adventure"}, Offset: 1, Limit: 1})
 		if err != nil {
 			t.Fatalf("Search: %v", err)
 		}
@@ -140,6 +142,38 @@ func TestDatamartEngineAgainstLiveDatamart(t *testing.T) {
 			`"results":[{"book_id":2,"title":"More Adventures","author":"jane austin","language":"en,fr","year":1850}]}`
 		if body := trimNewline(recorder.Body.String()); body != want {
 			t.Errorf("body = %s, want %s", body, want)
+		}
+	})
+
+	t.Run("GET /search normalizes q and ANDs every word", func(t *testing.T) {
+		router := newTestRouter(t, mongodb.NewDatamartReader(client))
+		cases := []struct {
+			rawQuery  string
+			wantTotal int
+			wantIDs   []models.BookID
+		}{
+			{rawQuery: "q=Adventure%21", wantTotal: 2, wantIDs: []models.BookID{2, 1}},
+			{rawQuery: "q=Island%2C+ADVENTURE%21", wantTotal: 1, wantIDs: []models.BookID{1}},
+			{rawQuery: "q=the+adventure+ends+on+the+island", wantTotal: 1, wantIDs: []models.BookID{1}},
+			{rawQuery: "q=island+whale", wantTotal: 0, wantIDs: []models.BookID{}},
+		}
+		for _, testCase := range cases {
+			recorder := httptest.NewRecorder()
+			router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/search?"+testCase.rawQuery, nil))
+			if recorder.Code != http.StatusOK {
+				t.Fatalf("%s: status = %d, want 200; body: %s", testCase.rawQuery, recorder.Code, recorder.Body.String())
+			}
+			var response api.SearchResponse
+			if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
+				t.Fatalf("%s: decode body: %v", testCase.rawQuery, err)
+			}
+			ids := make([]models.BookID, 0, len(response.Results))
+			for _, result := range response.Results {
+				ids = append(ids, result.BookID)
+			}
+			if response.Total != testCase.wantTotal || !slices.Equal(ids, testCase.wantIDs) {
+				t.Errorf("%s: total = %d, IDs = %v, want %d and %v", testCase.rawQuery, response.Total, ids, testCase.wantTotal, testCase.wantIDs)
+			}
 		}
 	})
 }

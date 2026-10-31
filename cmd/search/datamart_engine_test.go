@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"slices"
 	"testing"
 
@@ -42,8 +43,9 @@ func (emptyCatalog) FilterOptions(context.Context) (models.FilterValues, error) 
 func TestDatamartEngineMapsQueryToDatamartRequest(t *testing.T) {
 	searcher := &fakeSearcher{result: mongodb.SearchResult{Books: []models.BookMetadata{}}}
 	query := api.SearchQuery{
-		Term:    "Adventure!",
-		Filters: api.SearchFilters{Author: "Austen", Language: "en", Year: 1813},
+		Term:    "Sherlock Holmes!",
+		Terms:   []string{"sherlock", "holmes"},
+		Filters: api.SearchFilters{Author: "Doyle", Language: "en", Year: 1892},
 		Offset:  20,
 		Limit:   10,
 	}
@@ -52,54 +54,26 @@ func TestDatamartEngineMapsQueryToDatamartRequest(t *testing.T) {
 		t.Fatalf("Search: %v", err)
 	}
 
-	want := mongodb.SearchRequest{Term: "adventure", Author: "Austen", Language: "en", Year: 1813, Offset: 20, Limit: 10}
-	if searcher.calls != 1 || searcher.received != want {
+	want := mongodb.SearchRequest{
+		Terms: []string{"sherlock", "holmes"}, Author: "Doyle", Language: "en", Year: 1892, Offset: 20, Limit: 10,
+	}
+	if searcher.calls != 1 || !reflect.DeepEqual(searcher.received, want) {
 		t.Errorf("datamart got %d calls with %+v, want 1 call with %+v", searcher.calls, searcher.received, want)
 	}
 }
 
-func TestDatamartEngineSearchesFirstIndexableToken(t *testing.T) {
-	cases := []struct {
-		keyword  string
-		wantTerm string
-	}{
-		{keyword: "whale", wantTerm: "whale"},
-		{keyword: "MAN", wantTerm: "man"},
-		{keyword: "the whale", wantTerm: "whale"},
-		{keyword: "Moby-Dick", wantTerm: "moby"},
-		{keyword: "XIV Sherlock", wantTerm: "sherlock"},
+func TestDatamartEngineWithoutTermsDoesNotQueryDatamart(t *testing.T) {
+	searcher := &fakeSearcher{err: errors.New("the datamart must not be queried")}
+
+	page, err := NewDatamartEngine(searcher).Search(context.Background(), api.SearchQuery{Term: "the", Limit: api.DefaultLimit})
+	if err != nil {
+		t.Fatalf("Search: %v", err)
 	}
-	for _, testCase := range cases {
-		t.Run(testCase.keyword, func(t *testing.T) {
-			searcher := &fakeSearcher{result: mongodb.SearchResult{Books: []models.BookMetadata{}}}
-
-			_, err := NewDatamartEngine(searcher).Search(context.Background(), api.SearchQuery{Term: testCase.keyword, Limit: api.DefaultLimit})
-			if err != nil {
-				t.Fatalf("Search: %v", err)
-			}
-			if searcher.received.Term != testCase.wantTerm {
-				t.Errorf("datamart term = %q, want %q", searcher.received.Term, testCase.wantTerm)
-			}
-		})
+	if searcher.calls != 0 {
+		t.Errorf("datamart was queried %d times without terms", searcher.calls)
 	}
-}
-
-func TestDatamartEngineAnswersUnindexableKeywordWithoutQueryingDatamart(t *testing.T) {
-	for _, keyword := range []string{"the", "a", "XIV", "1813", "¿?"} {
-		t.Run(keyword, func(t *testing.T) {
-			searcher := &fakeSearcher{err: errors.New("the datamart must not be queried")}
-
-			page, err := NewDatamartEngine(searcher).Search(context.Background(), api.SearchQuery{Term: keyword, Limit: api.DefaultLimit})
-			if err != nil {
-				t.Fatalf("Search: %v", err)
-			}
-			if searcher.calls != 0 {
-				t.Errorf("datamart was queried %d times for a keyword that is never indexed", searcher.calls)
-			}
-			if page.Total != 0 || page.Books == nil || len(page.Books) != 0 {
-				t.Errorf("page = %+v, want total 0 and a non-nil empty slice", page)
-			}
-		})
+	if page.Total != 0 || page.Books == nil || len(page.Books) != 0 {
+		t.Errorf("page = %+v, want total 0 and a non-nil empty slice", page)
 	}
 }
 
@@ -110,7 +84,7 @@ func TestDatamartEngineReturnsDatamartPage(t *testing.T) {
 	}
 	searcher := &fakeSearcher{result: mongodb.SearchResult{Total: 7, Books: books}}
 
-	page, err := NewDatamartEngine(searcher).Search(context.Background(), api.SearchQuery{Term: "adventure", Limit: 2})
+	page, err := NewDatamartEngine(searcher).Search(context.Background(), api.SearchQuery{Term: "adventure", Terms: []string{"adventure"}, Limit: 2})
 	if err != nil {
 		t.Fatalf("Search: %v", err)
 	}
@@ -123,7 +97,7 @@ func TestDatamartEnginePropagatesDatamartFailure(t *testing.T) {
 	failure := errors.New("server selection timeout")
 	searcher := &fakeSearcher{err: failure}
 
-	_, err := NewDatamartEngine(searcher).Search(context.Background(), api.SearchQuery{Term: "whale", Limit: 1})
+	_, err := NewDatamartEngine(searcher).Search(context.Background(), api.SearchQuery{Term: "whale", Terms: []string{"whale"}, Limit: 1})
 	if !errors.Is(err, failure) {
 		t.Errorf("Search error = %v, want the datamart failure", err)
 	}
@@ -148,8 +122,52 @@ func TestSearchRouteIsServedByDatamartEngine(t *testing.T) {
 	if body := trimNewline(recorder.Body.String()); body != want {
 		t.Errorf("body = %s, want %s", body, want)
 	}
-	if searcher.received.Term != "prejudice" || searcher.received.Language != "en" {
-		t.Errorf("datamart request = %+v, want term prejudice and language en", searcher.received)
+	if !slices.Equal(searcher.received.Terms, []string{"prejudice"}) || searcher.received.Language != "en" {
+		t.Errorf("datamart request = %+v, want terms [prejudice] and language en", searcher.received)
+	}
+}
+
+// TestSearchRouteSendsEveryWordToDatamart proves a multi-word q reaches the datamart as the AND
+// of its normalized, distinct terms, with ignored words dropped.
+func TestSearchRouteSendsEveryWordToDatamart(t *testing.T) {
+	searcher := &fakeSearcher{result: mongodb.SearchResult{Books: []models.BookMetadata{}}}
+	router := newTestRouter(t, searcher)
+
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/search?q=Moby-Dick%2C+the+WHALE+whale", nil))
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200; body: %s", recorder.Code, recorder.Body.String())
+	}
+	if want := []string{"moby", "dick", "whale"}; searcher.calls != 1 || !slices.Equal(searcher.received.Terms, want) {
+		t.Errorf("datamart got %d calls with terms %q, want 1 call with %q", searcher.calls, searcher.received.Terms, want)
+	}
+}
+
+func TestSearchRouteAnswersUnsearchableQueriesWithoutDatamart(t *testing.T) {
+	cases := []struct {
+		rawQuery   string
+		wantStatus int
+	}{
+		{rawQuery: "q=the+of+and", wantStatus: http.StatusOK},
+		{rawQuery: "q=1813", wantStatus: http.StatusBadRequest},
+		{rawQuery: "q=alpha+bravo+charlie+delta+echo+foxtrot+golf+hotel+india+juliet+kilo", wantStatus: http.StatusBadRequest},
+	}
+	for _, testCase := range cases {
+		t.Run(testCase.rawQuery, func(t *testing.T) {
+			searcher := &fakeSearcher{err: errors.New("the datamart must not be queried")}
+			router := newTestRouter(t, searcher)
+
+			recorder := httptest.NewRecorder()
+			router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/search?"+testCase.rawQuery, nil))
+
+			if recorder.Code != testCase.wantStatus {
+				t.Errorf("status = %d, want %d; body: %s", recorder.Code, testCase.wantStatus, recorder.Body.String())
+			}
+			if searcher.calls != 0 {
+				t.Errorf("datamart was queried %d times", searcher.calls)
+			}
+		})
 	}
 }
 

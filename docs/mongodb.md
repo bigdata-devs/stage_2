@@ -61,7 +61,7 @@ The book `_id` doubles as the uniqueness constraint, so re-indexing the same boo
 
 ```go
 type SearchRequest struct {
-    Term     string // normalized exactly as the indexer stores it; matched verbatim
+    Terms    []string // one or more terms normalized exactly as the indexer stores them; each matched verbatim, all required (AND)
     Author   string // "" = no filter; case-insensitive substring of the author
     Language string // "" = no filter; matches any code of the comma list ("en,fr"), case-insensitive, spaces trimmed
     Year     int    // 0 = no filter; otherwise exact publication_year
@@ -71,10 +71,11 @@ type SearchRequest struct {
 ```
 
 - **One round trip.** The whole query (join postings with books, `status = published`, filters, count, sort, page) is a single server-side aggregation; the driver never streams candidates to Go.
-- **Ordering:** descending `tf`, ties broken by ascending `book_id` — exactly the ranking `GET /search` documents.
+- **AND:** a book matches only when it appears in the posting list of every term; repeated terms count once. The postings are intersected (grouped per book) before the join with `books`, so extra terms shrink the join instead of growing it.
+- **Ordering:** descending sum of the terms' `tf` in the book (plain `tf` for one term), ties broken by ascending `book_id` — exactly the ranking `GET /search` documents.
 - **`Total`** counts every match across pages; `Books` holds one page and is never nil.
 - **Visibility:** `pending` books are excluded from the page *and* from `Total`.
-- **Errors:** invalid input returns `ErrInvalidSearchRequest` (wraps a message); storage failures wrap with context. Nothing else is normalized — feeding raw user input is the caller's mistake (the bridge below normalizes with `indexer.ProcessText`).
+- **Errors:** invalid input returns `ErrInvalidSearchRequest` (wraps a message); storage failures wrap with context. Nothing else is normalized — feeding raw user input is the caller's mistake (the Search API handler splits `q` with `indexer.Tokenize` and `indexer.Normalize`).
 
 ## Bridge A — Indexing Service (implements `api.BookIndex`)
 
@@ -400,7 +401,7 @@ func (engine DatamartEngine) Search(ctx context.Context, query api.SearchQuery) 
 
 | `api.SearchQuery` (validated by the handler) | `mongodb.SearchRequest` | Note |
 |---|---|---|
-| `Term` (trimmed, non-empty) | `Term` = `indexer.ProcessText(Term)[0]` | The tokenizer is the single source of truth for what a term is; the datamart matches it verbatim. |
+| `Terms` (1–10 distinct terms the handler derived from `q`) | `Terms` | The handler splits `q` with the indexer's tokenizer, the single source of truth for what a term is; the datamart matches each verbatim and requires all of them. `Term` (raw `q`, trimmed) is only echoed in the response. |
 | `Filters.Author` (trimmed) | `Author` | Substring, case-insensitive, inside the aggregation. |
 | `Filters.Language` (lower-cased by handler) | `Language` | Matched against each code of the stored comma list. |
 | `Filters.Year` (1…9999 or 0) | `Year` | Exact match; 0 means no filter. |
@@ -465,6 +466,8 @@ func closeDatamart(client mongodb.Client) {
 4. Optionally update the command's package doc comment (it still says "Until the MongoDB datamart is ready…").
 
 **Status (30 Oct 2026):** landed. `cmd/search/datamart_engine.go` is committed and `run` wires it, sharing one `DatamartReader` with the catalog endpoints. The engine depends on a one-method `bookSearcher` interface (satisfied by `mongodb.DatamartReader`) so `cmd/search/datamart_engine_test.go` can unit-test it without a server; `datamart_engine_integration_test.go` exercises it against a live datamart and skips when none is reachable. `api.StubEngine` now lives in `internal/api/stub_engine_test.go`, so it exists only for the handler tests and cannot be compiled into a service binary.
+
+**Update (31 Oct 2026): multi-word `q`.** `GET /search` now treats `q` as the AND of its words. The handler splits `q` with the indexer's tokenizer into at most 10 distinct terms (stop words, single letters and Roman numerals dropped), answers 400 `invalid_parameter` when `q` has no word or more than 10 distinct terms, and answers 200 with an empty page without querying the datamart when every word is one the index never stores. The engine passes `Terms` straight to `SearchRequest.Terms`. The Bridge B code block above is the original single-keyword handoff (`ProcessText(Term)[0]`); `cmd/search/datamart_engine.go` holds the current code.
 
 ## Operational semantics at a glance
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 
 	"go.mongodb.org/mongo-driver/v2/bson"
@@ -11,19 +12,21 @@ import (
 	"boogle-engine/internal/models"
 )
 
-// ErrInvalidSearchRequest reports a SearchRequest the reader cannot serve: an empty term, a
-// negative offset, a limit below one or a negative year. The Search Service validates requests
+// ErrInvalidSearchRequest reports a SearchRequest the reader cannot serve: no terms or an empty
+// term, a negative offset, a limit below one or a negative year. The Search Service validates requests
 // before they reach the datamart; the reader re-checks so a bad request can never turn into an
 // unbounded query.
 var ErrInvalidSearchRequest = errors.New("invalid search request")
 
-// SearchRequest is one keyword search over the datamart. Term must be normalized exactly as the
-// indexer stores it (lowercase, stop words removed, see indexer.ProcessText): the reader matches
-// it verbatim. Author narrows results to books whose author contains the text ignoring case,
-// Language to books whose comma-separated list contains the code, and Year (0 for none) to books
-// published that exact year. Offset and Limit select one page; Limit must be at least 1.
+// SearchRequest is one keyword search over the datamart. Terms holds one or more terms normalized
+// exactly as the indexer stores them (lowercase, stop words removed, see indexer.ProcessText): the
+// reader matches each verbatim, and a book matches only when it contains every term (AND);
+// repeated terms count once. Author narrows results to books whose author contains the text
+// ignoring case, Language to books whose comma-separated list contains the code, and Year (0 for
+// none) to books published that exact year. Offset and Limit select one page; Limit must be at
+// least 1.
 type SearchRequest struct {
-	Term     string
+	Terms    []string
 	Author   string
 	Language string
 	Year     int
@@ -38,11 +41,12 @@ type SearchResult struct {
 	Books []models.BookMetadata
 }
 
-// SearchBooks answers one keyword search in a single server round trip: it joins the term's
-// posting list with published book metadata, applies the optional author, language and year
-// filters, counts every match and returns one page ordered by relevance (descending term
-// frequency, ties broken by ascending book ID). Books still pending or already filtered out
-// never reach the page and never count towards Total.
+// SearchBooks answers one keyword search in a single server round trip: it intersects the terms'
+// posting lists, joins the books that contain every term with published book metadata, applies
+// the optional author, language and year filters, counts every match and returns one page ordered
+// by relevance (descending sum of the terms' frequencies in the book, ties broken by ascending
+// book ID; with one term that is its plain term frequency). Books still pending or already
+// filtered out never reach the page and never count towards Total.
 func (reader DatamartReader) SearchBooks(ctx context.Context, request SearchRequest) (SearchResult, error) {
 	if err := validateSearchRequest(request); err != nil {
 		return SearchResult{}, err
@@ -50,18 +54,21 @@ func (reader DatamartReader) SearchBooks(ctx context.Context, request SearchRequ
 
 	cursor, err := reader.index().Aggregate(ctx, searchPipeline(request))
 	if err != nil {
-		return SearchResult{}, fmt.Errorf("search books for %q: %w", request.Term, err)
+		return SearchResult{}, fmt.Errorf("search books for %q: %w", strings.Join(request.Terms, " "), err)
 	}
 	var facets []searchFacet
 	if err := cursor.All(ctx, &facets); err != nil {
-		return SearchResult{}, fmt.Errorf("decode search results for %q: %w", request.Term, err)
+		return SearchResult{}, fmt.Errorf("decode search results for %q: %w", strings.Join(request.Terms, " "), err)
 	}
 	return searchResultFrom(facets), nil
 }
 
 func validateSearchRequest(request SearchRequest) error {
-	if request.Term == "" {
-		return fmt.Errorf("%w: term must not be empty", ErrInvalidSearchRequest)
+	if len(request.Terms) == 0 {
+		return fmt.Errorf("%w: at least one term is required", ErrInvalidSearchRequest)
+	}
+	if slices.Contains(request.Terms, "") {
+		return fmt.Errorf("%w: terms must not be empty", ErrInvalidSearchRequest)
 	}
 	if request.Offset < 0 {
 		return fmt.Errorf("%w: offset must not be negative", ErrInvalidSearchRequest)
@@ -75,14 +82,25 @@ func validateSearchRequest(request SearchRequest) error {
 	return nil
 }
 
-// searchPipeline matches the term document, fans its postings out to their book records, drops
-// every book that is not published or fails the filters, and packs the survivors into a total
-// count and a relevance-ordered page. With no matching term document the facet yields no document
-// at all, which searchResultFrom reports as an empty result.
+// searchPipeline matches the term documents, fans their postings out and groups them per book,
+// keeping only the books that appear under every term (the AND) with their summed frequency as
+// score. Only those books are joined with their records, so extra terms shrink the join instead
+// of growing it. Books that are not published or fail the filters are dropped, and the survivors
+// are packed into a total count and a relevance-ordered page. With no matching term document the
+// facet yields no document at all, which searchResultFrom reports as an empty result.
 func searchPipeline(request SearchRequest) bson.A {
+	terms := distinctTerms(request.Terms)
 	return bson.A{
-		bson.D{{Key: "$match", Value: bson.D{{Key: "_id", Value: request.Term}}}},
+		bson.D{{Key: "$match", Value: bson.D{{Key: "_id", Value: bson.D{{Key: "$in", Value: terms}}}}}},
 		bson.D{{Key: "$unwind", Value: "$postings"}},
+		bson.D{{Key: "$group", Value: bson.D{
+			{Key: "_id", Value: "$postings.book_id"},
+			{Key: "terms", Value: bson.D{{Key: "$addToSet", Value: "$_id"}}},
+			{Key: "score", Value: bson.D{{Key: "$sum", Value: "$postings.tf"}}},
+		}}},
+		bson.D{{Key: "$match", Value: bson.D{{Key: "$expr", Value: bson.D{{Key: "$eq", Value: bson.A{
+			bson.D{{Key: "$size", Value: "$terms"}}, len(terms),
+		}}}}}}},
 		bson.D{{Key: "$lookup", Value: lookupBook(request)}},
 		bson.D{{Key: "$unwind", Value: "$book"}},
 		bson.D{{Key: "$facet", Value: bson.D{
@@ -95,7 +113,7 @@ func searchPipeline(request SearchRequest) bson.A {
 func lookupBook(request SearchRequest) bson.D {
 	return bson.D{
 		{Key: "from", Value: BooksCollection},
-		{Key: "let", Value: bson.D{{Key: "bookId", Value: "$postings.book_id"}}},
+		{Key: "let", Value: bson.D{{Key: "bookId", Value: "$_id"}}},
 		{Key: "pipeline", Value: bson.A{bson.D{{Key: "$match", Value: publishedBookMatch(request)}}}},
 		{Key: "as", Value: "book"},
 	}
@@ -144,8 +162,8 @@ func languageCondition(language string) bson.D {
 func pageStages(request SearchRequest) bson.A {
 	stages := bson.A{
 		bson.D{{Key: "$sort", Value: bson.D{
-			{Key: "postings.tf", Value: -1},
-			{Key: "postings.book_id", Value: 1},
+			{Key: "score", Value: -1},
+			{Key: "_id", Value: 1},
 		}}},
 	}
 	if request.Offset > 0 {
@@ -156,6 +174,18 @@ func pageStages(request SearchRequest) bson.A {
 		bson.D{{Key: "$replaceRoot", Value: bson.D{{Key: "newRoot", Value: "$book"}}}},
 	)
 	return stages
+}
+
+// distinctTerms drops repeated terms, keeping first appearances in order, so the AND compares the
+// number of terms a book matched against the number of different terms asked for.
+func distinctTerms(terms []string) []string {
+	distinct := make([]string, 0, len(terms))
+	for _, term := range terms {
+		if !slices.Contains(distinct, term) {
+			distinct = append(distinct, term)
+		}
+	}
+	return distinct
 }
 
 func searchResultFrom(facets []searchFacet) SearchResult {
