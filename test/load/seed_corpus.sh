@@ -59,13 +59,20 @@ wait_ready() {
 }
 
 # ingest ID: prints the ingestion status (downloaded, available, unavailable or failed), retrying
-# temporary failures. A transport error or an unknown answer counts as failed.
+# temporary failures. The status comes from the body when the service sends one; otherwise HTTP 404
+# (book_unavailable: Gutenberg has no such book) is permanent, and anything else, including a
+# transport error, counts as a temporary failure.
 ingest() {
   local book="$1" attempt status code
   for attempt in $(seq 0 "$RETRIES"); do
     code="$(post "$INGESTION_URL/ingest/$book")"
     status="$(body_field status)"
-    [ -n "$status" ] || status="failed"
+    if [ -z "$status" ]; then
+      case "$code" in
+        404) status="unavailable" ;;
+        *) status="failed" ;;
+      esac
+    fi
     if [ "$status" != failed ]; then
       echo "$status"
       return 0
