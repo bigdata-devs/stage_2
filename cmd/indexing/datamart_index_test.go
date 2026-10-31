@@ -25,7 +25,7 @@ func datamartTestStart(t *testing.T) mongodb.Client {
 	ctx, cancel := context.WithTimeout(context.Background(), mongodb.DefaultConnectTimeout)
 	defer cancel()
 	if !mongodb.Available(ctx, config) {
-		t.Skipf("MongoDB is not available at %s; start it with: docker run -d --name boogle-mongo -p 27017:27017 mongo:7", config.URI)
+		t.Skipf("MongoDB is not available at %s; start it with: docker run -d --name boogle-mongo -p 27017:27017 mongo:7", mongodb.RedactURI(config.URI))
 	}
 	client, err := mongodb.Connect(ctx, config, mongodb.DefaultConnectTimeout)
 	if err != nil {

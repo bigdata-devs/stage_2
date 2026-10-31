@@ -13,7 +13,7 @@ func liveConfig(t testing.TB) Config {
 	t.Helper()
 	config := ConfigFromEnvironment()
 	if !Available(context.Background(), config) {
-		t.Skipf("no MongoDB reachable at %s; set MONGO_URI or start a server", config.URI)
+		t.Skipf("no MongoDB reachable at %s; set MONGO_URI or start a server", RedactURI(config.URI))
 	}
 	return config
 }
