@@ -15,6 +15,7 @@ Service bridge, catalog endpoints, load benchmark).
 | [`indexing_benchmark_2026-10-19T19-07-00-230Z.json`](indexing_benchmark_2026-10-19T19-07-00-230Z.json) | The complete k6 summary of that run (every metric, check and threshold), for plotting. |
 | [`indexing_benchmark_run.log`](indexing_benchmark_run.log) | Console transcript of the same run, including the threshold report. |
 | [`indexing_resources.csv`](indexing_resources.csv) | 1-second samples of the Indexing Service (CPU %, working set, private memory, threads) and of MongoDB in Docker (CPU %, memory) taken while k6 drove the load. |
+| [`api_validation_results.md`](api_validation_results.md) | **2026-10-31.** Output of `scripts/api_validation.sh` (audit RF 10): **19/19** Search API contract checks, from keyword, filters, empty and past-the-end pages to every 400/404 case, `/books/{book_id}`, `/search/filters`, multi-word AND and CORS preflight, with the literal response bodies. Recorded from an empty datamart seeded through the Ingestion and Indexing APIs; the services ran as local processes with the compose flags and environment (no Docker daemon in that workspace). |
 
 ## Environment
 
@@ -32,6 +33,9 @@ gofmt -l . && go vet ./... && go test ./...                 # repository verific
 go test -v -count=1 ./internal/mongodb/ > docs/evidence/tests.txt   # §tests
 go test -run '^$' -bench . -benchmem -benchtime 1s -count 10 ./internal/mongodb/   # §benchmarks
 go run golang.org/x/perf/cmd/benchstat@latest <benchmarks-output>                  # §benchstat
+
+docker compose up -d --build                                # API validation against the compose stack
+scripts/api_validation.sh --record docs/evidence/api_validation_results.md
 ```
 
 Both bridges from [`docs/mongodb.md`](../mongodb.md) are now committed
