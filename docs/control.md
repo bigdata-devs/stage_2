@@ -49,9 +49,12 @@ Flags override environment variables; all three endpoints are configurable so no
 Control Module on any machine with Docker:
 
 ```bash
-docker compose up -d --build                                     # mongo + ingestion + indexing + search
+docker compose up -d --build                                     # mongo + ingestion + indexing + search + nginx
+docker compose ps                                                # health of every container
 docker compose --profile tools run --rm control -discover        # orchestrate the whole datalake
 docker compose --profile tools run --rm control -ids 1342,84     # or an explicit selection
+docker compose logs -f ingestion indexing search nginx           # follow the service logs
+docker compose down                                              # stop; the named volumes are kept
 ```
 
 The services reach each other by container name (`http://ingestion:7001`,
@@ -60,6 +63,12 @@ the same configurability that keeps `localhost` out of the code. Host ports come
 from `.env` (copy `.env.example`); the Swagger UIs and the internal status routes
 stay reachable on `localhost:7001..7003`, where `7003` is published by nginx in
 front of the Search Service replicas (next section).
+
+Containers carry code only: the datalake, the control state files and the
+MongoDB datamart live in the named volumes `datalake`, `control-state` and
+`mongo-data`. Recreating or killing a container therefore never loses pipeline
+state, and a restarted Control Module resumes from `/data/control` exactly as
+described in the failure-semantics section below.
 
 ### Search replicas behind nginx (audit RF 8)
 
@@ -73,6 +82,7 @@ header, and every nginx log line carries `upstream=`.
 
 ```bash
 docker compose up -d --build --scale search=2                    # or SEARCH_REPLICAS=2 in .env
+docker compose -f docker-compose.yml -f docker-compose.replicas.yml up -d --build   # same, as an override file
 docker compose ps search nginx                                    # search-1, search-2, nginx-1
 docker compose logs nginx --no-log-prefix | grep -o 'upstream=[^ ]*' | sort | uniq -c   # load split
 ```
@@ -81,71 +91,12 @@ The replica experiment runs the same k6 profile twice against the same seeded
 datamart, once with `--scale search=1` and once with `--scale search=2`, while
 `test/load/sample_containers.sh` samples every search replica, nginx and MongoDB.
 
-Containers carry code only: the datalake, the control state files and the
-MongoDB datamart live in the named volumes `datalake`, `control-state` and
-`mongo-data`. Recreating or killing a container therefore never loses pipeline
-state, and a restarted Control Module resumes from `/data/control` exactly as
-described in the failure-semantics section below.
+### Resource limits (for benchmarking)
 
-## Orchestration flow
-
-For every candidate book, one worker:
-
-1. Skips the book when it is already indexed, or already recorded as failed.
-2. `POST /ingest/{book_id}` and waits for the final answer. A `2xx` status means
-   ingestion **has completed**; only then is the book recorded as downloaded.
-3. `POST /index/update/{book_id}` and waits for the answer. A `2xx` status means the
-   index update **has been published**; only then is the book recorded as indexed.
-
-The Control Module is the only writer of the state files. Services must stay
-idempotent: replayed `POST /ingest` calls answer `available`, replayed
-`POST /index/update` calls never create duplicate postings.
-
-## Run the whole stack with Docker Compose
-
-The repository includes a `docker-compose.yml` that deploys the whole system:
-MongoDB, ingestion, indexing, and search services, plus the control module for
-orchestration.
-
-```bash
-# Build and start all services
-docker compose up --build -d
-
-# Check service health
-docker compose ps
-
-# Run a control module task
-docker compose run --rm control -ids 1342,84
-
-# View logs
-docker compose logs -f ingestion indexing search
-
-# Stop all services
-docker compose down
-```
-
-### Replica Configuration (for benchmarking)
-
-To test horizontal scaling of the search service, use the replica override file:
-
-```bash
-# Start with 2 search replicas + nginx load balancer
-docker compose -f docker-compose.yml -f docker-compose.replicas.yml up --build -d
-
-# The nginx load balancer will be available at http://localhost:7003
-# Individual search instances are not directly exposed
-```
-
-The `docker-compose.replicas.yml` file:
-- Scales the search service to 2 replicas
-- Adds an nginx reverse proxy as a load balancer on port 7003
-- Distributes requests across search replicas using round-robin
-
-### Resource Limits (for benchmarking)
-
-The `docker-compose.yml` includes commented resource limits for each service. To
-enable them, uncomment the `deploy.resources.limits` section for the service you
-want to constrain:
+`docker-compose.yml` carries commented resource limits for MongoDB, ingestion and
+indexing; uncomment the `deploy.resources.limits` block of the service you want to
+constrain. The search service already has a `deploy` key (its replica count), so
+add `resources` under that key instead of a second `deploy`:
 
 ```yaml
 services:
@@ -168,6 +119,7 @@ services:
   search:
     # ... other config ...
     deploy:
+      replicas: ${SEARCH_REPLICAS:-1}
       resources:
         limits:
           cpus: '1.0'
@@ -184,6 +136,20 @@ services:
 
 These limits help simulate production constraints and measure performance under
 resource constraints. Adjust the values based on your benchmarking needs.
+
+## Orchestration flow
+
+For every candidate book, one worker:
+
+1. Skips the book when it is already indexed, or already recorded as failed.
+2. `POST /ingest/{book_id}` and waits for the final answer. A `2xx` status means
+   ingestion **has completed**; only then is the book recorded as downloaded.
+3. `POST /index/update/{book_id}` and waits for the answer. A `2xx` status means the
+   index update **has been published**; only then is the book recorded as indexed.
+
+The Control Module is the only writer of the state files. Services must stay
+idempotent: replayed `POST /ingest` calls answer `available`, replayed
+`POST /index/update` calls never create duplicate postings.
 
 ## Control state files
 

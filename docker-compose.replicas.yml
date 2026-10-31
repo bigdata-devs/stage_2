@@ -1,27 +1,10 @@
-# Replica override for testing horizontal scaling of the Search Service.
-# Usage: docker compose -f docker-compose.yml -f docker-compose.replicas.yml up -d
+# Shortcut for the RF 8 replica experiment: two Search Service replicas behind the nginx service
+# that docker-compose.yml already defines (deploy/nginx/nginx.conf publishes SEARCH_PORT).
+# Equivalent to `docker compose up -d --scale search=2` or SEARCH_REPLICAS=2 in .env.
 #
-# This override scales search to 2 replicas and adds an nginx load balancer
-# on port 7003 (the original search port). The services connect to nginx
-# instead of directly to search.
+# Usage: docker compose -f docker-compose.yml -f docker-compose.replicas.yml up -d --build
 
 services:
   search:
     deploy:
       replicas: 2
-    ports: !reset []  # Remove direct port mapping; nginx will handle it
-
-  nginx:
-    image: nginx:alpine
-    ports:
-      - "${SEARCH_PORT:-7003}:80"
-    volumes:
-      - ./nginx.conf:/etc/nginx/nginx.conf:ro
-    depends_on:
-      - search
-    healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:80/"]
-      interval: 5s
-      timeout: 5s
-      retries: 12
-      start_period: 5s
