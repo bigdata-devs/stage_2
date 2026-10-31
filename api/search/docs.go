@@ -336,7 +336,7 @@ var SwaggerInfo = &swag.Spec{
 	BasePath:         "/",
 	Schemes:          []string{"http"},
 	Title:            "Boogle Engine Search API",
-	Description:      "Front-end-facing API of the Boogle Engine Search Service: keyword search over\nProject Gutenberg books with optional author, language and publication-year filters.",
+	Description:      "Front-end-facing API of the Boogle Engine Search Service: keyword search over\nProject Gutenberg books with optional author, language and publication-year filters.\nBrowsers may call every endpoint cross-origin (CORS) from the origins in the service's\nCORS_ALLOWED_ORIGIN setting: any origin (`*`) by default, or an explicit comma-separated list.\nCross-origin pages may use GET, HEAD and OPTIONS and send the Content-Type header; credentials\n(cookies, Authorization) are never allowed. Preflight OPTIONS requests are answered with 204,\nor 403 `origin_not_allowed` for an origin outside the list.",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,
 	LeftDelim:        "{{",

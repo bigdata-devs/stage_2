@@ -76,6 +76,7 @@ services:
     environment:
       MONGO_URI: "mongodb://mongo:27017"
       MONGO_DATABASE: "boogle"
+      CORS_ALLOWED_ORIGIN: "${CORS_ALLOWED_ORIGIN:-*}"
     depends_on:
       mongo:
         condition: service_healthy
