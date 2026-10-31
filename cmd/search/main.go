@@ -1,8 +1,8 @@
 // Command search is the entry point of the Boogle Engine Search Service. It serves the
 // front-end-facing GET /search endpoint, the optional catalog endpoints GET /books/{book_id}
-// and GET /search/filters (both read from the MongoDB datamart), and the interactive OpenAPI
-// documentation. GET /search itself is answered by api.StubEngine's sample catalog until the
-// datamart search bridge lands.
+// and GET /search/filters, and the interactive OpenAPI documentation. Every endpoint reads the
+// MongoDB datamart the Indexing Service writes: GET /search through DatamartEngine, the catalog
+// endpoints through the same datamart reader.
 //
 // Usage:
 //
@@ -12,8 +12,12 @@
 // Then open http://localhost:7003/swagger/index.html or call
 // http://localhost:7003/search?q=adventure&language=en
 //
-// The service refuses to start when the datamart is unreachable (fail-fast); MONGO_URI and
-// MONGO_DATABASE select the cluster and database, as in the other services.
+// Configuration comes from the environment, as in the other services:
+//
+//	MONGO_URI       connection string of the datamart (default mongodb://localhost:27017)
+//	MONGO_DATABASE  database holding the books and inverted_index collections (default boogle)
+//
+// The service refuses to start when the datamart is unreachable (fail-fast).
 //
 // After changing any swag annotation, regenerate the specification in api/search with:
 //
@@ -70,8 +74,8 @@ func main() {
 }
 
 // run wires the service together and serves requests until Ctrl+C or SIGTERM. The datamart
-// connection is opened first and fails fast, because the catalog endpoints cannot serve without
-// it; the search engine is still the offline stub until the datamart search bridge lands.
+// connection is opened first and fails fast, because no endpoint can serve without it; one
+// stateless reader over that connection backs both the search engine and the catalog.
 func run(arguments []string) error {
 	address, err := parseAddress(arguments)
 	if err != nil {
@@ -82,11 +86,12 @@ func run(arguments []string) error {
 		return err
 	}
 	defer closeDatamart(client)
-	searchHandler, err := api.NewSearchHandler(api.NewStubEngine())
+	reader := mongodb.NewDatamartReader(client)
+	searchHandler, err := api.NewSearchHandler(NewDatamartEngine(reader))
 	if err != nil {
 		return err
 	}
-	catalogHandler, err := buildCatalogHandler(client)
+	catalogHandler, err := buildCatalogHandler(reader)
 	if err != nil {
 		return err
 	}
@@ -110,6 +115,7 @@ func connectDatamart() (mongodb.Client, error) {
 		}
 		return mongodb.Client{}, fmt.Errorf("ensure datamart indexes: %w", err)
 	}
+	slog.Info("datamart connected", "datamart", client.Describe())
 	return client, nil
 }
 

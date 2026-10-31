@@ -1,7 +1,7 @@
 // Package api exposes the front-end-facing HTTP API of the Boogle Engine Search Service.
 // Handlers depend only on the SearchEngine interface, so the storage behind the search
-// (the StubEngine sample catalog today, the MongoDB datamart later) can change without
-// touching any HTTP code.
+// (the MongoDB datamart in production, a fixed in-memory catalog in the tests) can change
+// without touching any HTTP code.
 package api
 
 import (

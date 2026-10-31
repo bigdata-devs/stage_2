@@ -34,9 +34,9 @@ go test -run '^$' -bench . -benchmem -benchtime 1s -count 10 ./internal/mongodb/
 go run golang.org/x/perf/cmd/benchstat@latest <benchmarks-output>                  # §benchstat
 ```
 
-The demo additionally needs the two bridge files and the wiring from
-[`docs/mongodb.md`](../mongodb.md) (they belong to the services of Members 3 and 5), the four-book
-corpus described at the top of `demo.md`, and both services started as shown there. On this
+Both bridges from [`docs/mongodb.md`](../mongodb.md) are now committed
+(`cmd/indexing/datamart_index.go`, `cmd/search/datamart_engine.go`), so the demo needs only the four-book
+corpus described at the top of `demo.md` and both services started as shown there. On this
 platform benchmark samples must span whole seconds — the monotonic clock reads sub-millisecond
 spans as zero — which the `-benchtime 1s` window and the ten repetitions guarantee.
 

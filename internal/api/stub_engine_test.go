@@ -9,9 +9,10 @@ import (
 	"boogle-engine/internal/models"
 )
 
-// StubEngine is a SearchEngine over a small, fixed catalog of well-known Gutenberg books. It
-// lets the Search Service run, be tested and be documented before the MongoDB datamart is
-// ready. It applies the filter rules that the real engine must honour:
+// StubEngine is a test double: a SearchEngine over a small, fixed catalog of well-known Gutenberg
+// books that exercises the HTTP contract of GET /search without a database. It lives in a _test.go
+// file on purpose, so the compiler keeps it out of every production binary; cmd/search serves
+// GET /search from the MongoDB datamart. It applies the filter rules that the real engine honours:
 //
 //   - q: case-insensitive substring of the title (a stand-in for the inverted index lookup)
 //   - author: case-insensitive substring of the author

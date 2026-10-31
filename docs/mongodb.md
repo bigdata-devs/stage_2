@@ -462,7 +462,9 @@ func closeDatamart(client mongodb.Client) {
 }
 ```
 
-4. Optionally update the command's package doc comment (it still says "Until the MongoDB datamart is ready…"). `api.StubEngine` stays in the tree as an offline fallback; only the wiring line changes.
+4. Optionally update the command's package doc comment (it still says "Until the MongoDB datamart is ready…").
+
+**Status (30 Oct 2026):** landed. `cmd/search/datamart_engine.go` is committed and `run` wires it, sharing one `DatamartReader` with the catalog endpoints. The engine depends on a one-method `bookSearcher` interface (satisfied by `mongodb.DatamartReader`) so `cmd/search/datamart_engine_test.go` can unit-test it without a server; `datamart_engine_integration_test.go` exercises it against a live datamart and skips when none is reachable. `api.StubEngine` now lives in `internal/api/stub_engine_test.go`, so it exists only for the handler tests and cannot be compiled into a service binary.
 
 ## Operational semantics at a glance
 
