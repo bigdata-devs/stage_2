@@ -2,6 +2,9 @@
 # (long-running) and the Control Module (on demand, behind the "tools" profile).
 # Containers carry code only; every dataset lives in a named volume, so a
 # recreated container never loses the datalake, the control state or the datamart.
+# The Search Service runs as one or more stateless replicas behind nginx, which
+# publishes the Search API on SEARCH_PORT (audit RF 8 replica experiment):
+#   docker compose up -d --build --scale search=2
 name: boogle-engine
 
 services:
@@ -88,12 +91,17 @@ services:
         SERVICE: search
     image: boogle-engine/search:latest
     restart: unless-stopped
-    ports:
-      - "${SEARCH_PORT:-7003}:7003"
+    # No host port: every replica listens on 7003 inside the compose network and nginx balances
+    # across them. SEARCH_REPLICAS (default 1) sets the count; --scale search=N overrides it.
+    expose:
+      - "7003"
+    deploy:
+      replicas: ${SEARCH_REPLICAS:-1}
     command: ["-addr", ":7003"]
     environment:
       MONGO_URI: "mongodb://mongo:27017"
       MONGO_DATABASE: "boogle"
+      CORS_ALLOWED_ORIGIN: "${CORS_ALLOWED_ORIGIN:-*}"
     depends_on:
       mongo:
         condition: service_healthy
@@ -103,6 +111,25 @@ services:
       timeout: 5s
       retries: 24
       start_period: 10s
+
+  # Front door of the Search API: load-balances SEARCH_PORT across the search replicas
+  # (configuration and rationale in deploy/nginx/nginx.conf).
+  nginx:
+    image: nginx:1.28-alpine
+    restart: unless-stopped
+    ports:
+      - "${SEARCH_PORT:-7003}:7003"
+    volumes:
+      - ./deploy/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      search:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:7003/search/filters"]
+      interval: 5s
+      timeout: 5s
+      retries: 24
+      start_period: 5s
 
   control:
     build:

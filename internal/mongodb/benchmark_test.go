@@ -106,7 +106,7 @@ func BenchmarkSearchBooksWithoutFilters(b *testing.B) {
 	seedBenchmarkCorpus(b, client)
 	reader := NewDatamartReader(client)
 	ctx := context.Background()
-	request := SearchRequest{Term: benchmarkTerm, Limit: 20}
+	request := SearchRequest{Terms: []string{benchmarkTerm}, Limit: 20}
 
 	b.ResetTimer()
 	for b.Loop() {
@@ -125,7 +125,7 @@ func BenchmarkSearchBooksWithAllFilters(b *testing.B) {
 	reader := NewDatamartReader(client)
 	ctx := context.Background()
 	request := SearchRequest{
-		Term:     benchmarkTerm,
+		Terms:    []string{benchmarkTerm},
 		Author:   "author 03",
 		Language: "de",
 		Year:     1703,

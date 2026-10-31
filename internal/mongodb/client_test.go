@@ -21,7 +21,7 @@ func TestMain(m *testing.M) {
 	liveMongoConfig = ConfigFromEnvironment()
 	liveMongoAvailable = Available(context.Background(), liveMongoConfig)
 	if !liveMongoAvailable {
-		fmt.Fprintf(os.Stderr, "no MongoDB reachable at %s; the live tests of this package will skip (set MONGO_URI or start a server)\n", liveMongoConfig.URI)
+		fmt.Fprintf(os.Stderr, "no MongoDB reachable at %s; the live tests of this package will skip (set MONGO_URI or start a server)\n", RedactURI(liveMongoConfig.URI))
 	}
 	os.Exit(m.Run())
 }
@@ -29,7 +29,7 @@ func TestMain(m *testing.M) {
 func liveConfig(t testing.TB) Config {
 	t.Helper()
 	if !liveMongoAvailable {
-		t.Skipf("no MongoDB reachable at %s; set MONGO_URI or start a server", liveMongoConfig.URI)
+		t.Skipf("no MongoDB reachable at %s; set MONGO_URI or start a server", RedactURI(liveMongoConfig.URI))
 	}
 	return liveMongoConfig
 }

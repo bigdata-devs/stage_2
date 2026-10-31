@@ -58,7 +58,28 @@ The services reach each other by container name (`http://ingestion:7001`,
 `http://indexing:7002`) through the environment variables of the compose file —
 the same configurability that keeps `localhost` out of the code. Host ports come
 from `.env` (copy `.env.example`); the Swagger UIs and the internal status routes
-stay reachable on `localhost:7001..7003`.
+stay reachable on `localhost:7001..7003`, where `7003` is published by nginx in
+front of the Search Service replicas (next section).
+
+### Search replicas behind nginx (audit RF 8)
+
+The Search Service is stateless, so it runs as N replicas without a host port and
+`nginx` (`deploy/nginx/nginx.conf`) balances `localhost:7003` across them with
+`least_conn`. nginx re-resolves the `search` service name every 5 s, so scaling
+needs no proxy restart; a replica that stops is taken out of rotation after a
+refused connection (the request is retried on another replica) and rejoins 10 s
+after it answers again. Every response names its replica in the `X-Upstream`
+header, and every nginx log line carries `upstream=`.
+
+```bash
+docker compose up -d --build --scale search=2                    # or SEARCH_REPLICAS=2 in .env
+docker compose ps search nginx                                    # search-1, search-2, nginx-1
+docker compose logs nginx --no-log-prefix | grep -o 'upstream=[^ ]*' | sort | uniq -c   # load split
+```
+
+The replica experiment runs the same k6 profile twice against the same seeded
+datamart, once with `--scale search=1` and once with `--scale search=2`, while
+`test/load/sample_containers.sh` samples every search replica, nginx and MongoDB.
 
 Containers carry code only: the datalake, the control state files and the
 MongoDB datamart live in the named volumes `datalake`, `control-state` and

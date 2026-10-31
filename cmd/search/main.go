@@ -1,8 +1,8 @@
 // Command search is the entry point of the Boogle Engine Search Service. It serves the
 // front-end-facing GET /search endpoint, the optional catalog endpoints GET /books/{book_id}
-// and GET /search/filters (both read from the MongoDB datamart), and the interactive OpenAPI
-// documentation. GET /search itself is answered by api.StubEngine's sample catalog until the
-// datamart search bridge lands.
+// and GET /search/filters, and the interactive OpenAPI documentation. Every endpoint reads the
+// MongoDB datamart the Indexing Service writes: GET /search through DatamartEngine, the catalog
+// endpoints through the same datamart reader.
 //
 // Usage:
 //
@@ -12,8 +12,16 @@
 // Then open http://localhost:7003/swagger/index.html or call
 // http://localhost:7003/search?q=adventure&language=en
 //
-// The service refuses to start when the datamart is unreachable (fail-fast); MONGO_URI and
-// MONGO_DATABASE select the cluster and database, as in the other services.
+// Configuration comes from the environment, as in the other services:
+//
+//	MONGO_URI            connection string of the datamart (default mongodb://localhost:27017)
+//	MONGO_DATABASE       database holding the books and inverted_index collections (default boogle)
+//	CORS_ALLOWED_ORIGIN  browser origins allowed to call the API cross-origin: * for any origin
+//	                     (default), or a comma-separated list such as
+//	                     https://boogle.example.com,http://localhost:5173
+//
+// The service refuses to start when CORS_ALLOWED_ORIGIN names no valid origin or the datamart is
+// unreachable (fail-fast). CORS never allows credentials: the API is public and read-only.
 //
 // After changing any swag annotation, regenerate the specification in api/search with:
 //
@@ -31,6 +39,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -53,6 +62,11 @@ const (
 //	@version		1.0.0
 //	@description	Front-end-facing API of the Boogle Engine Search Service: keyword search over
 //	@description	Project Gutenberg books with optional author, language and publication-year filters.
+//	@description	Browsers may call every endpoint cross-origin (CORS) from the origins in the service's
+//	@description	CORS_ALLOWED_ORIGIN setting: any origin (`*`) by default, or an explicit comma-separated list.
+//	@description	Cross-origin pages may use GET, HEAD and OPTIONS and send the Content-Type header; credentials
+//	@description	(cookies, Authorization) are never allowed. Preflight OPTIONS requests are answered with 204,
+//	@description	or 403 `origin_not_allowed` for an origin outside the list.
 //	@BasePath		/
 //	@schemes		http
 //	@tag.name		search
@@ -69,30 +83,37 @@ func main() {
 	}
 }
 
-// run wires the service together and serves requests until Ctrl+C or SIGTERM. The datamart
-// connection is opened first and fails fast, because the catalog endpoints cannot serve without
-// it; the search engine is still the offline stub until the datamart search bridge lands.
+// run wires the service together and serves requests until Ctrl+C or SIGTERM. Configuration is
+// checked before any connection is attempted. The datamart connection is then opened and fails
+// fast, because no endpoint can serve without it; one stateless reader over that connection backs
+// both the search engine and the catalog, and the CORS policy wraps every route.
 func run(arguments []string) error {
 	address, err := parseAddress(arguments)
 	if err != nil {
 		return err
 	}
+	cors, err := corsPolicyFromEnvironment()
+	if err != nil {
+		return err
+	}
+	slog.Info("cors policy", "allowed_origins", strings.Join(cors.AllowedOrigins(), ","))
 	client, err := connectDatamart()
 	if err != nil {
 		return err
 	}
 	defer closeDatamart(client)
-	searchHandler, err := api.NewSearchHandler(api.NewStubEngine())
+	reader := mongodb.NewDatamartReader(client)
+	searchHandler, err := api.NewSearchHandler(NewDatamartEngine(reader))
 	if err != nil {
 		return err
 	}
-	catalogHandler, err := buildCatalogHandler(client)
+	catalogHandler, err := buildCatalogHandler(reader)
 	if err != nil {
 		return err
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-	return serve(ctx, newServer(address, newRouter(searchHandler, catalogHandler)))
+	return serve(ctx, newServer(address, cors.Wrap(newRouter(searchHandler, catalogHandler))))
 }
 
 // connectDatamart opens the MongoDB pool described by MONGO_URI and MONGO_DATABASE and creates
@@ -110,6 +131,7 @@ func connectDatamart() (mongodb.Client, error) {
 		}
 		return mongodb.Client{}, fmt.Errorf("ensure datamart indexes: %w", err)
 	}
+	slog.Info("datamart connected", "datamart", client.Describe())
 	return client, nil
 }
 

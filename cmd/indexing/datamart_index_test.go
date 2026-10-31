@@ -26,7 +26,7 @@ func TestMain(m *testing.M) {
 	liveMongoConfig = mongodb.ConfigFromEnvironment()
 	liveMongoAvailable = mongodb.Available(context.Background(), liveMongoConfig)
 	if !liveMongoAvailable {
-		fmt.Fprintf(os.Stderr, "MongoDB is not available at %s; the live tests of this package will skip (start it with: docker run -d --name boogle-mongo -p 27017:27017 mongo:7)\n", liveMongoConfig.URI)
+		fmt.Fprintf(os.Stderr, "MongoDB is not available at %s; the live tests of this package will skip (start it with: docker run -d --name boogle-mongo -p 27017:27017 mongo:7)\n", mongodb.RedactURI(liveMongoConfig.URI))
 	}
 	os.Exit(m.Run())
 }
@@ -38,7 +38,7 @@ func TestMain(m *testing.M) {
 func datamartTestStart(t *testing.T) mongodb.Client {
 	t.Helper()
 	if !liveMongoAvailable {
-		t.Skipf("MongoDB is not available at %s; start it with: docker run -d --name boogle-mongo -p 27017:27017 mongo:7", liveMongoConfig.URI)
+		t.Skipf("MongoDB is not available at %s; start it with: docker run -d --name boogle-mongo -p 27017:27017 mongo:7", mongodb.RedactURI(liveMongoConfig.URI))
 	}
 	t.Setenv("MONGO_DATABASE", "boogle_indexing_bridge_test")
 	config := mongodb.ConfigFromEnvironment()

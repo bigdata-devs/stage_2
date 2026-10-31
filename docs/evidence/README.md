@@ -28,6 +28,7 @@ Service bridge, catalog endpoints, load benchmark).
 | [`e2e_compose_2026-10-30T11-16-16Z.txt`](e2e_compose_2026-10-30T11-16-16Z.txt) | **2026-10-30.** Transcript of `scripts/e2e_compose.sh` on Docker Desktop 4.97 (Engine 29.9.2, WSL2): stack build, orchestration, idempotent replay, front-facing search, ingestion-container failure recovery and named-volume persistence all PASS. |
 | [`ingestion_throughput.md`](ingestion_throughput.md) | **2026-10-30.** Cold-datalake ingestion throughput on 100 real Gutenberg books at `-workers 1, 2, 4, 8` with CPU/RAM samples (2xx-only counting), per the Stage 2 audit. |
 | [`api_validation.txt`](api_validation.txt) | Historical API validation checklist of the Ingestion Service (moved from `cmd/ingestion/results/`). |
+| [`api_validation_results.md`](api_validation_results.md) | **2026-10-31.** Output of `scripts/api_validation.sh` (audit RF 10): **19/19** Search API contract checks, from keyword, filters, empty and past-the-end pages to every 400/404 case, `/books/{book_id}`, `/search/filters`, multi-word AND and CORS preflight, with the literal response bodies. Recorded from an empty datamart seeded through the Ingestion and Indexing APIs; the services ran as local processes with the compose flags and environment (no Docker daemon in that workspace). |
 
 ## Environment
 
@@ -49,11 +50,14 @@ go test -run '^$' -bench . -benchmem -benchtime 1s -count 10 ./internal/mongodb/
 go run golang.org/x/perf/cmd/benchstat@latest <benchmarks-output>                  # §benchstat
 go run golang.org/x/perf/cmd/benchstat@latest -format csv <benchmarks-output> > docs/evidence/benchstat.csv  # §benchstat CSV
 # PowerShell: wrap the whole command in cmd /c "..." so ">" writes bytes, not UTF-16
+
+docker compose up -d --build                                # API validation against the compose stack
+scripts/api_validation.sh --record docs/evidence/api_validation_results.md
 ```
 
-The demo additionally needs the two bridge files and the wiring from
-[`docs/mongodb.md`](../mongodb.md) (they belong to the services of Members 3 and 5), the four-book
-corpus described at the top of `demo.md`, and both services started as shown there. On this
+Both bridges from [`docs/mongodb.md`](../mongodb.md) are now committed
+(`cmd/indexing/datamart_index.go`, `cmd/search/datamart_engine.go`), so the demo needs only the four-book
+corpus described at the top of `demo.md` and both services started as shown there. On this
 platform benchmark samples must span whole seconds — the monotonic clock reads sub-millisecond
 spans as zero — which the `-benchtime 1s` window and the ten repetitions guarantee.
 

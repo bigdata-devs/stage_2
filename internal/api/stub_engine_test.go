@@ -9,11 +9,13 @@ import (
 	"boogle-engine/internal/models"
 )
 
-// StubEngine is a SearchEngine over a small, fixed catalog of well-known Gutenberg books. It
-// lets the Search Service run, be tested and be documented before the MongoDB datamart is
-// ready. It applies the filter rules that the real engine must honour:
+// StubEngine is a test double: a SearchEngine over a small, fixed catalog of well-known Gutenberg
+// books that exercises the HTTP contract of GET /search without a database. It lives in a _test.go
+// file on purpose, so the compiler keeps it out of every production binary; cmd/search serves
+// GET /search from the MongoDB datamart. It applies the filter rules that the real engine honours:
 //
-//   - q: case-insensitive substring of the title (a stand-in for the inverted index lookup)
+//   - q: every search term is a case-insensitive substring of the title (a stand-in for the
+//     AND over the inverted index)
 //   - author: case-insensitive substring of the author
 //   - language: case-insensitive exact match against any of the book's comma-separated codes
 //   - year: exact original publication year
@@ -43,11 +45,20 @@ func (engine StubEngine) Search(_ context.Context, query SearchQuery) (SearchPag
 func (engine StubEngine) matchingBooks(query SearchQuery) []models.BookMetadata {
 	matches := []models.BookMetadata{}
 	for _, book := range engine.catalog {
-		if containsFold(book.Title, query.Term) && matchesFilters(book, query.Filters) {
+		if titleContainsEveryTerm(book.Title, query.Terms) && matchesFilters(book, query.Filters) {
 			matches = append(matches, book)
 		}
 	}
 	return matches
+}
+
+func titleContainsEveryTerm(title string, terms []string) bool {
+	for _, term := range terms {
+		if !containsFold(title, term) {
+			return false
+		}
+	}
+	return true
 }
 
 func matchesFilters(book models.BookMetadata, filters SearchFilters) bool {
