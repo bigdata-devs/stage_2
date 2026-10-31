@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# Samples the CPU and memory of the Search Service and MongoDB containers with `docker stats` while
-# the k6 search benchmark runs (audit RF 5), writing one CSV row per container per sample. Run it
-# in a second terminal, started just before k6 and stopped (Ctrl+C or DURATION) just after.
+# Samples the CPU and memory of the Search Service replicas, nginx and MongoDB with `docker stats`
+# while the k6 search benchmark runs (audit RF 5 and RF 8), writing one CSV row per container per
+# sample. Run it in a second terminal, started just before k6 and stopped (Ctrl+C or DURATION) just
+# after.
 #
 # Usage, from the repository root with the compose stack up:
 #   test/load/sample_containers.sh                                   sample until Ctrl+C
@@ -9,9 +10,10 @@
 #
 # Arguments: OUT_FILE (default test/load/results/search_resources.csv, the folder must exist) and
 # DURATION in seconds (default 0 = until Ctrl+C).
-# Environment: CONTAINERS (default "boogle-engine-search-1 boogle-engine-mongo-1", the names
-# docker compose gives this project; `docker compose ps` lists them) and INTERVAL (seconds slept
-# between samples, default 1). Each `docker stats --no-stream` call itself takes about a second,
+# Environment: CONTAINERS (default: every running container of the compose services search, nginx
+# and mongo, so each replica of `--scale search=N` is sampled; outside the repository it falls back
+# to "boogle-engine-search-1 boogle-engine-mongo-1") and INTERVAL (seconds slept between samples,
+# default 1). Each `docker stats --no-stream` call itself takes about a second,
 # so the effective period is about two seconds; every row carries its own UTC timestamp.
 #
 # cpu_percent is relative to one core (200 = two full cores), as docker stats reports it.
@@ -19,8 +21,11 @@ set -euo pipefail
 
 OUT_FILE="${1:-test/load/results/search_resources.csv}"
 DURATION="${2:-0}"
-CONTAINERS="${CONTAINERS:-boogle-engine-search-1 boogle-engine-mongo-1}"
 INTERVAL="${INTERVAL:-1}"
+if [ -z "${CONTAINERS:-}" ]; then
+  CONTAINERS="$(docker compose ps --format '{{.Name}}' search nginx mongo 2>/dev/null | tr '\n' ' ' || true)"
+  [ -n "${CONTAINERS// /}" ] || CONTAINERS="boogle-engine-search-1 boogle-engine-mongo-1"
+fi
 
 read -r -a containers <<<"$CONTAINERS"
 for container in "${containers[@]}"; do
