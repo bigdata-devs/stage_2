@@ -1,9 +1,10 @@
 # Benchmark Protocol — Official Stage 2 Session
 
-This is the runbook for the **official** benchmark session. The numbers currently in this folder
-were captured on a development laptop while the code was still moving; they are marked
-**PROVISIONAL** and must not be cited in the report. The official session replaces them atomically
-in one commit, on the Stage-1 host, executed by the Index Lead. Budget roughly **4–6 hours**.
+This is the runbook that guided the **official** benchmark session. **Executed on 2026-11-01** on
+the Stage-1 host (commit `ade7245`); the session replaced the earlier provisional numbers —
+captured on development laptops while the code was still moving — atomically in the commit
+`docs: record the official benchmark session`. Every timing number in this folder is now an
+official measurement, and this document is kept as the record of how it was taken.
 
 Everything is driven from the repository root. Commands are shown for a POSIX shell; on PowerShell
 wrap redirections in `cmd /c "..."` (see the warning in [`README.md`](README.md)) so files are
@@ -13,18 +14,18 @@ written as UTF-8 bytes, not UTF-16.
 
 | Property | Value |
 |---|---|
-| Date of the session | |
-| Git commit (`git rev-parse HEAD`) | |
-| CPU model, cores / threads | |
-| `GOMAXPROCS` reported by the benchmarks | |
-| RAM (total, and Docker Desktop VM cap) | |
-| Storage (model, type, free space) | |
-| OS and version | |
-| Go version (`go version`) | |
-| MongoDB server version (`mongosh --eval 'db.version()'`) | |
-| Docker VM CPUs / memory | |
-| k6 version (`k6 version`) | |
-| Power plan / load on the machine | |
+| Date of the session | 2026-11-01 |
+| Git commit (`git rev-parse HEAD`) | ade72451585fc7bda2e801a6b4c4e0b317fc48a9 |
+| CPU model, cores / threads | Intel Core i7-10750H @ 2.60 GHz, 6 cores / 12 threads (12 vCPUs to WSL2) |
+| `GOMAXPROCS` reported by the benchmarks | 12 (runtime default; swept with `-cpu 1,2,4,8`) |
+| RAM (total, and Docker Desktop VM cap) | 15.8 GB Windows host; 9.7 GB allocated to the WSL2 distro that runs Docker Engine |
+| Storage (model, type, free space) | Windows NTFS on /mnt/c (1.9 TB, 1.6 TB free); WSL2 ext4 root (1007 GB, 931 GB free) where Docker volumes live |
+| OS and version | WSL2 on Windows, Linux 6.18.33.2-microsoft-standard-WSL2 |
+| Go version (`go version`) | go1.27.2 linux/amd64 |
+| MongoDB server version (`mongosh --eval 'db.version()'`) | 7.0.45 (mongo:7 container) |
+| Docker VM CPUs / memory | Docker Engine 29.1.3 native in WSL2: 12 CPUs, 9.7 GB |
+| k6 version (`k6 version`) | v2.3.0 |
+| Power plan / load on the machine | Windows "High performance" plan (set before the session); machine otherwise idle, on AC |
 
 ## 2. Preconditions
 
@@ -134,14 +135,16 @@ Record both requests and responses with timestamps in `docs/evidence/rebuild_rep
 
 ## 7. Thread and replica variables (report section 7 evidence)
 
-| Variable | Default today | How this session varies it |
+Session of 2026-11-01, commit `ade7245`:
+
+| Variable | Default today | How this session varied it |
 |---|---|---|
-| Replicas per service | 1 (ingestion, indexing, search) | Search ×2 behind nginx (5.3); Indexing ×2 only in the rebuild experiment (6) |
-| `GOMAXPROCS` | runtime `NumCPU` of the host | `-cpu 1,2,4,8` sweep (4) |
+| Replicas per service | 1 (ingestion, indexing, search) + nginx front door | Search ×2 behind nginx (§5.3, `search_benchmark_*_2replicas.*`); Indexing ×2 only in the rebuild experiment (§6, `rebuild_replica.md`) |
+| `GOMAXPROCS` | runtime `NumCPU` of the host (12) | `-cpu 1,2,4,8` sweep on both suites (§4, `microbenchmarks.txt`, `benchmarks_cpu.txt`) |
 | Goroutines | one per HTTP connection (`net/http`) | not varied; bounded in practice by k6 VUs |
-| MongoDB driver pool | driver default `MaxPoolSize` 100 per process | not varied; replica runs double the pools, which stays below the server's ceiling at this scale |
-| Client concurrency (k6 VUs) | `1,5,10` (indexing), search profile (Search role) | already part of each load run |
-| Rebuild concurrency | one lease holder cluster-wide | enforced by experiment 6 |
+| MongoDB driver pool | driver default `MaxPoolSize` 100 per process | not varied; the two Indexing replicas in §6 double the pools, which stays below the server's ceiling at this scale |
+| Client concurrency (k6 VUs) | indexing `1,5,10`; search `1,10,50,100` | part of each load run |
+| Rebuild concurrency | one lease holder cluster-wide | enforced by experiment §6 (`rebuild_replica.md`) |
 
 ## 8. Smoke variants — discardable
 
@@ -155,11 +158,16 @@ HOLD_DURATION=10s VU_LEVELS=1 k6 run test/load/indexing_benchmark.js
 
 ## 9. Replacement checklist (single commit at the end)
 
-- [ ] Replace: `tests.txt`, `benchmarks.txt`, `benchstat.txt`, `benchstat.csv`,
+Executed on 2026-11-01 (commit `ade7245`):
+
+- [x] Replace: `tests.txt`, `benchmarks.txt`, `benchstat.txt`, `benchstat.csv`,
       `microbenchmarks.txt`, the k6 `.json`/`.csv`/`.log` outputs, `indexing_resources.csv`.
-- [ ] Add: `benchmarks_cpu.txt`, `benchstat_cpu.txt`, `rebuild_replica.md`, the search outputs.
-- [ ] Drop the **PROVISIONAL** banners from the files this session superseded.
-- [ ] Fill the host table of section 1 and the variables table of section 7.
-- [ ] Update the file table and the Environment section of [`README.md`](README.md) with the
+- [x] Add: `benchmarks_cpu.txt`, `benchstat_cpu.txt`, `rebuild_replica.md`, the search outputs
+      (`search_benchmark_*_{1replica,2replicas}.*`, `search_benchmark_run_*.log`,
+      `search_resources*.csv`).
+- [x] Drop the **PROVISIONAL** banners from the files this session superseded (README rewritten;
+      the regenerated `.txt` files carry no banner).
+- [x] Fill the host table of section 1 and the variables table of section 7.
+- [x] Update the file table and the Environment section of [`README.md`](README.md) with the
       official host and the new dates.
-- [ ] One atomic commit: `docs: record the official benchmark session`.
+- [x] One atomic commit: `docs: record the official benchmark session`.

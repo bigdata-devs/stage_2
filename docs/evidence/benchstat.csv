@@ -1,28 +1,40 @@
-# PROVISIONAL — development-host numbers pending the official session; see docs/evidence/benchmark_protocol.md. Do not cite in the report.
-goos: windows
+goos: linux
 goarch: amd64
 pkg: boogle-engine/internal/mongodb
-cpu: Intel(R) Core(TM) i7-14700HX
+cpu: Intel(R) Core(TM) i7-10750H CPU @ 2.60GHz
 ,docs/evidence/benchmarks.txt,
 ,sec/op,CI
-PostingsForTerms-28,0.000443955,5%
-SearchBooksWithoutFilters-28,0.007730082500000001,1%
-SearchBooksWithAllFilters-28,0.0125372745,1%
-IndexBook-28,0.001875499,11%
-geomean,0.0029971657636365164,
+PostingsForTerms-12,0.0006030005,5%
+SearchBooksWithoutFilters-12,0.026181343500000002,3%
+SearchBooksWithAllFilters-12,0.0379025365,12%
+IndexBook-12,0.0045442915,4%
+IndexBookRealBook-12,0.6369311660000001,2%
+geomean,0.017689164128248995,
 
 ,docs/evidence/benchmarks.txt,
 ,B/op,CI
-PostingsForTerms-28,55940,0%
-SearchBooksWithoutFilters-28,30871,0%
-SearchBooksWithAllFilters-28,31576,0%
-IndexBook-28,36460.5,0%
-geomean,37550.28376650122,
+PostingsForTerms-12,55663.5,0%
+SearchBooksWithoutFilters-12,34932.5,0%
+SearchBooksWithAllFilters-12,36409.5,0%
+IndexBook-12,43415.5,0%
+IndexBookRealBook-12,4.4411248e+07,5%
+geomean,168667.16120662782,
 
 ,docs/evidence/benchmarks.txt,
 ,allocs/op,CI
-PostingsForTerms-28,1973,0%
-SearchBooksWithoutFilters-28,728,0%
-SearchBooksWithAllFilters-28,633,0%
-IndexBook-28,480,0%
-geomean,812.7853235997128,
+PostingsForTerms-12,1973,0%
+SearchBooksWithoutFilters-12,773,0%
+SearchBooksWithAllFilters-12,679,0%
+IndexBook-12,582,0%
+IndexBookRealBook-12,444437.5,0%
+geomean,3059.0178191989207,
+
+,docs/evidence/benchmarks.txt,
+,terms/book,CI
+IndexBookRealBook-12,6576,0%
+geomean,6576.0000000000055,
+
+,docs/evidence/benchmarks.txt,
+,tokens/book,CI
+IndexBookRealBook-12,58856,0%
+geomean,58855.999999999985,

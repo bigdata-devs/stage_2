@@ -1,47 +1,56 @@
-# PROVISIONAL — development-host numbers pending the official session; see docs/evidence/benchmark_protocol.md. Do not cite in the report.
-goos: windows
+goos: linux
 goarch: amd64
 pkg: boogle-engine/internal/mongodb
-cpu: Intel(R) Core(TM) i7-14700HX
-BenchmarkPostingsForTerms-28             	    2787	    431481 ns/op	   55941 B/op	    1973 allocs/op
-BenchmarkPostingsForTerms-28             	    2372	    491148 ns/op	   55957 B/op	    1973 allocs/op
-BenchmarkPostingsForTerms-28             	    2714	    445801 ns/op	   55944 B/op	    1973 allocs/op
-BenchmarkPostingsForTerms-28             	    2800	    440524 ns/op	   55932 B/op	    1973 allocs/op
-BenchmarkPostingsForTerms-28             	    2908	    419844 ns/op	   55935 B/op	    1973 allocs/op
-BenchmarkPostingsForTerms-28             	    2300	    442109 ns/op	   55946 B/op	    1973 allocs/op
-BenchmarkPostingsForTerms-28             	    2592	    466376 ns/op	   55930 B/op	    1973 allocs/op
-BenchmarkPostingsForTerms-28             	    2751	    431691 ns/op	   55939 B/op	    1973 allocs/op
-BenchmarkPostingsForTerms-28             	    2379	    446072 ns/op	   55937 B/op	    1973 allocs/op
-BenchmarkPostingsForTerms-28             	    2718	    446659 ns/op	   55948 B/op	    1973 allocs/op
-BenchmarkSearchBooksWithoutFilters-28    	     154	   7699697 ns/op	   30954 B/op	     729 allocs/op
-BenchmarkSearchBooksWithoutFilters-28    	     153	   7774259 ns/op	   30859 B/op	     728 allocs/op
-BenchmarkSearchBooksWithoutFilters-28    	     154	   7736707 ns/op	   30890 B/op	     728 allocs/op
-BenchmarkSearchBooksWithoutFilters-28    	     154	   7720998 ns/op	   30856 B/op	     728 allocs/op
-BenchmarkSearchBooksWithoutFilters-28    	     153	   7730280 ns/op	   30868 B/op	     728 allocs/op
-BenchmarkSearchBooksWithoutFilters-28    	     153	   7729885 ns/op	   30856 B/op	     728 allocs/op
-BenchmarkSearchBooksWithoutFilters-28    	     156	   7701818 ns/op	   30856 B/op	     728 allocs/op
-BenchmarkSearchBooksWithoutFilters-28    	     153	   7738637 ns/op	   30883 B/op	     728 allocs/op
-BenchmarkSearchBooksWithoutFilters-28    	     156	   7651004 ns/op	   30874 B/op	     728 allocs/op
-BenchmarkSearchBooksWithoutFilters-28    	     151	   7797209 ns/op	   30903 B/op	     728 allocs/op
-BenchmarkSearchBooksWithAllFilters-28    	      84	  12642319 ns/op	   31562 B/op	     633 allocs/op
-BenchmarkSearchBooksWithAllFilters-28    	      91	  12571540 ns/op	   31547 B/op	     633 allocs/op
-BenchmarkSearchBooksWithAllFilters-28    	      94	  12515017 ns/op	   31572 B/op	     633 allocs/op
-BenchmarkSearchBooksWithAllFilters-28    	      96	  12765112 ns/op	   31587 B/op	     633 allocs/op
-BenchmarkSearchBooksWithAllFilters-28    	      96	  12516996 ns/op	   31703 B/op	     633 allocs/op
-BenchmarkSearchBooksWithAllFilters-28    	      93	  12413524 ns/op	   31727 B/op	     633 allocs/op
-BenchmarkSearchBooksWithAllFilters-28    	      92	  12557553 ns/op	   31580 B/op	     633 allocs/op
-BenchmarkSearchBooksWithAllFilters-28    	      94	  12500668 ns/op	   31701 B/op	     633 allocs/op
-BenchmarkSearchBooksWithAllFilters-28    	      94	  12621776 ns/op	   31557 B/op	     633 allocs/op
-BenchmarkSearchBooksWithAllFilters-28    	      94	  12512543 ns/op	   31555 B/op	     633 allocs/op
-BenchmarkIndexBook-28                    	     643	   1873437 ns/op	   36456 B/op	     480 allocs/op
-BenchmarkIndexBook-28                    	     642	   1866339 ns/op	   36450 B/op	     480 allocs/op
-BenchmarkIndexBook-28                    	     637	   1877561 ns/op	   36466 B/op	     480 allocs/op
-BenchmarkIndexBook-28                    	     642	   1855672 ns/op	   36461 B/op	     480 allocs/op
-BenchmarkIndexBook-28                    	     626	   1911375 ns/op	   36482 B/op	     480 allocs/op
-BenchmarkIndexBook-28                    	     642	   2074427 ns/op	   36460 B/op	     480 allocs/op
-BenchmarkIndexBook-28                    	     638	   1987453 ns/op	   36464 B/op	     480 allocs/op
-BenchmarkIndexBook-28                    	     644	   1866702 ns/op	   36473 B/op	     480 allocs/op
-BenchmarkIndexBook-28                    	     644	   1851187 ns/op	   36451 B/op	     480 allocs/op
-BenchmarkIndexBook-28                    	     579	   2114666 ns/op	   36437 B/op	     480 allocs/op
+cpu: Intel(R) Core(TM) i7-10750H CPU @ 2.60GHz
+BenchmarkPostingsForTerms-12             	    2012	    597571 ns/op	   55718 B/op	    1973 allocs/op
+BenchmarkPostingsForTerms-12             	    2148	    631756 ns/op	   55677 B/op	    1973 allocs/op
+BenchmarkPostingsForTerms-12             	    1945	    597934 ns/op	   55658 B/op	    1973 allocs/op
+BenchmarkPostingsForTerms-12             	    1977	    595389 ns/op	   55664 B/op	    1973 allocs/op
+BenchmarkPostingsForTerms-12             	    2108	    637005 ns/op	   55665 B/op	    1973 allocs/op
+BenchmarkPostingsForTerms-12             	    1921	    603608 ns/op	   55663 B/op	    1973 allocs/op
+BenchmarkPostingsForTerms-12             	    1906	    602393 ns/op	   55654 B/op	    1973 allocs/op
+BenchmarkPostingsForTerms-12             	    2043	    620731 ns/op	   55687 B/op	    1973 allocs/op
+BenchmarkPostingsForTerms-12             	    2011	    599416 ns/op	   55661 B/op	    1973 allocs/op
+BenchmarkPostingsForTerms-12             	    1932	    621649 ns/op	   55649 B/op	    1973 allocs/op
+BenchmarkSearchBooksWithoutFilters-12    	      43	  26195672 ns/op	   35116 B/op	     775 allocs/op
+BenchmarkSearchBooksWithoutFilters-12    	      44	  25902809 ns/op	   34995 B/op	     773 allocs/op
+BenchmarkSearchBooksWithoutFilters-12    	      44	  25715261 ns/op	   35008 B/op	     773 allocs/op
+BenchmarkSearchBooksWithoutFilters-12    	      44	  26045147 ns/op	   34914 B/op	     773 allocs/op
+BenchmarkSearchBooksWithoutFilters-12    	      43	  26682360 ns/op	   35017 B/op	     773 allocs/op
+BenchmarkSearchBooksWithoutFilters-12    	      43	  26146368 ns/op	   34816 B/op	     773 allocs/op
+BenchmarkSearchBooksWithoutFilters-12    	      43	  26167015 ns/op	   34945 B/op	     773 allocs/op
+BenchmarkSearchBooksWithoutFilters-12    	      43	  26976167 ns/op	   34795 B/op	     773 allocs/op
+BenchmarkSearchBooksWithoutFilters-12    	      44	  26891871 ns/op	   34883 B/op	     773 allocs/op
+BenchmarkSearchBooksWithoutFilters-12    	      42	  26636719 ns/op	   34920 B/op	     773 allocs/op
+BenchmarkSearchBooksWithAllFilters-12    	      33	  35542224 ns/op	   36405 B/op	     679 allocs/op
+BenchmarkSearchBooksWithAllFilters-12    	      30	  37087000 ns/op	   36420 B/op	     679 allocs/op
+BenchmarkSearchBooksWithAllFilters-12    	      30	  38478767 ns/op	   36553 B/op	     679 allocs/op
+BenchmarkSearchBooksWithAllFilters-12    	      31	  40093936 ns/op	   36414 B/op	     679 allocs/op
+BenchmarkSearchBooksWithAllFilters-12    	      31	  46518362 ns/op	   36315 B/op	     679 allocs/op
+BenchmarkSearchBooksWithAllFilters-12    	      31	  42385771 ns/op	   36321 B/op	     679 allocs/op
+BenchmarkSearchBooksWithAllFilters-12    	      27	  38746640 ns/op	   36441 B/op	     679 allocs/op
+BenchmarkSearchBooksWithAllFilters-12    	      31	  37326306 ns/op	   36315 B/op	     679 allocs/op
+BenchmarkSearchBooksWithAllFilters-12    	      33	  36278528 ns/op	   36325 B/op	     679 allocs/op
+BenchmarkSearchBooksWithAllFilters-12    	      32	  37146091 ns/op	   36538 B/op	     679 allocs/op
+BenchmarkIndexBook-12                    	     260	   4586040 ns/op	   43465 B/op	     582 allocs/op
+BenchmarkIndexBook-12                    	     253	   4798130 ns/op	   43400 B/op	     582 allocs/op
+BenchmarkIndexBook-12                    	     246	   4580154 ns/op	   43464 B/op	     582 allocs/op
+BenchmarkIndexBook-12                    	     272	   4437723 ns/op	   43354 B/op	     582 allocs/op
+BenchmarkIndexBook-12                    	     274	   4379210 ns/op	   43389 B/op	     582 allocs/op
+BenchmarkIndexBook-12                    	     266	   4736691 ns/op	   43481 B/op	     582 allocs/op
+BenchmarkIndexBook-12                    	     270	   4439460 ns/op	   43431 B/op	     582 allocs/op
+BenchmarkIndexBook-12                    	     259	   4658042 ns/op	   43446 B/op	     582 allocs/op
+BenchmarkIndexBook-12                    	     265	   4455005 ns/op	   43374 B/op	     582 allocs/op
+BenchmarkIndexBook-12                    	     264	   4508429 ns/op	   43375 B/op	     582 allocs/op
+BenchmarkIndexBookRealBook-12            	       2	 636757514 ns/op	      6576 terms/book	     58856 tokens/book	45254648 B/op	  444461 allocs/op
+BenchmarkIndexBookRealBook-12            	       2	 631161365 ns/op	      6576 terms/book	     58856 tokens/book	44634696 B/op	  444439 allocs/op
+BenchmarkIndexBookRealBook-12            	       2	 630212164 ns/op	      6576 terms/book	     58856 tokens/book	47084388 B/op	  444489 allocs/op
+BenchmarkIndexBookRealBook-12            	       2	 637104818 ns/op	      6576 terms/book	     58856 tokens/book	41466736 B/op	  444395 allocs/op
+BenchmarkIndexBookRealBook-12            	       2	 628146792 ns/op	      6576 terms/book	     58856 tokens/book	43549528 B/op	  444428 allocs/op
+BenchmarkIndexBookRealBook-12            	       2	 633866242 ns/op	      6576 terms/book	     58856 tokens/book	42330156 B/op	  444417 allocs/op
+BenchmarkIndexBookRealBook-12            	       2	 639650691 ns/op	      6576 terms/book	     58856 tokens/book	44254988 B/op	  444436 allocs/op
+BenchmarkIndexBookRealBook-12            	       2	 649966942 ns/op	      6576 terms/book	     58856 tokens/book	44567508 B/op	  444439 allocs/op
+BenchmarkIndexBookRealBook-12            	       2	 659821797 ns/op	      6576 terms/book	     58856 tokens/book	44117508 B/op	  444433 allocs/op
+BenchmarkIndexBookRealBook-12            	       2	 640220198 ns/op	      6576 terms/book	     58856 tokens/book	45954340 B/op	  444473 allocs/op
 PASS
-ok  	boogle-engine/internal/mongodb	72.029s
+ok  	boogle-engine/internal/mongodb	103.746s

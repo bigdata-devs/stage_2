@@ -1,0 +1,91 @@
+goos: linux
+goarch: amd64
+pkg: boogle-engine/internal/mongodb
+cpu: Intel(R) Core(TM) i7-10750H CPU @ 2.60GHz
+                            │ docs/evidence/benchmarks_cpu.txt │
+                            │              sec/op              │
+PostingsForTerms                                   536.2µ ± 6%
+PostingsForTerms-2                                 580.1µ ± 3%
+PostingsForTerms-4                                 597.0µ ± 5%
+PostingsForTerms-8                                 602.2µ ± 4%
+SearchBooksWithoutFilters                          26.23m ± 2%
+SearchBooksWithoutFilters-2                        26.32m ± 5%
+SearchBooksWithoutFilters-4                        26.26m ± 4%
+SearchBooksWithoutFilters-8                        26.22m ± 2%
+SearchBooksWithAllFilters                          36.08m ± 3%
+SearchBooksWithAllFilters-2                        36.03m ± 3%
+SearchBooksWithAllFilters-4                        36.57m ± 5%
+SearchBooksWithAllFilters-8                        37.07m ± 9%
+IndexBook                                          4.407m ± 2%
+IndexBook-2                                        4.419m ± 4%
+IndexBook-4                                        4.511m ± 4%
+IndexBook-8                                        4.481m ± 2%
+IndexBookRealBook                                  644.6m ± 2%
+IndexBookRealBook-2                                641.6m ± 3%
+IndexBookRealBook-4                                638.3m ± 4%
+IndexBookRealBook-8                                642.6m ± 2%
+geomean                                            17.37m
+
+                            │ docs/evidence/benchmarks_cpu.txt │
+                            │               B/op               │
+PostingsForTerms                                  54.18Ki ± 0%
+PostingsForTerms-2                                54.20Ki ± 0%
+PostingsForTerms-4                                54.26Ki ± 0%
+PostingsForTerms-8                                54.32Ki ± 0%
+SearchBooksWithoutFilters                         33.98Ki ± 0%
+SearchBooksWithoutFilters-2                       33.99Ki ± 0%
+SearchBooksWithoutFilters-4                       33.98Ki ± 0%
+SearchBooksWithoutFilters-8                       33.99Ki ± 0%
+SearchBooksWithAllFilters                         35.46Ki ± 0%
+SearchBooksWithAllFilters-2                       35.49Ki ± 0%
+SearchBooksWithAllFilters-4                       35.49Ki ± 0%
+SearchBooksWithAllFilters-8                       35.56Ki ± 0%
+IndexBook                                         42.22Ki ± 0%
+IndexBook-2                                       42.26Ki ± 0%
+IndexBook-4                                       42.32Ki ± 0%
+IndexBook-8                                       42.35Ki ± 0%
+IndexBookRealBook                                 38.16Mi ± 0%
+IndexBookRealBook-2                               38.97Mi ± 1%
+IndexBookRealBook-4                               41.53Mi ± 2%
+IndexBookRealBook-8                               41.65Mi ± 3%
+geomean                                           162.5Ki
+
+                            │ docs/evidence/benchmarks_cpu.txt │
+                            │            allocs/op             │
+PostingsForTerms                                   1.973k ± 0%
+PostingsForTerms-2                                 1.973k ± 0%
+PostingsForTerms-4                                 1.973k ± 0%
+PostingsForTerms-8                                 1.973k ± 0%
+SearchBooksWithoutFilters                           773.0 ± 0%
+SearchBooksWithoutFilters-2                         773.0 ± 0%
+SearchBooksWithoutFilters-4                         773.0 ± 0%
+SearchBooksWithoutFilters-8                         773.0 ± 0%
+SearchBooksWithAllFilters                           679.0 ± 0%
+SearchBooksWithAllFilters-2                         679.0 ± 0%
+SearchBooksWithAllFilters-4                         679.0 ± 0%
+SearchBooksWithAllFilters-8                         679.0 ± 0%
+IndexBook                                           582.0 ± 0%
+IndexBook-2                                         582.0 ± 0%
+IndexBook-4                                         582.0 ± 0%
+IndexBook-8                                         582.0 ± 0%
+IndexBookRealBook                                  444.4k ± 0%
+IndexBookRealBook-2                                444.4k ± 0%
+IndexBookRealBook-4                                444.4k ± 0%
+IndexBookRealBook-8                                444.4k ± 0%
+geomean                                            3.059k
+
+                    │ docs/evidence/benchmarks_cpu.txt │
+                    │            terms/book            │
+IndexBookRealBook                          6.576k ± 0%
+IndexBookRealBook-2                        6.576k ± 0%
+IndexBookRealBook-4                        6.576k ± 0%
+IndexBookRealBook-8                        6.576k ± 0%
+geomean                                    6.576k
+
+                    │ docs/evidence/benchmarks_cpu.txt │
+                    │           tokens/book            │
+IndexBookRealBook                          58.86k ± 0%
+IndexBookRealBook-2                        58.86k ± 0%
+IndexBookRealBook-4                        58.86k ± 0%
+IndexBookRealBook-8                        58.86k ± 0%
+geomean                                    58.86k

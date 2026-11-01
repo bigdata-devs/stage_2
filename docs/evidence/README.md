@@ -2,166 +2,167 @@
 
 Captured on 2026-10-18 from branch `feature/mongodb-datamart` (HEAD `6cc1e85`), extended on
 2026-10-19 from branch `feature/indexing-service` with the Index Lead deliverables (Indexing
-Service bridge, catalog endpoints, load benchmark).
-
-> **PROVISIONAL — every timing number in this folder.** The Go benchmark files and the k6 runs
-> were captured on development machines while the code was still moving; the banners at the top
-> of the benchmark files repeat the warning. None of it may be cited in the report: the official
-> session on the Stage-1 host, run per [`benchmark_protocol.md`](benchmark_protocol.md), replaces
-> the numbers in one atomic commit and drops the banners.
+Service bridge, catalog endpoints, load benchmark), and **replaced on 2026-11-01 by the official
+benchmark session** run per [`benchmark_protocol.md`](benchmark_protocol.md) on the Stage-1 host
+(commit `ade7245`, `develop`). The timing files in this folder are the official numbers.
 
 | File | Contents |
 |---|---|
-| [`tests.txt`](tests.txt) | Verbose run of the full `internal/mongodb` suite: **34 PASS** (30 tests + 4 subtests), **0 skipped, 0 failed**, `go test -v -count=1 ./internal/mongodb/` against the live `mongo:7` container. |
-| [`benchmarks.txt`](benchmarks.txt) | Raw `go test -run '^$' -bench . -benchmem -benchtime 1s -count 10 ./internal/mongodb/` output: four benchmarks × ten samples (300-book corpus, one second or more per sample). |
+| [`tests.txt`](tests.txt) | **2026-11-01 (official).** Verbose `go test -count=1 -v ./...` against the live `mongo:7` container: **365 PASS, 0 skipped, 0 failed**, every package `ok`. |
+| [`benchmarks.txt`](benchmarks.txt) | **2026-11-01 (official).** Raw `go test -run '^$' -bench . -benchmem -benchtime 1s -count 10 ./internal/mongodb/`: five benchmarks × ten samples (300-book corpus seeded through the real write path per sample). |
 | [`benchstat.txt`](benchstat.txt) | The same run aggregated with `benchstat` (medians with 95 % confidence intervals, plus `B/op` and `allocs/op`). |
 | [`benchstat.csv`](benchstat.csv) | The same aggregated table in machine-readable CSV (`benchstat -format csv`), the format §6.3 asks for. |
-| [`benchmark_protocol.md`](benchmark_protocol.md) | Runbook of the official benchmark session: host record to fill in, preconditions, exact commands, replica experiment and the atomic replacement checklist. |
+| [`benchmarks_cpu.txt`](benchmarks_cpu.txt) | **2026-11-01 (official).** The same datamart suite swept with `-cpu 1,2,4,8` (report section 7: threads). |
+| [`benchstat_cpu.txt`](benchstat_cpu.txt) | That sweep aggregated with `benchstat`. |
+| [`microbenchmarks.txt`](microbenchmarks.txt) | **2026-11-01 (official).** Raw `testing.B` output of `ProcessText`, `ExtractMetadata` and `SplitBookText` over the 383-book datalake copy with `-cpu 1,2,4,8`, ten samples each. |
+| [`benchmark_protocol.md`](benchmark_protocol.md) | Runbook of the official benchmark session: host record (filled in), preconditions, exact commands, replica experiment and the atomic replacement checklist. |
+| [`indexing_benchmark_2026-11-01T16-14-15-954Z.csv`](indexing_benchmark_2026-11-01T16-14-15-954Z.csv) | **2026-11-01 (official).** k6 steady-state table per concurrency level for `POST /index/update`: books indexed per second, latency percentiles, error rate. |
+| [`indexing_benchmark_2026-11-01T16-14-15-954Z.json`](indexing_benchmark_2026-11-01T16-14-15-954Z.json) | The complete k6 summary of that run (every metric, check and threshold), for plotting. |
+| [`indexing_benchmark_run.log`](indexing_benchmark_run.log) | Console transcript of the same run, including the threshold report. |
+| [`indexing_resources.csv`](indexing_resources.csv) | **2026-11-01 (official).** 2-second samples of the Indexing Service and MongoDB containers (CPU %, memory, PIDs) taken with `test/load/sample_containers.sh` while k6 drove the load. |
+| [`search_benchmark_2026-11-01T16-26-57-365Z_1replica.csv`](search_benchmark_2026-11-01T16-26-57-365Z_1replica.csv) | **2026-11-01 (official).** k6 `GET /search` with **one** Search replica behind nginx: throughput, latency percentiles and error rate per VU level. |
+| [`search_benchmark_2026-11-01T16-26-57-365Z_1replica.json`](search_benchmark_2026-11-01T16-26-57-365Z_1replica.json) | The complete k6 summary of that run. |
+| [`search_benchmark_run_1replica.log`](search_benchmark_run_1replica.log) | Console transcript of the same run. |
+| [`search_benchmark_2026-11-01T16-30-41-872Z_2replicas.csv`](search_benchmark_2026-11-01T16-30-41-872Z_2replicas.csv) | **2026-11-01 (official).** The same profile repeated with **two** Search replicas behind nginx (the only variable is the replica count). |
+| [`search_benchmark_2026-11-01T16-30-41-872Z_2replicas.json`](search_benchmark_2026-11-01T16-30-41-872Z_2replicas.json) | The complete k6 summary of that run. |
+| [`search_benchmark_run_2replicas.log`](search_benchmark_run_2replicas.log) | Console transcript of the same run. |
+| [`search_resources.csv`](search_resources.csv) | **2026-11-01 (official).** Container samples (Search, nginx, MongoDB) during the one-replica run. |
+| [`search_resources_2replicas.csv`](search_resources_2replicas.csv) | **2026-11-01 (official).** Container samples (both Search replicas, nginx, MongoDB) during the two-replica run. |
+| [`rebuild_replica.md`](rebuild_replica.md) | **2026-11-01 (official).** Cross-replica rebuild lease experiment: concurrent `POST /index/rebuild` on two Indexing replicas → `200` + `409 rebuild_in_progress`, retry succeeds after the lease is released. |
+| [`benchmark_protocol.md`](benchmark_protocol.md) | Runbook of the official benchmark session (host record filled in, preconditions, commands, replacement checklist). |
 | [`demo.md`](demo.md) | End-to-end transcript: datalake → Indexing Service → datamart → Search Service, with the literal request/response bodies of §1–§4. |
 | [`catalog_smoke.md`](catalog_smoke.md) | **2026-10-19.** HTTP transcript of the optional catalog endpoints (`GET /books/{book_id}`, `GET /search/filters`) plus the fail-fast start-up against an unreachable datamart. |
-| [`indexing_benchmark_2026-10-19T19-07-00-230Z.csv`](indexing_benchmark_2026-10-19T19-07-00-230Z.csv) | **2026-10-19.** k6 steady-state table per concurrency level: books indexed per second, latency percentiles, error rate. |
-| [`indexing_benchmark_2026-10-19T19-07-00-230Z.json`](indexing_benchmark_2026-10-19T19-07-00-230Z.json) | The complete k6 summary of that run (every metric, check and threshold), for plotting. |
-| [`indexing_benchmark_run.log`](indexing_benchmark_run.log) | Console transcript of the same run, including the threshold report. |
-| [`indexing_resources.csv`](indexing_resources.csv) | 1-second samples of the Indexing Service (CPU %, working set, private memory, threads) and of MongoDB in Docker (CPU %, memory) taken while k6 drove the load. |
-| [`microbenchmarks.txt`](microbenchmarks.txt) | **2026-10-28.** Raw `testing.B` output of `ProcessText`, `ExtractMetadata` and `SplitBookText` over the 20 real books with `-cpu 1,2,4,8` (review feedback). |
 | [`e2e_control_2026-10-30T10-09-40Z.txt`](e2e_control_2026-10-30T10-09-40Z.txt) | **2026-10-30.** Transcript of `scripts/e2e_control.sh` after restoring `cmd/ingestion/main.go` (RF 2): all orchestration, restart, permanent-failure and discovery checks PASS against real Gutenberg downloads. |
-| [`e2e_compose_2026-10-30T11-16-16Z.txt`](e2e_compose_2026-10-30T11-16-16Z.txt) | **2026-10-30.** Transcript of `scripts/e2e_compose.sh` on Docker Desktop 4.97 (Engine 29.9.2, WSL2): stack build, orchestration, idempotent replay, front-facing search, ingestion-container failure recovery and named-volume persistence all PASS. |
+| [`e2e_compose_2026-10-30T11-16-16Z.txt`](e2e_compose_2026-10-30T11-16-16Z.txt) | **2026-10-30.** Transcript of `scripts/e2e_compose.sh` on WSL2 with Docker Engine 29: stack build, orchestration, idempotent replay, front-facing search, ingestion-container failure recovery and named-volume persistence all PASS. |
 | [`ingestion_throughput.md`](ingestion_throughput.md) | **2026-10-30.** Cold-datalake ingestion throughput on 100 real Gutenberg books at `-workers 1, 2, 4, 8` with CPU/RAM samples (2xx-only counting), per the Stage 2 audit. |
 | [`api_validation.txt`](api_validation.txt) | Historical API validation checklist of the Ingestion Service (moved from `cmd/ingestion/results/`). |
-| [`api_validation_results.md`](api_validation_results.md) | **2026-10-31.** Output of `scripts/api_validation.sh` (audit RF 10): **19/19** Search API contract checks, from keyword, filters, empty and past-the-end pages to every 400/404 case, `/books/{book_id}`, `/search/filters`, multi-word AND and CORS preflight, with the literal response bodies. Recorded from an empty datamart seeded through the Ingestion and Indexing APIs; the services ran as local processes with the compose flags and environment (no Docker daemon in that workspace). |
+| [`api_validation_results.md`](api_validation_results.md) | **2026-10-31.** Output of `scripts/api_validation.sh` (audit RF 10): **19/19** Search API contract checks, from keyword, filters, empty and past-the-end pages to every 400/404 case, `/books/{book_id}`, `/search/filters`, multi-word AND and CORS preflight, with the literal response bodies. |
 
-## Environment
+## Environment (official session, 2026-11-01)
 
-- Windows 11, Go `go1.27.0` (module targets `go1.25.0`), `goarch=amd64`
-- MongoDB `7.0.45` in Docker (`boogle-mongo-test`, port `27017`, database `boogle`)
-- CPU: Intel Core i7-14700HX (benchmarks report `GOMAXPROCS=28`)
-- RAM: 32 GB physical (31.7 GB usable); the Docker Desktop VM that runs MongoDB is capped at ≈16 GB and 28 CPUs, which bounds what the database can use
-- Storage: Samsung MZAL81T0HFLB NVMe SSD, 954 GB (the machine's only internal drive)
-- k6 `v2.2.0` (winget `GrafanaLabs.k6`) for the load benchmark
+- Host: WSL2 on Windows, Linux `6.18.33.2-microsoft-standard-WSL2`, Windows power plan set to
+  **High performance** for the session
+- CPU: Intel Core i7-10750H @ 2.60 GHz, 6 cores / 12 threads (12 vCPUs to WSL2; benchmarks report
+  `GOMAXPROCS=12`)
+- RAM: 15.8 GB Windows host; 9.7 GB allocated to the WSL2 distro that runs Docker Engine 29.1.3
+- Storage: Windows NTFS on `/mnt/c` (1.9 TB) for the repository; WSL2 ext4 root (1007 GB) where the
+  Docker volumes (`datalake`, `mongo-data`) live
+- Go `go1.27.2 linux/amd64` (module targets `go1.25.0`); MongoDB `7.0.45` (`mongo:7` container);
+  k6 `v2.3.0`; Docker Compose `2.40.3`
+- Database per run: tests and Go benchmarks use `boogle`; every k6 run uses a fresh `boogle_bench`
+  (the compose file reads `MONGO_DATABASE` from the environment, `.env` pins `boogle_bench`)
+- Machine otherwise idle, on AC, during every measurement
 
 ## Reproducing
 
 ```bash
-docker start boogle-mongo-test                              # live tests skip without a server
-gofmt -l . && go vet ./... && go test ./...                 # repository verification
+docker compose up -d --build                          # stack + mongo on 27017
+go test -count=1 -v ./... > docs/evidence/tests.txt   # §tests (live server required)
 
-go test -v -count=1 ./internal/mongodb/ > docs/evidence/tests.txt   # §tests
-go test -run '^$' -bench . -benchmem -benchtime 1s -count 10 ./internal/mongodb/   # §benchmarks
-go run golang.org/x/perf/cmd/benchstat@latest <benchmarks-output>                  # §benchstat
-go run golang.org/x/perf/cmd/benchstat@latest -format csv <benchmarks-output> > docs/evidence/benchstat.csv  # §benchstat CSV
-# PowerShell: wrap the whole command in cmd /c "..." so ">" writes bytes, not UTF-16
+# §Go microbenchmarks (the datalake copy feeds internal/indexer)
+BOOGLE_BENCH_DATALAKE=/path/to/datalake go test -run '^$' -bench . -benchmem \
+  -benchtime 1s -count 10 -cpu 1,2,4,8 ./internal/indexer/ > docs/evidence/microbenchmarks.txt
+go test -run '^$' -bench . -benchmem -benchtime 1s -count 10 ./internal/mongodb/ \
+  > docs/evidence/benchmarks.txt
+go test -run '^$' -bench . -benchmem -benchtime 1s -count 10 -cpu 1,2,4,8 ./internal/mongodb/ \
+  > docs/evidence/benchmarks_cpu.txt
+go run golang.org/x/perf/cmd/benchstat@latest docs/evidence/benchmarks.txt      # §benchstat
+go run golang.org/x/perf/cmd/benchstat@latest -format csv docs/evidence/benchmarks.txt \
+  > docs/evidence/benchstat.csv                                                 # §benchstat CSV
+go run golang.org/x/perf/cmd/benchstat@latest docs/evidence/benchmarks_cpu.txt  # §benchstat CPU
 
-docker compose up -d --build                                # API validation against the compose stack
-scripts/api_validation.sh --record docs/evidence/api_validation_results.md
+# §k6 indexing (fresh boogle_bench, 20-book corpus warm-up indexed first)
+k6 run test/load/indexing_benchmark.js > docs/evidence/indexing_benchmark_run.log
+
+# §k6 search: seed ≥300 books, then the same profile with 1 and with 2 replicas
+test/load/seed_corpus.sh 300
+k6 run test/load/search_benchmark.js
+docker compose up -d --scale search=2 && k6 run test/load/search_benchmark.js
+
+# Resource sampling in a second terminal (containers, not processes)
+test/load/sample_containers.sh docs/evidence/search_resources.csv 360
 ```
 
-Both bridges from [`docs/mongodb.md`](../mongodb.md) are now committed
-(`cmd/indexing/datamart_index.go`, `cmd/search/datamart_engine.go`), so the demo needs only the four-book
-corpus described at the top of `demo.md` and both services started as shown there. On this
-platform benchmark samples must span whole seconds — the monotonic clock reads sub-millisecond
-spans as zero — which the `-benchtime 1s` window and the ten repetitions guarantee.
+k6 writes `<stamp>.csv` and `<stamp>.json` into `test/load/results/` and prints the summary table.
+A k6 exit code of `99` only means a threshold was crossed — read the "Thresholds" block of the log
+to see which; all availability thresholds (`http_req_failed<0.01`, `checks>0.99`) passed in every
+official run.
 
 ## Benchmark methodology (Go `testing.B` instead of JMH)
 
 The assignment suggests JMH; these benchmarks use Go's native `testing.B` framework aggregated
-with `benchstat`, which the project conventions designate as the Go substitute for JMH. The
-methodology is equivalent — adaptive iteration calibration (warm-up), ten repetitions with 95 %
+with `benchstat`, which the project conventions designate as the Go substitute for JMH.
+The methodology is equivalent — adaptive iteration calibration (warm-up), ten repetitions with 95 %
 confidence intervals, and `ns/op` + `B/op` + `allocs/op` metrics — while keeping measurement
 inside the process under study: driving the services through HTTP to satisfy JMH's JVM harness
 would time process scheduling and JSON marshalling instead of the datamart operations.
 
-## Indexing load benchmark — `POST /index/update` (Index Lead)
+## Official results — Go microbenchmarks (2026-11-01)
 
-`test/load/indexing_benchmark.js` drives the Indexing Service through HTTP with k6, because this
-benchmark is about the service as a whole (HTTP + tokenizer + postings writes), not about one
-datamart primitive. One successful update indexes one book, so throughput is reported directly in
-**books per second**.
+### Text pipeline (`internal/indexer`, 383 real books, `-cpu 1,2,4,8`, median of 10)
 
-### Workload
+| Benchmark | 1 thread | 8 threads | Speed-up | B/s at 8 |
+|---|---:|---:|---:|---:|
+| `ProcessText` (body) | 13.66 ms ± 8 % | 3.99 ms ± 6 % | 3.4× | 113 MiB/s |
+| `ExtractMetadata` (header) | 23.5 µs ± 10 % | 5.16 µs ± 6 % | 4.6× | 154 MiB/s |
+| `SplitBookText` (raw book) | 211 µs ± 2 % | 49.7 µs ± 2 % | 4.3× | 8.9 GiB/s |
 
-- Corpus: 20 real Project Gutenberg books (`11,26,43,46,74,76,84,98,201,521,844,1080,1260,1342,
-  1355,1400,1661,17489,1952,2701`), downloaded once into `./datalake` with the Ingestion Service
-  and warm-up indexed before the measured run, so the numbers are **steady-state re-indexing**.
-- Closed model, stepped profile: 1 → 5 → 10 VUs, ramp 10 s, hold 15 s each, think time 0, so the
-  VU count equals the client concurrency. Only hold phases are reported.
-- Seed 2026; every VU walks the corpus from its own offset. Re-indexing is idempotent, so the
-  corpus may be smaller than the number of requests.
+Tokenization dominates the per-book CPU cost; header parsing and marker splitting are an order of
+magnitude cheaper. All three scale with threads up to 8, so the indexing pipeline itself is not
+where the single-machine ceiling comes from.
 
-### Results (2026-10-19, `MONGO_DATABASE=boogle_bench`)
+### Datamart primitives (`internal/mongodb`, live server, 300-book corpus, `GOMAXPROCS=12`)
+
+| Benchmark | sec/op | B/op | allocs/op |
+|---|---:|---:|---:|
+| `PostingsForTerms` | 603.0 µs ± 5 % | 54.4 Ki | 1 973 |
+| `SearchBooksWithoutFilters` | 26.18 ms ± 3 % | 34.1 Ki | 773 |
+| `SearchBooksWithAllFilters` | 37.90 ms ± 12 % | 35.6 Ki | 679 |
+| `IndexBook` (synthetic 7-token book) | 4.544 ms ± 4 % | 42.4 Ki | 582 |
+| `IndexBookRealBook` (book 1342, 6 576 terms) | 636.9 ms ± 2 % | 42.4 Mi | 444.4 k |
+
+`IndexBookRealBook` reports `terms/book = 6 576` and `tokens/book = 58 860`: each real-book index
+call rewrites thousands of posting arrays, which is what puts MongoDB at high CPU during indexing.
+The thread sweep (`benchmarks_cpu.txt` / `benchstat_cpu.txt`) shows the read path flattening past
+a few threads — the server, not the client, is the limit.
+
+## Official results — k6 indexing (2026-11-01, `MONGO_DATABASE=boogle_bench`)
+
+Corpus: the 20 real Gutenberg books, warm-up indexed, so the numbers are steady-state re-indexing.
+Closed model, stepped profile 1 → 5 → 10 VUs, ramp 10 s, hold 30 s, think time 0.
 
 | VUs | books | books/s | avg ms | p95 ms | p99 ms | errors |
 |----:|------:|--------:|-------:|-------:|-------:|-------:|
-| 1 | 12 | 0.80 | 1237 | 1965 | 2334 | 0 % |
-| 5 | 51 | 3.40 | 1383 | 2926 | 3462 | 0 % |
-| 10 | 92 | 6.13 | 1667 | 3434 | 4554 | 0 % |
+| 1 | 33 | 1.10 | 919 | 1 692 | 2 109 | 0 % |
+| 5 | 108 | 3.60 | 1 370 | 2 904 | 3 410 | 0 % |
+| 10 | 160 | 5.33 | 1 904 | 3 189 | 4 078 | 0 % |
 
-Whole run: 267 successful updates, **0 % errors**, avg 1543 ms, p95 3123 ms. The load profile
-scales sub-linearly (10× the concurrency buys ≈7.7× the throughput) and the run exits `99`
-because the SLO thresholds (`avg<1500`, `p95<3000`, and `p95<3000` inside the 10-VU hold) are
-crossed — an honest saturation point, not a script failure: all availability thresholds
-(`http_req_failed<0.01`, `checks>0.99`) pass.
+The run exits `99` because the SLO thresholds (`avg<1500`, `p95<3000`) are crossed at the higher
+concurrency levels — an honest saturation point, not a script failure: all availability thresholds
+pass. Throughput scales sub-linearly (10× the concurrency buys ≈4.8× the throughput).
 
 ### Resource sample during the run (`indexing_resources.csv`)
 
-| Metric | Value |
-|---|---|
-| Indexing Service CPU | 0 – 13.9 % (avg 6.2 % of 28 threads ≈ 1.7 cores) |
-| Indexing Service working set | 39 MB → 156 MB |
-| Indexing Service threads | ≤ 17 |
-| MongoDB CPU (Docker) | up to **838.7 %** (≈ 8 cores), ~500–800 % under sustained load |
-| MongoDB memory | ~140 MiB |
+Taken with `test/load/sample_containers.sh` (the WSL2 equivalent of the Windows PowerShell
+sampler): one row per container every ~2 s for 170 s.
 
-The service is not CPU-bound — MongoDB absorbs the write amplification of every book's postings,
-which is where the throughput ceiling comes from. The pprof profiles of a load run can be pulled
-from the dedicated port (`-pprof :7012`) without touching the API port.
+## Official results — k6 search: 1 vs 2 replicas (2026-11-01)
 
-### Reproducing the load benchmark
+Same datamart (300 seeded books), same profile, same host: 1 → 10 → 50 → 100 VUs, ramp 10 s,
+hold 30 s. The only variable is the replica count behind nginx (`least_conn`, Docker DNS
+re-resolution).
 
-```bash
-go build -o bin/ingestion.exe ./cmd/ingestion
-go build -o bin/indexing.exe ./cmd/indexing
+| VUs | 1 replica req/s | 2 replicas req/s | 1 repl. avg/p95 ms | 2 repl. avg/p95 ms | errors |
+|----:|----------------:|-----------------:|-------------------:|-------------------:|-------:|
+| 1 | 47.2 | 49.1 | 21 / 32 | 20 / 30 | 0 % |
+| 10 | 246.1 | 245.5 | 40 / 62 | 40 / 63 | 0 % |
+| 50 | 246.4 | 242.1 | 202 / 345 | 206 / 356 | 0 % |
+| 100 | 249.7 | 247.7 | 400 / 674 | 403 / 680 | 0 % |
 
-# 1. corpus (once): download the 20 books with the Ingestion Service
-bin/ingestion.exe -addr :7016 -datalake datalake &
-for id in 11 26 43 46 74 76 84 98 201 521 844 1080 1260 1342 1355 1400 1661 17489 1952 2701; do
-  curl -X POST http://localhost:7016/ingest/$id
-done
-
-# 2. service with the profiler port, on an isolated database
-MONGO_DATABASE=boogle_bench bin/indexing.exe -addr :7015 -datalake datalake -pprof :7012 &
-
-# 3. warm-up indexation (first-time indexing is not part of the measured state)
-for id in 11 26 43 46 74 76 84 98 201 521 844 1080 1260 1342 1355 1400 1661 17489 1952 2701; do
-  curl -X POST http://localhost:7015/index/update/$id
-done
-
-# 4. resource sampler and load test, in two terminals
-powershell -File test/load/sample_resources.ps1 -ProcessName indexing -DurationS 150 -DockerContainer boogle-mongo
-BASE_URL=http://localhost:7015 HOLD_DURATION=15s k6 run test/load/indexing_benchmark.js
-```
-
-k6 writes `<stamp>.csv` and `<stamp>.json` into `test/load/results/` (create the folder first)
-and prints the table above. A k6 exit code of `99` only means a threshold was crossed — read the
-"Thresholds" block of the log to see which.
-
-## Microbenchmarks of the text pipeline (review feedback)
-
-`internal/indexer/benchmark_test.go` measures the three per-book primitives of indexing on the
-same 20-book corpus, cycling it once per iteration with one cursor per goroutine and `SetBytes`
-sized to the average item. `SplitBookText` rebuilds the raw Gutenberg layout around the stored
-header and body, because the datalake keeps them already split.
-
-```bash
-go test ./internal/indexer -run '^$' -bench . -benchmem -cpu 1,2,4,8 -benchtime=500ms
-```
-
-| Benchmark | 1 worker | 8 workers | Speed-up | Allocations |
-|---|---:|---:|---:|---:|
-| `ProcessText` (body) | 21.6 ms/op, 22.7 MB/s | 5.2 ms/op, 94.0 MB/s | 4.1× | 10.4 MB, 23 allocs |
-| `ExtractMetadata` (header) | 64 µs/op, 13.1 MB/s | 11 µs/op, 76.3 MB/s | 5.8× | 3.5 kB, 46 allocs |
-| `SplitBookText` (raw book) | 0.88 ms/op, 560 MB/s | 0.12 ms/op, 4.2 GB/s | 7.5× | 0 kB, 0 allocs |
-
-Run on 2026-10-28 on the Index Lead's machine (i7-1355U, 12 logical CPUs). Tokenization dominates
-the CPU cost and allocates ~10 MB per average book, which is why the rebuild now streams one book
-at a time instead of collecting every token stream first; header parsing and marker splitting are
-negligible. Raw output in [`microbenchmarks.txt`](microbenchmarks.txt).
+**Finding:** two replicas do not raise the ceiling — throughput saturates at ≈250 req/s either way
+and latency at 100 VUs is statistically identical. nginx logged real traffic on both upstreams
+(`X-Upstream` alternates between the two container IPs), so the load *was* distributed. The
+bottleneck therefore lies outside the Search Service process — the shared MongoDB datamart and the
+single host — which is exactly the kind of local limit §6.5 asks the report to identify: adding
+process replicas cannot fix a storage-side or host-side ceiling, and Stage 3 would need the
+datamart itself replicated or sharded.
