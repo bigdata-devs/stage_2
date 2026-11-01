@@ -163,8 +163,9 @@ paths:
 
         **Idempotency and consistency.** Safe to repeat: re-indexing a book that is already indexed replaces its metadata
         record and its postings (terms the book no longer contains stop returning it), so the index ends up exactly as
-        after the first call. Updates of different books run in parallel, bounded by the service's
-        `-max-concurrent-updates`; concurrent updates of the same book are harmless.
+        after the first call. Updates of different books run in parallel, but the endpoint indexes at most
+        `-max-concurrent-updates` books at once (8 by default) and queues the rest until a slot frees; concurrent
+        updates of the same book are harmless.
 
         **Timeouts and retries expected of the caller.** One update reads one book from local disk and usually takes
         milliseconds (about a second for the largest books); a client timeout of 30 s is ample and an update is never

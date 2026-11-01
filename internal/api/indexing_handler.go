@@ -64,21 +64,32 @@ type IndexStatusResponse struct {
 	IndexSizeMB float64 `json:"index_size_MB" example:"42.7"`
 }
 
-// IndexingHandler serves the internal Indexing API that the Control Module consumes.
+// IndexingHandler serves the internal Indexing API that the Control Module consumes. Its update
+// slots bound how many POST /index/update requests may be indexed at the same time, so a burst of
+// requests waits instead of exhausting the datamart connection pool.
 type IndexingHandler struct {
 	index          BookIndex
 	rebuildTimeout time.Duration
+	updateSlots    chan struct{}
 }
 
-// NewIndexingHandler returns a handler over index whose rebuilds may run for at most rebuildTimeout.
-func NewIndexingHandler(index BookIndex, rebuildTimeout time.Duration) (IndexingHandler, error) {
+// NewIndexingHandler returns a handler over index whose rebuilds may run for at most
+// rebuildTimeout and which indexes at most maxConcurrentUpdates books at a time.
+func NewIndexingHandler(index BookIndex, rebuildTimeout time.Duration, maxConcurrentUpdates int) (IndexingHandler, error) {
 	if index == nil {
 		return IndexingHandler{}, ErrMissingIndex
 	}
 	if rebuildTimeout <= 0 {
 		return IndexingHandler{}, fmt.Errorf("rebuild timeout must be positive, got %s", rebuildTimeout)
 	}
-	return IndexingHandler{index: index, rebuildTimeout: rebuildTimeout}, nil
+	if maxConcurrentUpdates < 1 {
+		return IndexingHandler{}, fmt.Errorf("max concurrent updates must be a positive integer, got %d", maxConcurrentUpdates)
+	}
+	return IndexingHandler{
+		index:          index,
+		rebuildTimeout: rebuildTimeout,
+		updateSlots:    make(chan struct{}, maxConcurrentUpdates),
+	}, nil
 }
 
 // RegisterRoutes mounts the indexing endpoints on router. The Go 1.22 method patterns make any
@@ -107,8 +118,9 @@ func (handler IndexingHandler) RegisterRoutes(router *http.ServeMux) {
 //	@Description
 //	@Description	**Idempotency and consistency.** Safe to repeat: re-indexing a book that is already indexed replaces its metadata
 //	@Description	record and its postings (terms the book no longer contains stop returning it), so the index ends up exactly as
-//	@Description	after the first call. Updates of different books run in parallel, bounded by the service's
-//	@Description	`-max-concurrent-updates`; concurrent updates of the same book are harmless.
+//	@Description	after the first call. Updates of different books run in parallel, but the endpoint indexes at most
+//	@Description	`-max-concurrent-updates` books at once (8 by default) and queues the rest until a slot frees; concurrent
+//	@Description	updates of the same book are harmless.
 //	@Description
 //	@Description	**Timeouts and retries expected of the caller.** One update reads one book from local disk and usually takes
 //	@Description	milliseconds (about a second for the largest books); a client timeout of 30 s is ample and an update is never
@@ -135,11 +147,34 @@ func (handler IndexingHandler) UpdateBook(writer http.ResponseWriter, request *h
 		writeInvalidBookID(writer, err)
 		return
 	}
+	if err := handler.acquireUpdateSlot(request.Context()); err != nil {
+		slog.Warn("[INDEXING] update gave up waiting for a slot", "book_id", bookID, "error", err)
+		message := fmt.Sprintf("book %d could not be indexed: the service was saturated and the caller stopped waiting", bookID)
+		writeJSON(writer, http.StatusInternalServerError, ErrorResponse{Error: internalErrorCode, Message: message})
+		return
+	}
+	defer handler.releaseUpdateSlot()
 	if err := handler.index.IndexBook(request.Context(), bookID); err != nil {
 		writeIndexingFailure(writer, bookID, err)
 		return
 	}
 	writeJSON(writer, http.StatusOK, IndexUpdateResponse{BookID: bookID, Index: IndexUpdated})
+}
+
+// acquireUpdateSlot takes one of the handler's update slots, waiting while every slot is busy
+// until the caller's context ends: a client that disconnects while queued frees nothing and is
+// never charged a slot.
+func (handler IndexingHandler) acquireUpdateSlot(ctx context.Context) error {
+	select {
+	case handler.updateSlots <- struct{}{}:
+		return nil
+	case <-ctx.Done():
+		return fmt.Errorf("wait for an update slot: %w", ctx.Err())
+	}
+}
+
+func (handler IndexingHandler) releaseUpdateSlot() {
+	<-handler.updateSlots
 }
 
 // Rebuild replaces the published index with one built from scratch out of the whole datalake.
