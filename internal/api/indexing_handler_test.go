@@ -33,7 +33,7 @@ func newIndexingFixture(t *testing.T, storedBookIDs ...models.BookID) indexingFi
 	for _, bookID := range storedBookIDs {
 		storeSampleBook(t, lake, bookID)
 	}
-	return indexingFixture{lake: lake, router: newIndexingRouter(t, newFakeIndex(lake), time.Minute)}
+	return indexingFixture{lake: lake, router: newIndexingRouter(t, newFakeIndex(lake), time.Minute, testMaxConcurrentUpdates)}
 }
 
 // fakeIndex is the BookIndex the API tests drive. It keeps the set of indexed books over the
@@ -91,9 +91,13 @@ func storeSampleBook(t *testing.T, lake datalake.Datalake, bookID models.BookID)
 	}
 }
 
-func newIndexingRouter(t *testing.T, index BookIndex, rebuildTimeout time.Duration) *http.ServeMux {
+// testMaxConcurrentUpdates is the update cap most API tests run with; the tests that exercise the
+// cap itself build a router with their own value.
+const testMaxConcurrentUpdates = 4
+
+func newIndexingRouter(t *testing.T, index BookIndex, rebuildTimeout time.Duration, maxConcurrentUpdates int) *http.ServeMux {
 	t.Helper()
-	handler, err := NewIndexingHandler(index, rebuildTimeout)
+	handler, err := NewIndexingHandler(index, rebuildTimeout, maxConcurrentUpdates)
 	if err != nil {
 		t.Fatalf("NewIndexingHandler: %v", err)
 	}
@@ -246,14 +250,14 @@ func TestRebuildFailuresKeepTheContract(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			router := newIndexingRouter(t, scriptedIndex{rebuildErr: testCase.err}, time.Minute)
+			router := newIndexingRouter(t, scriptedIndex{rebuildErr: testCase.err}, time.Minute, testMaxConcurrentUpdates)
 			assertErrorCode(t, serveRequest(router, http.MethodPost, "/index/rebuild"), testCase.wantStatus, testCase.wantCode)
 		})
 	}
 }
 
 func TestRebuildIsStoppedByTheRebuildBudget(t *testing.T) {
-	router := newIndexingRouter(t, scriptedIndex{waitForContext: true}, 20*time.Millisecond)
+	router := newIndexingRouter(t, scriptedIndex{waitForContext: true}, 20*time.Millisecond, testMaxConcurrentUpdates)
 
 	recorder := serveRequest(router, http.MethodPost, "/index/rebuild")
 
@@ -261,7 +265,7 @@ func TestRebuildIsStoppedByTheRebuildBudget(t *testing.T) {
 }
 
 func TestIndexUpdateFailureReturnsInternalError(t *testing.T) {
-	router := newIndexingRouter(t, scriptedIndex{indexErr: errors.New("disk read failed")}, time.Minute)
+	router := newIndexingRouter(t, scriptedIndex{indexErr: errors.New("disk read failed")}, time.Minute, testMaxConcurrentUpdates)
 
 	assertErrorCode(t, serveRequest(router, http.MethodPost, "/index/update/1342"), http.StatusInternalServerError, internalErrorCode)
 }
@@ -273,7 +277,7 @@ func TestStatusMatchesTheContractExample(t *testing.T) {
 		LastUpdate:   time.Date(2025, 10, 8, 15, 5, 0, 789_000_000, time.FixedZone("CET", 3600)),
 		SizeBytes:    uint64(indexSizeMB * bytesPerMegabyte),
 	}
-	router := newIndexingRouter(t, scriptedIndex{stats: stats}, time.Minute)
+	router := newIndexingRouter(t, scriptedIndex{stats: stats}, time.Minute, testMaxConcurrentUpdates)
 
 	recorder := serveRequest(router, http.MethodGet, "/index/status")
 
@@ -282,10 +286,94 @@ func TestStatusMatchesTheContractExample(t *testing.T) {
 }
 
 func TestNewIndexingHandlerValidatesItsArguments(t *testing.T) {
-	if _, err := NewIndexingHandler(nil, time.Minute); !errors.Is(err, ErrMissingIndex) {
+	if _, err := NewIndexingHandler(nil, time.Minute, testMaxConcurrentUpdates); !errors.Is(err, ErrMissingIndex) {
 		t.Errorf("missing index: err = %v, want ErrMissingIndex", err)
 	}
-	if _, err := NewIndexingHandler(scriptedIndex{}, 0); err == nil {
+	if _, err := NewIndexingHandler(scriptedIndex{}, 0, testMaxConcurrentUpdates); err == nil {
 		t.Error("a zero rebuild timeout was accepted")
+	}
+	if _, err := NewIndexingHandler(scriptedIndex{}, time.Minute, 0); err == nil {
+		t.Error("a zero max concurrent updates was accepted")
+	}
+}
+
+// gatedIndex blocks every IndexBook call on its gate and reports each entry, so a test can hold
+// one update open and watch whether a second one is allowed to start.
+type gatedIndex struct {
+	entered chan struct{}
+	gate    chan struct{}
+}
+
+func (index *gatedIndex) IndexBook(ctx context.Context, _ models.BookID) error {
+	index.entered <- struct{}{}
+	select {
+	case <-index.gate:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
+func (index *gatedIndex) Rebuild(context.Context) (indexer.RebuildReport, error) {
+	return indexer.RebuildReport{}, nil
+}
+
+func (index *gatedIndex) Stats() indexer.IndexStats {
+	return indexer.IndexStats{LastUpdate: time.Now()}
+}
+
+// startUpdate answers POST /index/update/{book_id} in the background and returns its recorder.
+func startUpdate(router *http.ServeMux, target string) <-chan *httptest.ResponseRecorder {
+	done := make(chan *httptest.ResponseRecorder, 1)
+	go func() { done <- serveRequest(router, http.MethodPost, target) }()
+	return done
+}
+
+func TestIndexUpdateWaitsForAFreeUpdateSlot(t *testing.T) {
+	index := &gatedIndex{entered: make(chan struct{}, 4), gate: make(chan struct{})}
+	router := newIndexingRouter(t, index, time.Minute, 1)
+
+	first := startUpdate(router, "/index/update/1342")
+	<-index.entered
+
+	second := startUpdate(router, "/index/update/84")
+	select {
+	case <-index.entered:
+		t.Fatal("a second update started while -max-concurrent-updates was 1")
+	case <-time.After(100 * time.Millisecond):
+	}
+
+	close(index.gate)
+	if recorder := <-first; recorder.Code != http.StatusOK {
+		t.Errorf("first update = %d: %s", recorder.Code, recorder.Body.String())
+	}
+	if recorder := <-second; recorder.Code != http.StatusOK {
+		t.Errorf("queued update = %d: %s", recorder.Code, recorder.Body.String())
+	}
+}
+
+func TestIndexUpdateGivesUpWhileWaitingForAnUpdateSlot(t *testing.T) {
+	index := &gatedIndex{entered: make(chan struct{}, 4), gate: make(chan struct{})}
+	router := newIndexingRouter(t, index, time.Minute, 1)
+
+	first := startUpdate(router, "/index/update/1342")
+	<-index.entered
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	request := httptest.NewRequest(http.MethodPost, "/index/update/84", nil).WithContext(ctx)
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, request)
+
+	assertErrorCode(t, recorder, http.StatusInternalServerError, internalErrorCode)
+	select {
+	case <-index.entered:
+		t.Fatal("the caller that gave up still reached the index")
+	default:
+	}
+
+	close(index.gate)
+	if recorder := <-first; recorder.Code != http.StatusOK {
+		t.Errorf("first update = %d: %s", recorder.Code, recorder.Body.String())
 	}
 }

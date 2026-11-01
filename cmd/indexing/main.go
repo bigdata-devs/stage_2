@@ -179,11 +179,8 @@ func buildIndexingHandler(config serviceConfig, client mongodb.Client) (api.Inde
 	if err != nil {
 		return api.IndexingHandler{}, err
 	}
-	index, err := NewDatamartIndex(lake, client, config.maxConcurrentUpdates)
-	if err != nil {
-		return api.IndexingHandler{}, err
-	}
-	return api.NewIndexingHandler(index, config.rebuildTimeout)
+	index := NewDatamartIndex(lake, client)
+	return api.NewIndexingHandler(index, config.rebuildTimeout, config.maxConcurrentUpdates)
 }
 
 func parseConfig(arguments []string) (serviceConfig, error) {
