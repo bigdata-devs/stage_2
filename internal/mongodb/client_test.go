@@ -8,10 +8,6 @@ import (
 	"time"
 )
 
-// These tests exercise a live server. TestMain probes availability once for the whole package,
-// so the suite stays green and skips fast on machines without MongoDB (the same policy as the
-// Stage 1 Python tests).
-
 var (
 	liveMongoConfig    Config
 	liveMongoAvailable bool

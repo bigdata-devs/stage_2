@@ -10,33 +10,26 @@ import (
 	"boogle-engine/internal/models"
 )
 
-// BookFetcher downloads a book already split into header and body. GutenbergClient implements it.
 type BookFetcher interface {
 	FetchBook(ctx context.Context, bookID models.BookID) (models.Book, error)
 }
 
-// BookStore persists split books. datalake.Datalake implements it.
 type BookStore interface {
 	Locate(bookID models.BookID) (models.StoredBook, error)
 	Store(book models.Book) (models.StoredBook, error)
 }
 
-// RetryPolicy controls how often a transient download failure is retried inside one run.
-// The wait doubles after every failed attempt, starting at InitialBackoff.
 type RetryPolicy struct {
 	MaxAttempts    int
 	InitialBackoff time.Duration
 }
 
-// Ingester runs the whole ingestion of a single book: skip it if the datalake already holds it,
-// otherwise download, split and store it. It is safe for concurrent use.
 type Ingester struct {
 	fetcher BookFetcher
 	store   BookStore
 	retry   RetryPolicy
 }
 
-// NewIngester wires a fetcher and a store together under a retry policy.
 func NewIngester(fetcher BookFetcher, store BookStore, retry RetryPolicy) (Ingester, error) {
 	if retry.MaxAttempts < 1 {
 		return Ingester{}, fmt.Errorf("max attempts must be a positive integer, got %d", retry.MaxAttempts)
@@ -47,8 +40,6 @@ func NewIngester(fetcher BookFetcher, store BookStore, retry RetryPolicy) (Inges
 	return Ingester{fetcher: fetcher, store: store, retry: retry}, nil
 }
 
-// Ingest brings one book into the datalake and reports the outcome. Ingesting a book that is
-// already stored is a no-op, so repeated requests never duplicate work.
 func (ingester Ingester) Ingest(ctx context.Context, bookID models.BookID) models.IngestionResult {
 	if stored, err := ingester.store.Locate(bookID); err == nil {
 		return models.IngestionResult{BookID: bookID, Status: models.StatusAvailable, Path: stored.Directory}
@@ -80,13 +71,11 @@ func (ingester Ingester) fetchWithRetry(ctx context.Context, bookID models.BookI
 	}
 }
 
-// shouldRetry is true only for transient failures, while attempts remain and the run is still active.
 func (ingester Ingester) shouldRetry(ctx context.Context, err error, attempt int) bool {
 	isTransient := errors.Is(err, ErrTransientDownload)
 	return isTransient && attempt < ingester.retry.MaxAttempts && ctx.Err() == nil
 }
 
-// sleep waits for the given duration, returning early with the context error on cancellation.
 func sleep(ctx context.Context, duration time.Duration) error {
 	timer := time.NewTimer(duration)
 	defer timer.Stop()
@@ -98,7 +87,6 @@ func sleep(ctx context.Context, duration time.Duration) error {
 	}
 }
 
-// failedResult maps an error to a permanent (unavailable) or temporary (failed) outcome.
 func failedResult(bookID models.BookID, err error) models.IngestionResult {
 	status := models.StatusFailed
 	if errors.Is(err, ErrBookUnavailable) {

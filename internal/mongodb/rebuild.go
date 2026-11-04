@@ -12,33 +12,17 @@ import (
 	"boogle-engine/internal/models"
 )
 
-// adminDatabase owns cluster-wide commands; renameCollection only runs against it.
 const adminDatabase = "admin"
 
-// namespaceExistsCode is the MongoDB error code reported when create targets a live collection.
 const namespaceExistsCode = 48
 
-// RebuildResult reports what a rebuild produced: how many books it stored and how long it took.
 type RebuildResult struct {
 	BooksProcessed int
 	Elapsed        time.Duration
 }
 
-// NextBook returns the next book of the source, or false once it is exhausted. Rebuild calls it
-// once per book, so the caller can read and tokenize the datalake lazily and the rebuild never
-// holds more than one book in memory, however large the datalake grows.
 type NextBook func(ctx context.Context) (models.IndexBookInput, bool, error)
 
-// Rebuild replaces the whole datamart with the books that next yields. It writes them into
-// temporary collections as they arrive, creates the query indexes there, and only then renames
-// both into place, so search never observes a half-built index. Each rename is atomic, but the
-// two renames are not a single transaction: for the few milliseconds between them a reader can
-// pair new postings with old metadata. That window is negligible on the single-machine Stage 2
-// host; a Stage 3 cluster should replace the renames with a version pointer search resolves
-// before querying.
-//
-// Rebuild does not guard against two rebuilds racing: the Indexing Service serializes them with
-// Client.AcquireRebuildLock, which holds across every replica sharing the datamart.
 func (indexer BookIndexer) Rebuild(ctx context.Context, next NextBook) (RebuildResult, error) {
 	started := time.Now()
 	temporaryBooks := indexer.client.database.Collection(BooksCollection + rebuildSuffix)
@@ -83,9 +67,6 @@ func (indexer BookIndexer) Rebuild(ctx context.Context, next NextBook) (RebuildR
 	return RebuildResult{BooksProcessed: processed, Elapsed: time.Since(started)}, nil
 }
 
-// publishRebuild swaps the temporary collections over the live ones, index first so that a reader
-// in the tiny window between the two renames still resolves every new posting to metadata that is
-// about to be published.
 func (indexer BookIndexer) publishRebuild(ctx context.Context, temporaryBooks, temporaryIndex *mongo.Collection) error {
 	if err := renameIntoPlace(ctx, temporaryIndex, InvertedIndexCollection); err != nil {
 		return err
@@ -96,8 +77,6 @@ func (indexer BookIndexer) publishRebuild(ctx context.Context, temporaryBooks, t
 	return nil
 }
 
-// renameIntoPlace atomically replaces the live collection with a fully built temporary one. The
-// command only runs against the admin database, and dropTarget clears whatever held the name.
 func renameIntoPlace(ctx context.Context, temporary *mongo.Collection, live string) error {
 	database := temporary.Database()
 	temporaryName := fmt.Sprintf("%s.%s", database.Name(), temporary.Name())
@@ -113,9 +92,6 @@ func renameIntoPlace(ctx context.Context, temporary *mongo.Collection, live stri
 	return nil
 }
 
-// ensureTemporary creates the temporary collections up front so the swap always finds its source,
-// even for a rebuild of an empty datalake: with no books to write, no upsert would ever create
-// them. An already existing collection is the wanted state, so NamespaceExists is not an error.
 func ensureTemporary(ctx context.Context, collections ...*mongo.Collection) error {
 	for _, collection := range collections {
 		command := bson.D{{Key: "create", Value: collection.Name()}}
@@ -132,8 +108,6 @@ func ensureTemporary(ctx context.Context, collections ...*mongo.Collection) erro
 	return nil
 }
 
-// dropIfExists removes temporary collections left behind by a rebuild that failed before it could
-// swap, so a retry always starts from a clean slate.
 func dropIfExists(ctx context.Context, collections ...*mongo.Collection) error {
 	for _, collection := range collections {
 		if err := collection.Drop(ctx); err != nil {

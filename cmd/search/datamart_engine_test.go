@@ -14,8 +14,6 @@ import (
 	"boogle-engine/internal/mongodb"
 )
 
-// fakeSearcher stands in for mongodb.DatamartReader: it records the last request the engine sent
-// and answers with a fixed result or error, so these tests need no MongoDB server.
 type fakeSearcher struct {
 	result   mongodb.SearchResult
 	err      error
@@ -29,7 +27,6 @@ func (searcher *fakeSearcher) SearchBooks(_ context.Context, request mongodb.Sea
 	return searcher.result, searcher.err
 }
 
-// emptyCatalog satisfies api.BookCatalog so the real router can be built around the engine.
 type emptyCatalog struct{}
 
 func (emptyCatalog) PublishedBook(context.Context, models.BookID) (models.BookMetadata, bool, error) {
@@ -103,8 +100,6 @@ func TestDatamartEnginePropagatesDatamartFailure(t *testing.T) {
 	}
 }
 
-// TestSearchRouteIsServedByDatamartEngine drives GET /search through the router run() builds,
-// proving the production path reaches the datamart engine and its JSON contract holds.
 func TestSearchRouteIsServedByDatamartEngine(t *testing.T) {
 	searcher := &fakeSearcher{result: mongodb.SearchResult{Total: 1, Books: []models.BookMetadata{
 		{BookID: 1342, Title: "Pride and Prejudice", Author: "Jane Austen", Language: "en", PublicationYear: 1813},
@@ -127,8 +122,6 @@ func TestSearchRouteIsServedByDatamartEngine(t *testing.T) {
 	}
 }
 
-// TestSearchRouteSendsEveryWordToDatamart proves a multi-word q reaches the datamart as the AND
-// of its normalized, distinct terms, with ignored words dropped.
 func TestSearchRouteSendsEveryWordToDatamart(t *testing.T) {
 	searcher := &fakeSearcher{result: mongodb.SearchResult{Books: []models.BookMetadata{}}}
 	router := newTestRouter(t, searcher)

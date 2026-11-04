@@ -12,7 +12,6 @@ import (
 
 var errMissingBook = errors.New("missing book")
 
-// memoryReader is an in-memory BookReader standing in for the datalake.
 type memoryReader map[models.BookID]models.Book
 
 func (reader memoryReader) ReadBook(bookID models.BookID) (models.Book, error) {

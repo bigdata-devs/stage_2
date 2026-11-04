@@ -55,7 +55,6 @@ func TestFilterOptionsListsPublishedValues(t *testing.T) {
 			t.Fatalf("book %d: %v", input.Metadata.BookID, err)
 		}
 	}
-	// A pending book must not contribute any filter value.
 	seedPendingBook(t, client, metadataInput(3, "Mark Twain", "de", 1901, "castaway"))
 
 	values, err := NewDatamartReader(client).FilterOptions(context.Background())

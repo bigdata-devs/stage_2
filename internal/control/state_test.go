@@ -161,7 +161,6 @@ func TestWipeFailuresClearsAndReturnsClearedIDs(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// Verify returned IDs are sorted
 	if len(cleared) != 3 {
 		t.Fatalf("expected 3 cleared IDs, got %d", len(cleared))
 	}
@@ -172,18 +171,15 @@ func TestWipeFailuresClearsAndReturnsClearedIDs(t *testing.T) {
 		}
 	}
 
-	// Verify in-memory state is cleared
 	if state.FailedCount() != 0 {
 		t.Fatalf("expected 0 failures after wipe, got %d", state.FailedCount())
 	}
 
-	// Verify file is empty
 	content := readControlFile(t, state.directory, failedFileName)
 	if content != "" {
 		t.Fatalf("expected empty failed_books.txt after wipe, got %q", content)
 	}
 
-	// Verify state persists after reload
 	reloaded, err := LoadState(state.directory)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -216,7 +212,6 @@ func TestWipeFailuresAtomicWrite(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// Manually write to the file to verify atomic replacement
 	failedPath := filepath.Join(state.directory, failedFileName)
 	if err := os.WriteFile(failedPath, []byte("1342\terror1\n"), filePermissions); err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -227,12 +222,10 @@ func TestWipeFailuresAtomicWrite(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// Should return the ID that was in memory (1342), not re-read from file
 	if len(cleared) != 1 || cleared[0] != 1342 {
 		t.Fatalf("expected [1342], got %v", cleared)
 	}
 
-	// File should be empty after atomic write
 	content := readControlFile(t, state.directory, failedFileName)
 	if content != "" {
 		t.Fatalf("expected empty file after wipe, got %q", content)
@@ -253,7 +246,6 @@ func TestIndexedIDsReturnsSortedCopy(t *testing.T) {
 
 	ids := state.IndexedIDs()
 
-	// Verify sorted order
 	if len(ids) != 3 {
 		t.Fatalf("expected 3 IDs, got %d", len(ids))
 	}
@@ -264,7 +256,6 @@ func TestIndexedIDsReturnsSortedCopy(t *testing.T) {
 		}
 	}
 
-	// Verify it's a copy, not a reference to internal state
 	ids[0] = 9999
 	idsAgain := state.IndexedIDs()
 	if idsAgain[0] != 5 {

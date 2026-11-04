@@ -11,7 +11,6 @@ import (
 	"boogle-engine/internal/models"
 )
 
-// fakeFetcher serves canned books, counts calls and records the peak number of parallel calls.
 type fakeFetcher struct {
 	unavailable     map[models.BookID]bool
 	transientFirst  int32

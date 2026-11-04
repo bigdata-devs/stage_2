@@ -19,9 +19,6 @@ import (
 	"boogle-engine/internal/models"
 )
 
-// fakeGutenberg is a crawler.BookFetcher that serves generated books without network access.
-// It counts downloads, can fail every download with failure, and holds every download until
-// release is closed when release is set.
 type fakeGutenberg struct {
 	failure   error
 	release   chan struct{}
@@ -51,8 +48,6 @@ func (gutenberg *fakeGutenberg) waitForRelease(ctx context.Context) error {
 	}
 }
 
-// ingestionFixture is an Ingestion API wired like cmd/ingestion, but over a temporary datalake
-// and a fake Gutenberg.
 type ingestionFixture struct {
 	gutenberg *fakeGutenberg
 	lake      datalake.Datalake
@@ -165,7 +160,7 @@ func TestConcurrentIngestionsOfSameBookShareOneDownload(t *testing.T) {
 		}()
 	}
 	started.Wait()
-	time.Sleep(100 * time.Millisecond) // let every caller reach the held download
+	time.Sleep(100 * time.Millisecond)
 	close(fixture.gutenberg.release)
 	finished.Wait()
 
@@ -258,7 +253,6 @@ func TestRoutesRejectWrongMethods(t *testing.T) {
 	}
 }
 
-// heldIngester is a BookIngester whose ingestions wait until release is closed.
 type heldIngester struct {
 	release chan struct{}
 	calls   atomic.Int32
@@ -290,7 +284,7 @@ func TestCoalescerJoinsTheIngestionInProgress(t *testing.T) {
 func TestCoalescerReportsTransientFailureWhenNoSlotFreesUpInTime(t *testing.T) {
 	ingester := &heldIngester{release: make(chan struct{})}
 	coalescer := newIngestionCoalescer(ingester, IngestionLimits{Timeout: 20 * time.Millisecond, MaxConcurrentDownloads: 1})
-	coalescer.slots <- struct{}{} // every download slot is busy
+	coalescer.slots <- struct{}{}
 
 	result, err := coalescer.Ingest(context.Background(), 1342)
 
@@ -311,7 +305,7 @@ func TestCoalescerLetsCallerStopWaitingWithoutCancellingTheIngestion(t *testing.
 	if _, err := coalescer.Ingest(ctx, 1342); !errors.Is(err, context.Canceled) {
 		t.Errorf("err = %v, want context.Canceled", err)
 	}
-	retry := coalescer.join(1342) // the abandoned ingestion is still running, so the retry joins it
+	retry := coalescer.join(1342)
 	close(ingester.release)
 	<-retry.done
 

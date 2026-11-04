@@ -14,9 +14,6 @@ import (
 	"boogle-engine/internal/models"
 )
 
-// PublishedBook returns the metadata of one published book. found is false when the datamart
-// holds no published record under that ID: an unknown book and a book still awaiting publication
-// are both hidden from readers, exactly like GET /search hides them.
 func (reader DatamartReader) PublishedBook(ctx context.Context, bookID models.BookID) (models.BookMetadata, bool, error) {
 	var book models.BookMetadata
 	err := reader.books().FindOne(ctx, bson.D{
@@ -32,10 +29,6 @@ func (reader DatamartReader) PublishedBook(ctx context.Context, bookID models.Bo
 	return book, true, nil
 }
 
-// FilterOptions returns the distinct filter values of the published books: every ISO 639 code of
-// their comma-separated language lists and every known original publication year, each sorted
-// ascending. Values that a reader could never match through GET /search are left out: the
-// "Unknown" placeholder of books without a language and the year 0 of books without a date.
 func (reader DatamartReader) FilterOptions(ctx context.Context) (models.FilterValues, error) {
 	values := models.FilterValues{Languages: []string{}, Years: []int{}}
 	published := bson.D{{Key: "status", Value: StatusPublished}}
@@ -56,8 +49,6 @@ func (reader DatamartReader) FilterOptions(ctx context.Context) (models.FilterVa
 	return values, nil
 }
 
-// flattenLanguages splits the stored language lists ("en,fr") into their single codes, drops the
-// empty and the "Unknown" placeholder values, de-duplicates the codes and sorts them.
 func flattenLanguages(rawValues []any) []string {
 	seen := map[string]bool{}
 	codes := []string{}
@@ -79,8 +70,6 @@ func flattenLanguages(rawValues []any) []string {
 	return codes
 }
 
-// knownYears collects the publication years the datamart stores as integers, drops the unknown
-// value 0 and sorts the rest ascending. BSON integers reach the driver as int32 or int64.
 func knownYears(rawValues []any) []int {
 	years := []int{}
 	for _, rawValue := range rawValues {

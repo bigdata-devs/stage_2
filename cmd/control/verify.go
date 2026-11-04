@@ -12,13 +12,6 @@ import (
 	"boogle-engine/internal/models"
 )
 
-// verifyIndexed reconciles the indexed books held in the control state with the
-// datamart the Search Service exposes: for every book in indexed_books.txt it
-// issues GET /books/{id} and reports which ones the datamart actually returns.
-//
-// A 404 means the datamart lost that record; any other non-2xx answer, or a
-// transport error, aborts the run because the Search Service itself is not
-// reachable and the reconciliation would be unreliable.
 func verifyIndexed(ctx context.Context, searchURL string, perBook time.Duration, state *control.ControlState) error {
 	indexed := state.IndexedIDs()
 	if len(indexed) == 0 {
@@ -54,9 +47,6 @@ func verifyIndexed(ctx context.Context, searchURL string, perBook time.Duration,
 	return nil
 }
 
-// probeBook performs one GET /books/{id} and returns the HTTP status code without
-// buffering the body; the body is always drained and closed so the underlying
-// connection can be reused by the next call.
 func probeBook(ctx context.Context, client *http.Client, searchURL string, bookID models.BookID) (int, error) {
 	url := fmt.Sprintf("%s/books/%d", searchURL, bookID)
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)

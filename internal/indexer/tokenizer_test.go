@@ -5,8 +5,6 @@ import (
 	"testing"
 )
 
-// The cases mirror tests/test_utils/test_text_processor.py and the Stage 1 Go port.
-
 func TestTokenize(t *testing.T) {
 	cases := []struct {
 		name     string

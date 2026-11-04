@@ -16,10 +16,6 @@ import (
 	"boogle-engine/internal/mongodb"
 )
 
-// searchDatamartStart connects to a live datamart dedicated to these tests. It skips when MongoDB
-// is not reachable and drops the collections it is about to pollute. The database name is
-// overridden so the suite never collides with the internal/mongodb or cmd/indexing tests, which
-// the go test command may run at the same time.
 func searchDatamartStart(t *testing.T) mongodb.Client {
 	t.Helper()
 	t.Setenv("MONGO_DATABASE", "boogle_search_bridge_test")
@@ -50,8 +46,6 @@ func searchDatamartStart(t *testing.T) mongodb.Client {
 	return client
 }
 
-// indexBody writes one book through the Indexing Service's real write path, tokenizing the body
-// exactly as the service does.
 func indexBody(t *testing.T, client mongodb.Client, metadata models.BookMetadata, body string) {
 	t.Helper()
 	input := models.IndexBookInput{Metadata: metadata, Tokens: indexer.ProcessText(body)}
@@ -60,7 +54,6 @@ func indexBody(t *testing.T, client mongodb.Client, metadata models.BookMetadata
 	}
 }
 
-// markPending reverts a published book to the in-progress state an interrupted indexing leaves.
 func markPending(t *testing.T, client mongodb.Client, bookID models.BookID) {
 	t.Helper()
 	_, err := client.Database().Collection(mongodb.BooksCollection).UpdateOne(context.Background(),
@@ -79,9 +72,6 @@ func pageIDs(page api.SearchPage) []models.BookID {
 	return ids
 }
 
-// TestDatamartEngineAgainstLiveDatamart seeds the datamart through the indexing write path and
-// checks the bridge end to end. The subtests share one connection, so a machine without MongoDB
-// pays the connection timeout once.
 func TestDatamartEngineAgainstLiveDatamart(t *testing.T) {
 	client := searchDatamartStart(t)
 	indexBody(t, client,

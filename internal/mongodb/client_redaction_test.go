@@ -95,8 +95,6 @@ func TestRedactURIHidesCredentialsAndKeepsDiagnostics(t *testing.T) {
 	}
 }
 
-// TestConnectErrorsNeverContainThePassword covers both failure paths: the driver rejecting the
-// URI (its parse errors quote option values back) and a ping that cannot reach the server.
 func TestConnectErrorsNeverContainThePassword(t *testing.T) {
 	cases := []struct {
 		name       string
