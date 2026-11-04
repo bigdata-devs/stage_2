@@ -10,7 +10,6 @@ import (
 	"boogle-engine/internal/models"
 )
 
-// UnknownValue replaces any metadata field that the header does not provide.
 const UnknownValue = "Unknown"
 
 var (
@@ -20,7 +19,6 @@ var (
 	yearPattern              = regexp.MustCompile(`\d{4}`)
 )
 
-// languageCodes maps Gutenberg language names to ISO 639 codes (Stage 1 LANGUAGE_CODES).
 var languageCodes = map[string]string{
 	"afrikaans": "af", "arabic": "ar", "bulgarian": "bg", "catalan": "ca", "chinese": "zh",
 	"czech": "cs", "danish": "da", "dutch": "nl", "english": "en", "esperanto": "eo",
@@ -32,16 +30,8 @@ var languageCodes = map[string]string{
 	"spanish": "es", "swedish": "sv", "tagalog": "tl", "welsh": "cy",
 }
 
-// headerFields maps each lower-cased field name ("title", "author"...) to its values in order.
 type headerFields map[string][]string
 
-// ExtractMetadata ports extract_metadata: it returns the title, the authors joined with "; ",
-// the language codes, the original publication year and the Gutenberg release year of a header.
-// Missing text fields become UnknownValue and missing years become 0.
-//
-// When the header has no "Original Publication" year (common in Gutenberg books), the publication
-// year falls back to the release year, so the year filter still reaches those books. The release
-// year is always reported as parsed.
 func ExtractMetadata(bookID models.BookID, header string) models.BookMetadata {
 	fields := parseHeaderFields(header)
 	releaseYear := firstYear(fields["release date"])
@@ -55,8 +45,6 @@ func ExtractMetadata(bookID models.BookID, header string) models.BookMetadata {
 	}
 }
 
-// publicationYear prefers the original publication year and falls back to the Gutenberg release
-// year when the header does not provide a readable one.
 func publicationYear(originalPublication []string, releaseYear int) int {
 	if year := firstYear(originalPublication); year != 0 {
 		return year
@@ -64,8 +52,6 @@ func publicationYear(originalPublication []string, releaseYear int) int {
 	return releaseYear
 }
 
-// NormalizeLanguage maps language names to ISO 639 codes: "English" -> "en" and
-// "English, French" -> "en,fr". Names without a known code are kept in lower case.
 func NormalizeLanguage(rawLanguage string) string {
 	cleaned := strings.ToLower(collapseWhitespace(rawLanguage))
 	if cleaned == "" {
@@ -77,8 +63,6 @@ func NormalizeLanguage(rawLanguage string) string {
 	return strings.Join(distinctLanguageCodes(languageSeparatorPattern.Split(cleaned, -1)), ",")
 }
 
-// parseHeaderFields reads "Name: value" lines. Indented lines continue the previous value, and
-// a field such as Author may appear several times.
 func parseHeaderFields(header string) headerFields {
 	fields := headerFields{}
 	currentField := ""
@@ -89,7 +73,6 @@ func parseHeaderFields(header string) headerFields {
 	return fields
 }
 
-// consumeLine records one header line and returns the field that a following indented line extends.
 func (fields headerFields) consumeLine(line string, currentField string) string {
 	if strings.TrimSpace(line) == "" {
 		return ""
@@ -140,9 +123,6 @@ func joinedValuesOrUnknown(values []string) string {
 	return joined
 }
 
-// firstYear returns the first four-digit year of the first value that contains one,
-// ignoring bracketed segments such as "[eBook #2147]". A missing or unreadable year
-// yields 0, which models.BookMetadata documents as "unknown".
 func firstYear(values []string) int {
 	for _, value := range values {
 		if year := yearIn(bracketSegmentPattern.ReplaceAllString(value, " ")); year != 0 {
@@ -177,7 +157,6 @@ func distinctLanguageCodes(languageNames []string) []string {
 	return codes
 }
 
-// languageCode returns the code of a language name; values that already look like codes are kept.
 func languageCode(languageName string) string {
 	if code, known := languageCodes[languageName]; known {
 		return code
@@ -190,7 +169,6 @@ func startsWithWhitespace(line string) bool {
 	return unicode.IsSpace(firstCharacter)
 }
 
-// collapseWhitespace trims the value and turns every internal run of whitespace into one space.
 func collapseWhitespace(value string) string {
 	return strings.Join(strings.Fields(value), " ")
 }

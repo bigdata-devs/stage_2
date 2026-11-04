@@ -20,8 +20,6 @@ var (
 	liveMongoAvailable bool
 )
 
-// TestMain probes MongoDB once for the whole package, so the live tests skip instantly when no
-// server is reachable instead of each waiting for its own connection timeout.
 func TestMain(m *testing.M) {
 	liveMongoConfig = mongodb.ConfigFromEnvironment()
 	liveMongoAvailable = mongodb.Available(context.Background(), liveMongoConfig)
@@ -31,10 +29,6 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
-// datamartTestStart connects to a live datamart dedicated to these tests. It skips the test when
-// MongoDB was unreachable at start-up and drops the collections it is about to pollute. The
-// database name is overridden so the suite never collides with the internal/mongodb tests, which
-// the go test command may run at the same time against the default database.
 func datamartTestStart(t *testing.T) mongodb.Client {
 	t.Helper()
 	if !liveMongoAvailable {
@@ -77,7 +71,6 @@ func resetDatamart(t *testing.T, client mongodb.Client) {
 	}
 }
 
-// sampleBook builds a datalake book whose body always contains the given term.
 func sampleBook(bookID models.BookID, title string, term string) models.Book {
 	return models.Book{
 		ID: bookID,
@@ -89,7 +82,6 @@ func sampleBook(bookID models.BookID, title string, term string) models.Book {
 	}
 }
 
-// storeBooks writes the books into a fresh datalake under t.TempDir().
 func storeBooks(t *testing.T, books ...models.Book) datalake.Datalake {
 	t.Helper()
 	lake, err := datalake.New(filepath.Join(t.TempDir(), "datalake"), datalake.DefaultBatchSize)
@@ -175,7 +167,6 @@ func TestDatamartIndexKeepsDataAcrossInstances(t *testing.T) {
 	if err := NewDatamartIndex(lake, client).IndexBook(context.Background(), 7); err != nil {
 		t.Fatalf("index book: %v", err)
 	}
-	// A second adapter models a service restart: the datamart still holds the book.
 	restarted := NewDatamartIndex(lake, client)
 	if count := restarted.Stats().BooksIndexed; count != 1 {
 		t.Errorf("books_indexed after restart = %d, want 1", count)
@@ -226,8 +217,6 @@ func TestRebuildReplacesPreviousContent(t *testing.T) {
 	if err := index.IndexBook(context.Background(), 1); err != nil {
 		t.Fatalf("index book: %v", err)
 	}
-	// The datalake loses the book between the update and the rebuild: the rebuild builds from
-	// the datalake, so the stale entry must disappear with the swap.
 	if err := os.RemoveAll(lake.BookDirectory(1)); err != nil {
 		t.Fatalf("remove book from datalake: %v", err)
 	}

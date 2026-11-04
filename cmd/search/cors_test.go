@@ -52,8 +52,6 @@ func TestCORSPolicyFromEnvironment(t *testing.T) {
 	}
 }
 
-// TestSearchRoutesAnswerCrossOriginBrowsers drives the production router behind the policy that
-// run() builds, from a front-end on another origin.
 func TestSearchRoutesAnswerCrossOriginBrowsers(t *testing.T) {
 	setCORSEnvironment(t, ptr("https://boogle.example.com"))
 	cors, err := corsPolicyFromEnvironment()
@@ -107,8 +105,6 @@ func TestSearchRoutesAnswerCrossOriginBrowsers(t *testing.T) {
 	}
 }
 
-// setCORSEnvironment sets CORS_ALLOWED_ORIGIN for one test, or unsets it when value is nil, and
-// restores the previous state afterwards.
 func setCORSEnvironment(t *testing.T, value *string) {
 	t.Helper()
 	t.Setenv(corsEnvironmentVariable, "")

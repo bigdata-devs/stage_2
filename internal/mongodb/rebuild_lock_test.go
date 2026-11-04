@@ -70,7 +70,6 @@ func TestReleaseKeepsALockOwnedByAnotherReplica(t *testing.T) {
 	if err != nil {
 		t.Fatalf("acquire: %v", err)
 	}
-	// Model a lease stolen after the holder stalled: Release must not delete it.
 	if _, err := client.Database().Collection(RebuildLocksCollection).UpdateOne(ctx,
 		bson.D{{Key: "_id", Value: rebuildLockID}},
 		bson.D{{Key: "$set", Value: bson.D{{Key: "owner", Value: bson.NewObjectID()}}}},

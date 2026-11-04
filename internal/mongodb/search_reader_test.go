@@ -12,9 +12,6 @@ import (
 	"boogle-engine/internal/models"
 )
 
-// These tests exercise a live server. They skip automatically when none is reachable, so the
-// suite stays green on machines without MongoDB (the same policy as the Stage 1 Python tests).
-
 func TestSearchBooksRanksByTermFrequency(t *testing.T) {
 	reader := seededReader(t)
 
@@ -210,9 +207,6 @@ func TestSearchBooksRequiresEveryTerm(t *testing.T) {
 	}
 }
 
-// TestSearchBooksRanksMultiTermMatchesBySummedFrequency adds two books where the per-term order
-// and the summed order disagree, so only the documented score (sum of the terms' frequencies)
-// puts book 6 first.
 func TestSearchBooksRanksMultiTermMatchesBySummedFrequency(t *testing.T) {
 	reader := seededReader(t)
 	indexer := NewBookIndexer(reader.client)
@@ -233,7 +227,6 @@ func TestSearchBooksRanksMultiTermMatchesBySummedFrequency(t *testing.T) {
 	if result.Total != 3 {
 		t.Fatalf("expected total 3, got %d", result.Total)
 	}
-	// Scores: book 5 = 4+1 = 5, books 6 and 7 = 1+5 = 6 (tie broken by ascending ID).
 	assertBookIDs(t, result.Books, []models.BookID{6, 7, 5})
 }
 
@@ -281,10 +274,6 @@ func seededReader(t *testing.T) DatamartReader {
 	return NewDatamartReader(client)
 }
 
-// seedSearchBooks mirrors a realistic corpus: three published books that share terms with
-// different frequencies and languages, plus a book left pending mid-indexing that carries a term
-// no published book has. The pending book is seeded first so the published books merge their
-// postings into its term documents, as they would after a retried indexing run.
 func seedSearchBooks(t *testing.T, client Client) {
 	t.Helper()
 	seedPendingBook(t, client, metadataInput(3, "Mark Twain", "es", 1901,
@@ -304,8 +293,6 @@ func seedSearchBooks(t *testing.T, client Client) {
 	}
 }
 
-// seedPendingBook reproduces a book whose indexing stopped between the posting write and the
-// publish step: metadata recorded as pending and term postings already present.
 func seedPendingBook(t *testing.T, client Client, input models.IndexBookInput) {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)

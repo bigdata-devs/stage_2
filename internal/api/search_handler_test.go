@@ -16,8 +16,6 @@ import (
 	"boogle-engine/internal/models"
 )
 
-// recordingEngine is a SearchEngine fake that remembers the last query it received and answers
-// with a fixed page or error.
 type recordingEngine struct {
 	page          SearchPage
 	err           error
@@ -51,7 +49,6 @@ func decodeBody[Body any](t *testing.T, recorder *httptest.ResponseRecorder) Bod
 	return body
 }
 
-// rawField returns one top-level field of the response exactly as it was serialized.
 func rawField(t *testing.T, recorder *httptest.ResponseRecorder, name string) string {
 	t.Helper()
 	fields := decodeBody[map[string]json.RawMessage](t, recorder)

@@ -12,7 +12,6 @@ import (
 	"boogle-engine/internal/models"
 )
 
-// fakeCatalog is a BookCatalog fake that answers with fixed values or errors.
 type fakeCatalog struct {
 	book      models.BookMetadata
 	found     bool
@@ -36,7 +35,6 @@ func (catalog *fakeCatalog) FilterOptions(context.Context) (models.FilterValues,
 	return catalog.values, nil
 }
 
-// sendCatalog routes one request through a ServeMux so path parameters reach the handlers.
 func sendCatalog(t *testing.T, catalog BookCatalog, method, target string) *httptest.ResponseRecorder {
 	t.Helper()
 	handler, err := NewCatalogHandler(catalog)

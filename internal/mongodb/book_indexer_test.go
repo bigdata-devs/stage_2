@@ -12,9 +12,6 @@ import (
 	"boogle-engine/internal/models"
 )
 
-// These tests exercise a live server. They skip automatically when none is reachable, so the
-// suite stays green on machines without MongoDB (the same policy as the Stage 1 Python tests).
-
 func liveClient(t testing.TB) Client {
 	t.Helper()
 	config := liveConfig(t)
@@ -30,8 +27,6 @@ func liveClient(t testing.TB) Client {
 	return client
 }
 
-// resetDatamart drops every collection the write path touches, so each test starts from an empty
-// datamart.
 func resetDatamart(t testing.TB, client Client) {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)

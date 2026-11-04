@@ -11,7 +11,6 @@ import (
 	"boogle-engine/internal/models"
 )
 
-// booksOf feeds the given books to Rebuild in order.
 func booksOf(books ...models.IndexBookInput) NextBook {
 	position := 0
 	return func(context.Context) (models.IndexBookInput, bool, error) {
@@ -80,7 +79,6 @@ func TestRebuildStopsWhenTheStreamFails(t *testing.T) {
 		t.Fatal("expected the failing stream to fail the rebuild")
 	}
 
-	// The half-built collections are never published: the previous index still answers.
 	if _, err := fetchExistingBook(client, 1); err != nil {
 		t.Fatalf("previous book disappeared after a failed rebuild: %v", err)
 	}

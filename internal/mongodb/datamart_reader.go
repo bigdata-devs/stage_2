@@ -11,22 +11,14 @@ import (
 	"boogle-engine/internal/models"
 )
 
-// DatamartReader reads what the BookIndexer writes: the posting lists of the inverted index and
-// the metadata of the books collection. Reads observe committed documents only, so a book always
-// appears whole and never blocks a concurrent writer.
 type DatamartReader struct {
 	client Client
 }
 
-// NewDatamartReader wires the reader to a connected datamart.
 func NewDatamartReader(client Client) DatamartReader {
 	return DatamartReader{client: client}
 }
 
-// PostingsForTerms returns the posting list of every requested term the index holds, ordered by
-// term so the same input always yields the same output. A term without a posting list is absent
-// from the result, and terms must be normalized exactly as the indexer stores them (lowercase,
-// stop words removed), because the reader never rewrites them.
 func (reader DatamartReader) PostingsForTerms(ctx context.Context, terms []string) ([]models.TermPostings, error) {
 	if len(terms) == 0 {
 		return []models.TermPostings{}, nil
@@ -53,8 +45,6 @@ func (reader DatamartReader) PostingsForTerms(ctx context.Context, terms []strin
 	return postings, nil
 }
 
-// BooksByID returns the metadata of the requested books, ordered by book ID. Books the datamart
-// does not hold are simply absent, so callers that care about a specific book compare the IDs.
 func (reader DatamartReader) BooksByID(ctx context.Context, bookIDs []models.BookID) ([]models.BookMetadata, error) {
 	if len(bookIDs) == 0 {
 		return []models.BookMetadata{}, nil
@@ -76,8 +66,6 @@ func (reader DatamartReader) BooksByID(ctx context.Context, bookIDs []models.Boo
 	return books, nil
 }
 
-// termDocument is the wire shape of one inverted-index record: the normalized term as the _id and
-// its posting list.
 type termDocument struct {
 	Term     string           `bson:"_id"`
 	Postings []models.Posting `bson:"postings"`

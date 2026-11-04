@@ -17,8 +17,6 @@ import (
 	"boogle-engine/internal/models"
 )
 
-// indexingFixture is an Indexing API wired like cmd/indexing: a real datalake in a temporary
-// folder and an index the tests can inspect through GET /index/status.
 type indexingFixture struct {
 	lake   datalake.Datalake
 	router *http.ServeMux
@@ -36,9 +34,6 @@ func newIndexingFixture(t *testing.T, storedBookIDs ...models.BookID) indexingFi
 	return indexingFixture{lake: lake, router: newIndexingRouter(t, newFakeIndex(lake), time.Minute, testMaxConcurrentUpdates)}
 }
 
-// fakeIndex is the BookIndex the API tests drive. It keeps the set of indexed books over the
-// fixture's datalake: enough for the handler contract (counters and datalake errors) without a
-// live datamart, since the MongoDB adapter is covered by cmd/indexing and internal/mongodb tests.
 type fakeIndex struct {
 	lake  datalake.Datalake
 	mutex sync.Mutex
@@ -91,8 +86,6 @@ func storeSampleBook(t *testing.T, lake datalake.Datalake, bookID models.BookID)
 	}
 }
 
-// testMaxConcurrentUpdates is the update cap most API tests run with; the tests that exercise the
-// cap itself build a router with their own value.
 const testMaxConcurrentUpdates = 4
 
 func newIndexingRouter(t *testing.T, index BookIndex, rebuildTimeout time.Duration, maxConcurrentUpdates int) *http.ServeMux {
@@ -212,8 +205,6 @@ func TestRebuildStartsFromScratch(t *testing.T) {
 	assertBooksIndexed(t, fixture, 1)
 }
 
-// scriptedIndex is a BookIndex that answers with fixed values, or whose Rebuild runs until its
-// context ends when waitForContext is set.
 type scriptedIndex struct {
 	indexErr       error
 	rebuildErr     error
@@ -297,8 +288,6 @@ func TestNewIndexingHandlerValidatesItsArguments(t *testing.T) {
 	}
 }
 
-// gatedIndex blocks every IndexBook call on its gate and reports each entry, so a test can hold
-// one update open and watch whether a second one is allowed to start.
 type gatedIndex struct {
 	entered chan struct{}
 	gate    chan struct{}
@@ -322,7 +311,6 @@ func (index *gatedIndex) Stats() indexer.IndexStats {
 	return indexer.IndexStats{LastUpdate: time.Now()}
 }
 
-// startUpdate answers POST /index/update/{book_id} in the background and returns its recorder.
 func startUpdate(router *http.ServeMux, target string) <-chan *httptest.ResponseRecorder {
 	done := make(chan *httptest.ResponseRecorder, 1)
 	go func() { done <- serveRequest(router, http.MethodPost, target) }()

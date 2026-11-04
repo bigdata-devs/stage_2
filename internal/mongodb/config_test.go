@@ -2,9 +2,6 @@ package mongodb
 
 import "testing"
 
-// The cases check the documented defaults and the environment overrides of Config, mirroring the
-// configuration rules the assignment requires (no hard-coded hosts).
-
 func TestConfigFromEnvironmentUsesDefaultsWhenUnset(t *testing.T) {
 	t.Setenv(uriEnvironmentVariable, "")
 	t.Setenv(databaseEnvironmentVariable, "")

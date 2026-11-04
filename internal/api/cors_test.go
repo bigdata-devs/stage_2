@@ -63,7 +63,6 @@ func TestNewCORSPolicyRejectsSettingsItCannotEnforce(t *testing.T) {
 	}
 }
 
-// countingHandler stands in for the router: it counts calls and answers with a fixed status.
 type countingHandler struct {
 	calls  int
 	status int

@@ -5,8 +5,6 @@ import (
 	"testing"
 )
 
-// The cases mirror tests/test_control/test_book_id.py from Stage 1.
-
 func TestParseBookIDStripsWhitespaceAndLeadingZeros(t *testing.T) {
 	bookID, err := ParseBookID(" 0042 ")
 	if err != nil {

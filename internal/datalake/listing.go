@@ -14,8 +14,6 @@ import (
 
 var batchFolderPattern = regexp.MustCompile(`^batch_\d+_\d+$`)
 
-// ListBookIDs returns, in ascending order, the ID of every complete book in the datalake.
-// A missing root folder simply means an empty datalake.
 func (lake Datalake) ListBookIDs() ([]models.BookID, error) {
 	batchDirectories, err := lake.batchDirectories()
 	if err != nil {
@@ -50,8 +48,6 @@ func (lake Datalake) batchDirectories() ([]string, error) {
 	return directories, nil
 }
 
-// completeBooksIn returns the books of one batch folder whose header and body both exist.
-// Folders that are not book IDs, or that sit in the wrong batch, are ignored.
 func (lake Datalake) completeBooksIn(batchDirectory string) ([]models.BookID, error) {
 	entries, err := os.ReadDir(batchDirectory)
 	if err != nil {

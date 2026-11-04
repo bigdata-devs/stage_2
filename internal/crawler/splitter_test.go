@@ -6,7 +6,6 @@ import (
 	"testing"
 )
 
-// Same fixture as tests/test_datalake/fakes.py and the Stage 1 Go splitter tests.
 const (
 	sampleHeader = "Title: Sample Book\nAuthor: Jane Doe"
 	sampleBody   = "It was a bright cold day in April."

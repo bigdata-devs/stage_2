@@ -6,16 +6,12 @@ import (
 	"boogle-engine/internal/models"
 )
 
-// BookSelector hands out each candidate book ID exactly once, so concurrent workers
-// never claim the same book. It is safe for concurrent use.
 type BookSelector struct {
 	mutex      sync.Mutex
 	candidates []models.BookID
 	position   int
 }
 
-// NewBookSelector returns a selector over the given candidates, in their original
-// order and without repeats.
 func NewBookSelector(candidates []models.BookID) BookSelector {
 	seen := make(map[models.BookID]struct{}, len(candidates))
 	unique := make([]models.BookID, 0, len(candidates))
@@ -29,7 +25,6 @@ func NewBookSelector(candidates []models.BookID) BookSelector {
 	return BookSelector{candidates: unique}
 }
 
-// Claim returns the next unclaimed candidate, or false once the list is exhausted.
 func (selector *BookSelector) Claim() (models.BookID, bool) {
 	selector.mutex.Lock()
 	defer selector.mutex.Unlock()

@@ -12,26 +12,16 @@ import (
 	"boogle-engine/internal/models"
 )
 
-// postingUpsertBatchSize caps how many term updates one bulk request carries, so a single book's
-// postings never push a request past the server's practical message-size limit.
 const postingUpsertBatchSize = 1000
 
-// BookIndexer writes books into the datamart: their metadata into the books collection and their
-// body terms into the inverted index. Writes are idempotent, so replaying the same book never
-// duplicates postings, and a book only becomes visible to search once its postings are complete.
 type BookIndexer struct {
 	client Client
 }
 
-// NewBookIndexer wires the writer to a connected datamart.
 func NewBookIndexer(client Client) BookIndexer {
 	return BookIndexer{client: client}
 }
 
-// IndexBook stores one book in four ordered steps: it marks the metadata pending, drops the
-// postings of the previous version, upserts every current term posting, and finally publishes the
-// metadata. Search only returns published books, so a crash at any step leaves the book invisible
-// rather than half-indexed, and a retry converges to the same state.
 func (indexer BookIndexer) IndexBook(ctx context.Context, input models.IndexBookInput) error {
 	bookID := input.Metadata.BookID
 	if err := writeMetadata(ctx, indexer.books(), input.Metadata, StatusPending); err != nil {
@@ -57,8 +47,6 @@ func (indexer BookIndexer) index() *mongo.Collection {
 	return indexer.client.database.Collection(InvertedIndexCollection)
 }
 
-// writeMetadata stores a book's header fields and publication status, replacing any record already
-// held under that book ID.
 func writeMetadata(ctx context.Context, collection *mongo.Collection, metadata models.BookMetadata, status string) error {
 	_, err := collection.ReplaceOne(ctx,
 		bson.D{{Key: "_id", Value: metadata.BookID}},
@@ -67,7 +55,6 @@ func writeMetadata(ctx context.Context, collection *mongo.Collection, metadata m
 	return err
 }
 
-// publishMetadata flips a book's status to published, which is the moment search may return it.
 func publishMetadata(ctx context.Context, collection *mongo.Collection, bookID models.BookID) error {
 	_, err := collection.UpdateOne(ctx,
 		bson.D{{Key: "_id", Value: bookID}},
@@ -75,10 +62,6 @@ func publishMetadata(ctx context.Context, collection *mongo.Collection, bookID m
 	return err
 }
 
-// removeBookPostings drops a book's entry from every term it was recorded under, so a re-index
-// forgets terms the new version no longer contains. It is bounded by the multikey index on
-// postings.book_id. Term documents left with an empty posting list never match a search and the
-// next rebuild discards them.
 func removeBookPostings(ctx context.Context, collection *mongo.Collection, bookID models.BookID) error {
 	_, err := collection.UpdateMany(ctx,
 		bson.D{{Key: "postings.book_id", Value: bookID}},
@@ -86,8 +69,6 @@ func removeBookPostings(ctx context.Context, collection *mongo.Collection, bookI
 	return err
 }
 
-// upsertPostings stores one book's posting inside every term document it touches, in unordered
-// batches so a term-dense book stays under the server's per-message limit.
 func upsertPostings(ctx context.Context, collection *mongo.Collection, bookID models.BookID, frequencies map[string]int) error {
 	if len(frequencies) == 0 {
 		return nil
@@ -111,9 +92,6 @@ func upsertPostings(ctx context.Context, collection *mongo.Collection, bookID mo
 	return nil
 }
 
-// postingUpsert replaces one book's entry inside a term's posting list. The pipeline drops any
-// posting already recorded for that book, appends the fresh {book_id, tf} pair and re-sorts by book
-// ID, so re-indexing the book converges to the same document instead of stacking duplicates.
 func postingUpsert(term string, bookID models.BookID, termFrequency int) *mongo.UpdateOneModel {
 	fresh := bson.D{{Key: "book_id", Value: bookID}, {Key: "tf", Value: termFrequency}}
 	setUnion := bson.D{{Key: "$setUnion", Value: bson.A{postingsWithout(bookID), bson.A{fresh}}}}
@@ -129,9 +107,6 @@ func postingUpsert(term string, bookID models.BookID, termFrequency int) *mongo.
 		SetUpsert(true)
 }
 
-// postingsWithout projects the stored postings minus every entry for bookID, so the following
-// append records exactly one up-to-date entry for that book. It tolerates a missing postings field
-// on a brand-new term document.
 func postingsWithout(bookID models.BookID) bson.D {
 	stored := bson.D{{Key: "$ifNull", Value: bson.A{"$postings", bson.A{}}}}
 	dropBook := bson.D{{Key: "$ne", Value: bson.A{"$$this.book_id", bookID}}}
@@ -141,8 +116,6 @@ func postingsWithout(bookID models.BookID) bson.D {
 	}}}
 }
 
-// termFrequencies counts how often each token appears in one body, turning the caller's raw token
-// stream into the per-term counts the inverted index stores.
 func termFrequencies(tokens []string) map[string]int {
 	frequencies := make(map[string]int, len(tokens))
 	for _, token := range tokens {

@@ -1,25 +1,3 @@
-// Command control is the entry point of the Boogle Engine Control Module: it
-// orchestrates the Ingestion and Indexing Services over HTTP and records pipeline
-// progress under a control directory (default "control/").
-//
-// Usage:
-//
-//	go run ./cmd/control -ids 1342,84,11 -workers 4
-//	go run ./cmd/control -from 1 -to 500
-//	go run ./cmd/control -discover
-//	go run ./cmd/control -ids 1342,84 -retry-failed
-//	go run ./cmd/control -verify -search-url http://localhost:7003
-//
-// With -discover the candidates come from GET /ingest/list, so the module processes
-// every complete book of the datalake that is not indexed or failed yet.
-//
-// -retry-failed re-enqueues every book recorded in failed_books.txt so the run
-// tries them again; -verify reconciles indexed_books.txt with the datamart the
-// Search Service exposes, issuing GET /books/{id} for every recorded book.
-//
-// Service endpoints come from flags or the INGESTION_URL, INDEXING_URL,
-// SEARCH_URL and CONTROL_STATE_DIR environment variables. Run "go run
-// ./cmd/control -h" to list every option.
 package main
 
 import (
@@ -40,13 +18,11 @@ import (
 )
 
 const (
-	defaultIngestionURL = "http://localhost:7001"
-	defaultIndexingURL  = "http://localhost:7002"
-	defaultSearchURL    = "http://localhost:7003"
-	defaultStateDir     = "control"
-	defaultWorkers      = 4
-	// defaultIngestTimeout stays above the Ingestion Service budget (2 minutes by default),
-	// so a slow download is never aborted by the control module itself.
+	defaultIngestionURL  = "http://localhost:7001"
+	defaultIndexingURL   = "http://localhost:7002"
+	defaultSearchURL     = "http://localhost:7003"
+	defaultStateDir      = "control"
+	defaultWorkers       = 4
 	defaultIngestTimeout = 150 * time.Second
 	defaultTimeout       = 30 * time.Second
 	defaultAttempts      = 3
@@ -54,7 +30,6 @@ const (
 	readinessTimeout     = 10 * time.Second
 )
 
-// serviceConfig gathers every setting of one control run.
 type serviceConfig struct {
 	ingestionURL   string
 	indexingURL    string
@@ -83,13 +58,6 @@ func main() {
 	}
 }
 
-// run checks that both services answer, resolves the candidate books, loads the control
-// state and orchestrates every requested book. Ctrl+C or SIGTERM stops claiming new books;
-// the books already in flight run until their current step returns, and the summary is logged.
-//
-// With -verify the run skips orchestration and reconciles indexed_books.txt with the
-// datamart the Search Service exposes. With -retry-failed the run wipes failed_books.txt
-// before orchestrating, so previously failed books are tried again.
 func run(arguments []string) error {
 	config, err := parseConfig(arguments)
 	if err != nil {
@@ -192,7 +160,6 @@ func registerServiceFlags(flags *flag.FlagSet) *serviceConfig {
 	return config
 }
 
-// bookSelection holds the raw -ids, -from, -to and -discover flags before they are validated.
 type bookSelection struct {
 	rawIDs   string
 	firstID  int
@@ -210,8 +177,6 @@ func registerSelectionFlags(flags *flag.FlagSet) *bookSelection {
 	return selection
 }
 
-// bookIDs merges the -ids list and the -from/-to range; unless -discover is set, at least
-// one of them must be given.
 func (selection bookSelection) bookIDs() ([]models.BookID, error) {
 	listedIDs, err := parseBookIDList(selection.rawIDs)
 	if err != nil {
@@ -243,7 +208,6 @@ func parseBookIDList(rawIDs string) ([]models.BookID, error) {
 	return bookIDs, nil
 }
 
-// bookIDRange returns firstID..lastID inclusive; leaving both flags at 0 means "no range".
 func bookIDRange(firstID int, lastID int) ([]models.BookID, error) {
 	if firstID == 0 && lastID == 0 {
 		return []models.BookID{}, nil
@@ -258,9 +222,6 @@ func bookIDRange(firstID int, lastID int) ([]models.BookID, error) {
 	return bookIDs, nil
 }
 
-// checkServices fails fast when a required service is unreachable: it reads the documented
-// status endpoint of each service, which answers 2xx only while the service runs. The short
-// readiness deadline keeps a hanging service from blocking the start.
 func checkServices(ctx context.Context, ingestion httpclient.IngestionClient, indexing httpclient.IndexingClient) error {
 	readinessCtx, cancel := context.WithTimeout(ctx, readinessTimeout)
 	defer cancel()
@@ -273,8 +234,6 @@ func checkServices(ctx context.Context, ingestion httpclient.IngestionClient, in
 	return nil
 }
 
-// resolveCandidates returns the explicitly selected books plus, in discover mode, every
-// complete book of the datalake; the orchestrator skips the ones already indexed or failed.
 func resolveCandidates(ctx context.Context, config serviceConfig, ingestion httpclient.IngestionClient) ([]models.BookID, error) {
 	if !config.discover {
 		return config.bookIDs, nil
@@ -305,8 +264,6 @@ func buildOrchestrator(config serviceConfig, ingestion httpclient.IngestionClien
 	})
 }
 
-// logSummary prints the totals, the per-step coordination cost and the indexing
-// throughput, the key metrics of the Stage 2 benchmarks.
 func logSummary(summary control.Summary, elapsed time.Duration) {
 	pipelineBooks := summary.Indexed + summary.Failed
 	slog.Info("[CONTROL] run finished",
@@ -323,7 +280,6 @@ func logSummary(summary control.Summary, elapsed time.Duration) {
 	)
 }
 
-// averageStepDuration spreads one step total over the books that entered the pipeline.
 func averageStepDuration(total time.Duration, books int) time.Duration {
 	if books == 0 {
 		return 0
@@ -331,7 +287,6 @@ func averageStepDuration(total time.Duration, books int) time.Duration {
 	return (total / time.Duration(books)).Round(time.Millisecond)
 }
 
-// envOr reads an environment variable or falls back to a default value.
 func envOr(key string, fallback string) string {
 	if value := os.Getenv(key); value != "" {
 		return value

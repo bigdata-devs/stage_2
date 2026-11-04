@@ -13,16 +13,12 @@ import (
 	"boogle-engine/internal/models"
 )
 
-// benchmarkBook is one real book of the datalake, loaded once before the timer starts.
 type benchmarkBook struct {
 	ID     models.BookID
 	Header string
 	Body   string
 }
 
-// benchmarkBooks loads the books the Ingestion Service stored under datalake/, the same corpus the
-// end-to-end load benchmark indexes. BOOGLE_BENCH_DATALAKE points at another copy. Without a corpus
-// (a fresh clone or CI) the microbenchmarks skip instead of failing.
 func benchmarkBooks(b *testing.B) []benchmarkBook {
 	b.Helper()
 	root := os.Getenv("BOOGLE_BENCH_DATALAKE")
@@ -64,8 +60,6 @@ func loadBenchmarkBook(bodyPath string) (benchmarkBook, error) {
 	return benchmarkBook{ID: models.BookID(id), Header: string(header), Body: string(body)}, nil
 }
 
-// cycle runs operation once per iteration, cycling through count positions with one cursor per
-// goroutine, so the -cpu measurements do not contend on shared state.
 func cycle(b *testing.B, count int, operation func(position int)) {
 	b.Helper()
 	b.ReportAllocs()
@@ -79,7 +73,6 @@ func cycle(b *testing.B, count int, operation func(position int)) {
 	})
 }
 
-// averageSize sizes the corpus so SetBytes reports the throughput of the average item.
 func averageSize(sizes []int) int64 {
 	total := 0
 	for _, size := range sizes {
@@ -130,9 +123,6 @@ func BenchmarkSplitBookText(b *testing.B) {
 	})
 }
 
-// gutenbergText rebuilds the raw plain-text layout the Ingestion Service downloads, because the
-// datalake keeps the header and body already split. Splitting it again measures the marker scan
-// and whitespace trimming over real book sizes.
 func gutenbergText(book benchmarkBook) string {
 	const licenceFooter = "\n\nProduced by an anonymous volunteer.\n"
 	return book.Header + "\n\n" +

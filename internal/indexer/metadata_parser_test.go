@@ -7,7 +7,6 @@ import (
 	"boogle-engine/internal/models"
 )
 
-// The fixture and cases mirror tests/test_datamarts/test_header_parser.py from Stage 1.
 const gutenbergHeader = "The Project Gutenberg eBook of Pride and Prejudice\r\r\n" +
 	"    \r\r\n" +
 	"This eBook is for the use of anyone anywhere in the United States and\r\r\n" +

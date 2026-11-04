@@ -7,9 +7,6 @@ import (
 	"boogle-engine/internal/models"
 )
 
-// These tests exercise a live server. They skip automatically when none is reachable, so the
-// suite stays green on machines without MongoDB (the same policy as the Stage 1 Python tests).
-
 func TestPostingsForTermsReturnsMatchingTermsOrderedByTerm(t *testing.T) {
 	client := liveClient(t)
 	resetDatamart(t, client)

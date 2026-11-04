@@ -1,6 +1,3 @@
-// Package control implements the Control Module of Boogle Engine: the process that
-// orchestrates the Ingestion and Indexing Services over HTTP and records pipeline
-// progress so a restart resumes exactly where the previous run stopped.
 package control
 
 import (
@@ -13,12 +10,6 @@ import (
 	"boogle-engine/internal/models"
 )
 
-// ControlState is the durable record of pipeline progress: which books were downloaded,
-// which ones were indexed, and why the rest failed. It is backed by append-only text
-// files under one directory — downloaded_books.txt and indexed_books.txt hold one book
-// ID per line, failed_books.txt holds "<book_id>\t<reason>" — with every append
-// protected by flock. The Control Module is the only writer of those files. Methods are
-// safe for concurrent use by several goroutines.
 type ControlState struct {
 	mutex      sync.RWMutex
 	directory  string
@@ -27,9 +18,6 @@ type ControlState struct {
 	failed     map[models.BookID]string
 }
 
-// LoadState rebuilds the sets from the control directory. A missing directory or file
-// means "nothing recorded yet". Malformed lines are skipped: replaying an idempotent
-// service call is safe, losing an id would not be.
 func LoadState(directory string) (*ControlState, error) {
 	if err := os.MkdirAll(directory, directoryPermissions); err != nil {
 		return nil, fmt.Errorf("create control directory: %w", err)
@@ -54,8 +42,6 @@ func LoadState(directory string) (*ControlState, error) {
 	}, nil
 }
 
-// RecordDownloaded marks a book as stored in the datalake. Repeating the call for the
-// same book appends nothing.
 func (state *ControlState) RecordDownloaded(bookID models.BookID) error {
 	state.mutex.Lock()
 	defer state.mutex.Unlock()
@@ -70,8 +56,6 @@ func (state *ControlState) RecordDownloaded(bookID models.BookID) error {
 	return nil
 }
 
-// RecordIndexed marks a book as processed by the Indexing Service. Repeating the call
-// for the same book appends nothing.
 func (state *ControlState) RecordIndexed(bookID models.BookID) error {
 	state.mutex.Lock()
 	defer state.mutex.Unlock()
@@ -86,8 +70,6 @@ func (state *ControlState) RecordIndexed(bookID models.BookID) error {
 	return nil
 }
 
-// RecordFailed stores why a book left the pipeline. The first recorded reason wins;
-// repeating the call for the same book appends nothing.
 func (state *ControlState) RecordFailed(bookID models.BookID, reason string) error {
 	state.mutex.Lock()
 	defer state.mutex.Unlock()
@@ -103,7 +85,6 @@ func (state *ControlState) RecordFailed(bookID models.BookID, reason string) err
 	return nil
 }
 
-// IsDownloaded reports whether a book was ever recorded as stored in the datalake.
 func (state *ControlState) IsDownloaded(bookID models.BookID) bool {
 	state.mutex.RLock()
 	defer state.mutex.RUnlock()
@@ -111,7 +92,6 @@ func (state *ControlState) IsDownloaded(bookID models.BookID) bool {
 	return recorded
 }
 
-// IsIndexed reports whether a book was ever recorded as fully indexed.
 func (state *ControlState) IsIndexed(bookID models.BookID) bool {
 	state.mutex.RLock()
 	defer state.mutex.RUnlock()
@@ -119,7 +99,6 @@ func (state *ControlState) IsIndexed(bookID models.BookID) bool {
 	return recorded
 }
 
-// FailureReason returns the recorded failure reason of a book, if any.
 func (state *ControlState) FailureReason(bookID models.BookID) (string, bool) {
 	state.mutex.RLock()
 	defer state.mutex.RUnlock()
@@ -127,28 +106,24 @@ func (state *ControlState) FailureReason(bookID models.BookID) (string, bool) {
 	return reason, recorded
 }
 
-// DownloadedCount returns how many distinct books were recorded as downloaded.
 func (state *ControlState) DownloadedCount() int {
 	state.mutex.RLock()
 	defer state.mutex.RUnlock()
 	return len(state.downloaded)
 }
 
-// IndexedCount returns how many distinct books were recorded as indexed.
 func (state *ControlState) IndexedCount() int {
 	state.mutex.RLock()
 	defer state.mutex.RUnlock()
 	return len(state.indexed)
 }
 
-// FailedCount returns how many distinct books were recorded as failed.
 func (state *ControlState) FailedCount() int {
 	state.mutex.RLock()
 	defer state.mutex.RUnlock()
 	return len(state.failed)
 }
 
-// IndexedIDs returns a sorted copy of every book ID recorded as indexed.
 func (state *ControlState) IndexedIDs() []models.BookID {
 	state.mutex.RLock()
 	defer state.mutex.RUnlock()
@@ -160,10 +135,6 @@ func (state *ControlState) IndexedIDs() []models.BookID {
 	return ids
 }
 
-// WipeFailures atomically empties failed_books.txt and clears the in-memory failed
-// set, returning the IDs that were cleared so the caller can re-enqueue them. It
-// is the backing call of the -retry-failed flag: a crash during the wipe leaves
-// either the old content or an empty file, never a half-written one.
 func (state *ControlState) WipeFailures() ([]models.BookID, error) {
 	state.mutex.Lock()
 	defer state.mutex.Unlock()
