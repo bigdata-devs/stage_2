@@ -2,31 +2,41 @@
 
 **Owner:** Member 4 (MongoDB & datamarts) · **Audience:** Member 3 (Indexing Service), Member 5 (Search Service), and anyone wiring the services together.
 
-This document hands over `internal/mongodb` — the datamart storage of Boogle Engine — and the two small adapter files that connect it to the existing services. Every code block below was compiled and exercised end-to-end against a live MongoDB 7 container at the time of writing (see [Verification](#verification)); paste it as-is and the HTTP contracts do not change.
+This document describes `internal/mongodb`, the datamart storage of Boogle Engine. In the hexagonal layout of the module ([architecture.md](architecture.md#code-structure-hexagonal-layout)) it is a **driven adapter**: it implements the storage ports declared by the indexing and search cores, and it is the only package that imports the MongoDB driver. The document started as the handoff of the datamart to the service owners; it now describes the code as it stands after the hexagonal refactor, and the [History](#history) section records what changed.
 
-## Why this handoff exists
+## Why the datamart exists
 
 Stage 2 moves the Stage 1 datamarts into the service architecture:
 
 - §2 of the assignment: the Indexing Service must *"store optimized structures in the datamarts"*.
 - §3.2.2: `POST /index/update/{book_id}` must *"update both metadata tables and the inverted index **stored in the datamart**"*.
 
-At handoff `cmd/indexing` ran `indexer.PublishedIndex`, an **in-memory** index: the Search Service is a different process and cannot see a single posting it holds. That type was removed after the review, once the datamart bridge replaced it. The datamart closes that gap — it is the shared store both services speak to:
+At handoff `cmd/indexing` ran `indexer.PublishedIndex`, an **in-memory** index: the Search Service is a different process and cannot see a single posting it holds. That type was removed after the review, once the datamart replaced it. The datamart closes that gap — it is the shared store both services speak to:
 
 ```
-                 writes (idempotent, 3-step)                    reads (one aggregation)
+                 writes (idempotent, 4-step)                    reads (one aggregation)
   datalake ──► [Indexing Service] ──► MongoDB datamart ◄── [Search Service] ──► GET /search
-                 BookIndex bridge                           DatamartEngine bridge
+           indexing.Service → IndexWriter            search.Service → Index
 ```
 
-The HTTP layer of both services already depends on small interfaces (`api.BookIndex`, `api.SearchEngine`). The bridges below implement those interfaces over `internal/mongodb`; no handler code changes.
+Neither service talks to the driver directly. Each core declares the operations it needs as ports, and `internal/mongodb` implements them:
+
+| Core | Port | Implemented by |
+|---|---|---|
+| `internal/indexing` | `IndexWriter` (write one book, rebuild from a `NextBook` stream) | `mongodb.BookIndexer` |
+| `internal/indexing` | `RebuildLocker` / `RebuildLease` | `mongodb.RebuildLocker` |
+| `internal/indexing` | `IndexMetrics` (published-book count, data size) | `mongodb.DatamartReader` |
+| `internal/search` | `Index` (one ranked, filtered page) | `mongodb.SearchIndex` |
+| `internal/search` | `CatalogStore` (one published book, raw filter values) | `mongodb.DatamartReader` |
+
+The assertions in `indexing_ports.go` and `search_ports.go` make the build fail if an adapter stops satisfying its port. The HTTP handlers and the cores never import `internal/mongodb`; only the composition roots `cmd/indexing` and `cmd/search` do.
 
 ## Configuration
 
 | Environment variable | Default | Meaning |
 |---|---|---|
 | `MONGO_URI` | `mongodb://localhost:27017` | Connection string of the datamart server |
-| `MONGO_DATABASE` | `boogle` | Database holding the two collections |
+| `MONGO_DATABASE` | `boogle` | Database holding the datamart collections |
 
 Nothing else is configured in code; ports and datalake paths keep using the existing flags. For local development:
 
@@ -50,17 +60,18 @@ The book `_id` doubles as the uniqueness constraint, so re-indexing the same boo
 
 ## Package tour — `internal/mongodb`
 
-| Symbol | Contract |
-|---|---|
-| `ConfigFromEnvironment()`, `Connect`, `Client`, `Client.Close` | Pool of connections; one `Client` per process is enough (safe for concurrent use). |
-| `Client.EnsureIndexes(ctx)` | Creates the filter indexes; call once per start-up. |
-| `NewBookIndexer(client).IndexBook(ctx, models.IndexBookInput{Metadata, Tokens})` | Writes one book in four ordered steps — mark `pending`, drop the previous version's postings, upsert the current postings with tf computed internally, mark `published`. Idempotent and concurrency-safe; a crash mid-way leaves the book invisible, never half-indexed. |
-| `BookIndexer.Rebuild(ctx, mongodb.NextBook)` | Pulls one book at a time from the caller's stream, writes both collections aside (`*_rebuild`), creates their indexes, then atomically renames them into place. Search keeps reading the previous complete datamart until the swap, and memory holds one book, not the whole datalake. |
-| `Client.AcquireRebuildLock(ctx)` | Claims the cluster-wide rebuild lease (`locks` collection); returns `ErrRebuildLocked` while another replica holds it, takes over an expired lease, renews it in the background and deletes it on `Release`. |
-| `NewDatamartReader(client).PostingsForTerms(ctx, terms)` | Raw posting lists for the normalized terms present in the index, ordered by term. |
-| `DatamartReader.BooksByID(ctx, ids)` | Metadata for the given IDs ordered by book ID; absent books are omitted. |
-| `DatamartReader.SearchBooks(ctx, mongodb.SearchRequest)` | The search query — see below. |
-| `DatamartReader.PublishedBook(ctx, bookID)`, `DatamartReader.FilterOptions(ctx)` (file `catalog_reader.go`) | The catalog endpoints: one published book's metadata and the distinct language/publication-year filter values, both computed from `status = published` books only, so an unknown or still-pending book stays invisible to readers exactly like in search results. |
+| Symbol | Port | Contract |
+|---|---|---|
+| `ConfigFromEnvironment()`, `Connect`, `Client`, `Client.Close` | — | Pool of connections; one `Client` per process is enough (safe for concurrent use). |
+| `Client.EnsureIndexes(ctx)` | — | Creates the filter indexes; call once per start-up. |
+| `NewBookIndexer(client).IndexBook(ctx, models.IndexBookInput{Metadata, Tokens})` | `indexing.IndexWriter` | Writes one book in four ordered steps — mark `pending`, drop the previous version's postings, upsert the current postings with tf computed internally, mark `published`. Idempotent and concurrency-safe; a crash mid-way leaves the book invisible, never half-indexed. |
+| `BookIndexer.Rebuild(ctx, indexing.NextBook)` | `indexing.IndexWriter` | Pulls one book at a time from the caller's stream, writes both collections aside (`*_rebuild`), creates their indexes, then atomically renames them into place and returns the number of books processed. Search keeps reading the previous complete datamart until the swap, and memory holds one book, not the whole datalake. |
+| `Client.AcquireRebuildLock(ctx)` | — | Claims the cluster-wide rebuild lease (`locks` collection); returns `ErrRebuildLocked` while another replica holds it, takes over an expired lease, renews it in the background and deletes it on `Release`. |
+| `NewRebuildLocker(client).AcquireRebuildLease(ctx)` | `indexing.RebuildLocker` | Wraps `AcquireRebuildLock` for the indexing core and translates `ErrRebuildLocked` into `indexing.ErrRebuildInProgress` (HTTP 409). |
+| `NewDatamartReader(client).CountPublishedBooks(ctx)`, `DatamartReader.DataSizeBytes(ctx)` (file `index_metrics.go`) | `indexing.IndexMetrics` | Number of `published` books, and the `dataSize` reported by `dbStats`. Errors are returned; `indexing.Service.Stats` turns them into zeros and a log line so `GET /index/status` always answers. |
+| `DatamartReader.SearchBooks(ctx, mongodb.SearchRequest)` | — | The search query — see below. |
+| `NewSearchIndex(reader).Search(ctx, search.Query)` | `search.Index` | Maps the core's `search.Query` onto a `SearchRequest` and the result onto a `search.Page`. |
+| `DatamartReader.PublishedBook(ctx, bookID)`, `DatamartReader.DistinctFilterValues(ctx)` (file `catalog_reader.go`) | `search.CatalogStore` | One published book's metadata, and the raw distinct `language` lists and `publication_year` values, both computed from `status = published` books only, so an unknown or still-pending book stays invisible to readers exactly like in search results. Turning the raw values into the `GET /search/filters` answer (language codes without the `Unknown` placeholder, years within the range `GET /search` accepts, de-duplicated and sorted) is a rule of `search.CatalogService.FilterOptions`, not of the adapter. |
 
 ### `SearchRequest` semantics
 
@@ -80,371 +91,80 @@ type SearchRequest struct {
 - **Ordering:** descending sum of the terms' `tf` in the book (plain `tf` for one term), ties broken by ascending `book_id` — exactly the ranking `GET /search` documents.
 - **`Total`** counts every match across pages; `Books` holds one page and is never nil.
 - **Visibility:** `pending` books are excluded from the page *and* from `Total`.
-- **Errors:** invalid input returns `ErrInvalidSearchRequest` (wraps a message); storage failures wrap with context. Nothing else is normalized — feeding raw user input is the caller's mistake (the Search API handler splits `q` with `indexer.Tokenize` and `indexer.Normalize`).
+- **Errors:** invalid input returns `ErrInvalidSearchRequest` (wraps a message); storage failures wrap with context. Nothing else is normalized — feeding raw user input is the caller's mistake (the search core, `internal/search`, splits `q` with `indexer.Tokenize` and `indexer.Normalize` before calling the `search.Index` port).
 
-## Bridge A — Indexing Service (implements `api.BookIndex`)
+**Why evaluation lives in the aggregation (a deliberate push-down).** The search core decides what a query *means*: which terms, which filters, which page. Evaluating it — the AND intersection, the relevance score, the tie-break, the visibility rule, the filters, the total and the page — is left to this one aggregation on purpose, as a performance choice and not as a leak of business rules into the adapter. Run on the server, a query costs one round trip and returns one page of metadata; run in Go, it would have to stream every posting of every query term to the Search replica on each request, and the posting list of a common term spans most of the corpus. Intersecting before the `$lookup` also keeps the join proportional to the matches rather than to the postings. The price is that these rules are part of the `search.Index` contract: they are documented in this section and pinned by the live tests in `search_reader_test.go`, and any other `search.Index` adapter must reproduce them.
 
-**File: `cmd/indexing/datamart_index.go`** (committed bridge, whole package `main`). The listing
-below mirrors that file; when the bridge changes, update this listing in the same commit.
+## Indexing Service — use case in `internal/indexing`, storage in `internal/mongodb`
 
-```go
-package main
-
-import (
-	"context"
-	"errors"
-	"fmt"
-	"log/slog"
-	"sync"
-	"sync/atomic"
-	"time"
-
-	"go.mongodb.org/mongo-driver/v2/bson"
-
-	"boogle-engine/internal/indexer"
-	"boogle-engine/internal/models"
-	"boogle-engine/internal/mongodb"
-)
-
-// statsTimeout bounds the datamart round trips of Stats, whose interface carries no context.
-const statsTimeout = 5 * time.Second
-
-// DatamartIndex adapts the MongoDB datamart to the api.BookIndex contract of the Indexing API.
-// One update reads one datalake book and writes it to the datamart; a rebuild streams the datalake
-// book by book into fresh collections aside and swaps them in, so search never observes a
-// half-built index. It is safe for concurrent use: a book indexed while a rebuild is under way is
-// recorded before its write and replayed on the fresh datamart afterwards, which is the promise
-// the OpenAPI specification makes for POST /index/update during a rebuild. Rebuilds are
-// serialized across every replica sharing the datamart by a lease in MongoDB; how many updates
-// run at once is bounded by the HTTP handler that drives this adapter.
-type DatamartIndex struct {
-	source       indexer.BookSource
-	writer       mongodb.BookIndexer
-	client       mongodb.Client
-	pendingMutex sync.Mutex
-	pending      []models.BookID
-	rebuilding   atomic.Bool
-	lastUpdate   atomic.Int64
-}
-
-// NewDatamartIndex wires the adapter to the datalake it indexes from and the connected datamart
-// it writes to. The datamart keeps its contents across restarts, so only the start-up timestamp
-// starts fresh.
-func NewDatamartIndex(source indexer.BookSource, client mongodb.Client) *DatamartIndex {
-	adapted := &DatamartIndex{
-		source:  source,
-		writer:  mongodb.NewBookIndexer(client),
-		client:  client,
-		pending: []models.BookID{},
-	}
-	adapted.markUpdated()
-	return adapted
-}
-
-// IndexBook reads one book from the datalake and stores its metadata and body terms in the
-// datamart. The rebuild flag is read before the write on purpose: a swap can then never overtake
-// a book already flagged for replay, so an update concurrent with a rebuild is never lost. The
-// request context bounds the datamart writes, so a caller that disconnects cancels its own
-// update instead of leaving work behind.
-func (index *DatamartIndex) IndexBook(ctx context.Context, bookID models.BookID) error {
-	book, err := index.source.ReadBook(bookID)
-	if err != nil {
-		return fmt.Errorf("read book %d: %w", bookID, err)
-	}
-	input := models.IndexBookInput{
-		Metadata: indexer.ExtractMetadata(book.ID, book.Header),
-		Tokens:   indexer.ProcessText(book.Body),
-	}
-	if index.rebuilding.Load() {
-		index.recordPending(bookID)
-	}
-	if err := index.writer.IndexBook(ctx, input); err != nil {
-		return fmt.Errorf("index book %d in datamart: %w", bookID, err)
-	}
-	index.markUpdated()
-	return nil
-}
-
-// Rebuild reads every complete book of the datalake and swaps the freshly built collections into
-// the datamart in one step. Only one rebuild runs at a time across the replicas that share the
-// datamart: the request first claims the rebuild lease, and a request that finds it taken
-// receives indexer.ErrRebuildInProgress, which the handler maps to 409. Books recorded during the
-// rebuild are replayed after the swap; a failure of that replay fails the rebuild so the caller
-// retries. The lease is held until the replay finishes, so no other replica can swap a datamart
-// while this one still has books to replay.
-func (index *DatamartIndex) Rebuild(ctx context.Context) (indexer.RebuildReport, error) {
-	lock, err := index.client.AcquireRebuildLock(ctx)
-	if errors.Is(err, mongodb.ErrRebuildLocked) {
-		return indexer.RebuildReport{}, indexer.ErrRebuildInProgress
-	}
-	if err != nil {
-		return indexer.RebuildReport{}, fmt.Errorf("claim rebuild lock: %w", err)
-	}
-	defer func() {
-		if releaseErr := lock.Release(); releaseErr != nil {
-			slog.Error("[INDEXING] release rebuild lock", "error", releaseErr)
-		}
-	}()
-	if !index.rebuilding.CompareAndSwap(false, true) {
-		return indexer.RebuildReport{}, indexer.ErrRebuildInProgress
-	}
-	startedAt := time.Now()
-	processed, err := index.buildFreshDatamart(ctx)
-	pending := index.finishRebuild()
-	if err != nil {
-		return indexer.RebuildReport{}, err
-	}
-	if err := index.replayPending(ctx, pending); err != nil {
-		return indexer.RebuildReport{}, err
-	}
-	index.markUpdated()
-	return indexer.RebuildReport{BooksProcessed: processed, Elapsed: time.Since(startedAt)}, nil
-}
-
-// Stats reports how many books the datamart publishes, when this process last changed them and
-// how many document bytes the datamart holds. A failed round trip reports zero instead of
-// failing: GET /index/status must answer even when a measurement is unavailable.
-func (index *DatamartIndex) Stats() indexer.IndexStats {
-	ctx, cancel := context.WithTimeout(context.Background(), statsTimeout)
-	defer cancel()
-	return indexer.IndexStats{
-		BooksIndexed: index.countPublishedBooks(ctx),
-		LastUpdate:   time.Unix(0, index.lastUpdate.Load()).UTC(),
-		SizeBytes:    index.datamartBytes(ctx),
-	}
-}
-
-func (index *DatamartIndex) buildFreshDatamart(ctx context.Context) (int, error) {
-	bookIDs, err := index.source.ListBookIDs()
-	if err != nil {
-		return 0, fmt.Errorf("list datalake books: %w", err)
-	}
-	result, err := index.writer.Rebuild(ctx, index.nextBook(bookIDs))
-	if err != nil {
-		return 0, fmt.Errorf("rebuild datamart: %w", err)
-	}
-	return result.BooksProcessed, nil
-}
-
-// nextBook reads and tokenizes one book per call, so a rebuild holds a single book in memory at a
-// time however large the datalake grows.
-func (index *DatamartIndex) nextBook(bookIDs []models.BookID) mongodb.NextBook {
-	position := 0
-	return func(ctx context.Context) (models.IndexBookInput, bool, error) {
-		if err := ctx.Err(); err != nil {
-			return models.IndexBookInput{}, false, err
-		}
-		if position >= len(bookIDs) {
-			return models.IndexBookInput{}, false, nil
-		}
-		bookID := bookIDs[position]
-		position++
-		book, err := index.source.ReadBook(bookID)
-		if err != nil {
-			return models.IndexBookInput{}, false, fmt.Errorf("read book %d: %w", bookID, err)
-		}
-		return models.IndexBookInput{
-			Metadata: indexer.ExtractMetadata(book.ID, book.Header),
-			Tokens:   indexer.ProcessText(book.Body),
-		}, true, nil
-	}
-}
-
-// finishRebuild lifts the rebuild flag and returns the books recorded under it. It runs after
-// success and failure alike: without a swap the recorded books already sit in the live datamart,
-// so the caller simply drops them.
-func (index *DatamartIndex) finishRebuild() []models.BookID {
-	index.rebuilding.Store(false)
-	index.pendingMutex.Lock()
-	defer index.pendingMutex.Unlock()
-	pending := index.pending
-	index.pending = []models.BookID{}
-	return pending
-}
-
-func (index *DatamartIndex) recordPending(bookID models.BookID) {
-	index.pendingMutex.Lock()
-	defer index.pendingMutex.Unlock()
-	index.pending = append(index.pending, bookID)
-}
-
-func (index *DatamartIndex) replayPending(ctx context.Context, pending []models.BookID) error {
-	for _, bookID := range pending {
-		if err := index.IndexBook(ctx, bookID); err != nil {
-			return fmt.Errorf("replay book %d after rebuild: %w", bookID, err)
-		}
-	}
-	return nil
-}
-
-func (index *DatamartIndex) countPublishedBooks(ctx context.Context) int {
-	count, err := index.client.Database().Collection(mongodb.BooksCollection).
-		CountDocuments(ctx, bson.D{{Key: "status", Value: mongodb.StatusPublished}})
-	if err != nil {
-		slog.Warn("[INDEXING] count published books", "error", err)
-		return 0
-	}
-	return int(count)
-}
-
-func (index *DatamartIndex) datamartBytes(ctx context.Context) uint64 {
-	var stats struct {
-		DataSize int64 `bson:"dataSize"`
-	}
-	command := bson.D{{Key: "dbStats", Value: 1}}
-	if err := index.client.Database().RunCommand(ctx, command).Decode(&stats); err != nil {
-		slog.Warn("[INDEXING] measure datamart size", "error", err)
-		return 0
-	}
-	return uint64(max(stats.DataSize, 0))
-}
-
-func (index *DatamartIndex) markUpdated() {
-	index.lastUpdate.Store(time.Now().UnixNano())
-}
-```
+The indexing use case is `indexing.Service` (`internal/indexing/service.go`). It owns everything that is not MongoDB-specific: reading a book through the `BookSource` port, extracting metadata and terms with `internal/indexer`, claiming the rebuild lease, recording the updates that arrive during a rebuild and replaying them after the swap, and reporting statistics. The datamart only stores what the service hands it.
 
 ### Wiring — `cmd/indexing/main.go`
 
-The wiring is committed next to the bridge, and `main.go` is the source of truth. The datamart touches three places:
+The composition root is the source of truth. The datamart touches three places:
 
 - **`run`** calls `connectDatamart()` before building any handler, so a datamart that cannot be reached fails the start-up instead of accepting updates it cannot store.
 - **`connectDatamart`** opens the pool from `MONGO_URI` / `MONGO_DATABASE` and calls `Client.EnsureIndexes` once at start-up (idempotent); `closeDatamart` releases the pool on shutdown.
-- **`buildIndexingHandler`** adapts the datalake with `NewDatamartIndex(lake, client)` — and hands the adapter to `api.NewIndexingHandler(index, config.rebuildTimeout, config.maxConcurrentUpdates)`, whose constructor validates the cap and owns the slot queue that bounds `POST /index/update`.
-
-Flags: `-max-concurrent-updates` (default `8`) caps simultaneous `POST /index/update` requests; `-pprof` exposes `/debug/pprof/` on a separate port (empty disables it); `-rebuild-timeout` bounds both `POST /index/rebuild` and the HTTP write deadline. `-datalake` and `-batch-size` keep their Stage 1 meaning. The rebuild reads the datalake sequentially through `NextBook`, so the old `-workers` flag is gone.
-
-Notes:
-
-- The OpenAPI annotations and HTTP behavior are untouched; no `swag` regeneration is needed.
-- **Why record-before-write:** the rebuild flag is read *before* the datamart write. If a rebuild's swap lands between the flag check and the write, the book was already appended to the replay list and the replay runs after the swap — so an update concurrent with a rebuild cannot be dropped, which is what the `POST /index/update` annotation promises. Duplicates in the replay list are harmless: `IndexBook` is idempotent.
-- **Restart semantics:** the datamart persists, so after a service restart the books are still searchable. `POST /index/rebuild` remains necessary after tokenizer or metadata-parser changes (and the Control Module may still call it after start-up; it is idempotent).
-
-## Bridge B — Search Service (implements `api.SearchEngine`)
-
-**File: `cmd/search/datamart_engine.go`** (new file):
+- **`buildIndexingHandler`** opens the datalake, builds the core with its four ports and hands it to `indexingapi.NewIndexingHandler(service, config.rebuildTimeout, config.maxConcurrentUpdates)`, whose constructor validates the cap and owns the slot queue that bounds `POST /index/update`:
 
 ```go
-package main
-
-import (
-	"context"
-
-	"boogle-engine/internal/api"
-	"boogle-engine/internal/indexer"
-	"boogle-engine/internal/models"
-	"boogle-engine/internal/mongodb"
-)
-
-// DatamartEngine answers the Search API from the MongoDB datamart. It normalizes the keyword
-// with the same tokenizer the Indexing Service applies to book bodies and delegates ranking,
-// filters, pagination and the total count to one server-side aggregation. It is safe for
-// concurrent use: every request runs against a stateless reader.
-type DatamartEngine struct {
-	reader mongodb.DatamartReader
-}
-
-// NewDatamartEngine wires the search API to a connected datamart.
-func NewDatamartEngine(reader mongodb.DatamartReader) DatamartEngine {
-	return DatamartEngine{reader: reader}
-}
-
-// Search resolves query.Term to the stored form of the inverted index: tokenizer rules decide
-// it, so "Adventure!" searches "adventure". GET /search promises one keyword, so of several
-// tokens only the first is searched, and a keyword made only of stop words matches nothing
-// because those terms are never indexed. The handler has already trimmed, lower-cased and
-// bounded every field, so they pass straight through to the datamart request.
-func (engine DatamartEngine) Search(ctx context.Context, query api.SearchQuery) (api.SearchPage, error) {
-	tokens := indexer.ProcessText(query.Term)
-	if len(tokens) == 0 {
-		return api.SearchPage{Books: []models.BookMetadata{}}, nil
-	}
-	result, err := engine.reader.SearchBooks(ctx, mongodb.SearchRequest{
-		Term:     tokens[0],
-		Author:   query.Filters.Author,
-		Language: query.Filters.Language,
-		Year:     query.Filters.Year,
-		Offset:   query.Offset,
-		Limit:    query.Limit,
+func newIndexingService(lake datalake.Datalake, client mongodb.Client) (*indexing.Service, error) {
+	return indexing.NewService(indexing.Ports{
+		Source:  lake,
+		Writer:  mongodb.NewBookIndexer(client),
+		Locker:  mongodb.NewRebuildLocker(client),
+		Metrics: mongodb.NewDatamartReader(client),
 	})
-	if err != nil {
-		return api.SearchPage{}, err
-	}
-	return api.SearchPage{Total: result.Total, Books: result.Books}, nil
 }
 ```
 
+Flags: `-max-concurrent-updates` (default `8`) caps simultaneous `POST /index/update` requests; `-pprof` exposes `/debug/pprof/` on a separate port (empty disables it); `-rebuild-timeout` bounds both `POST /index/rebuild` and the HTTP write deadline. `-datalake` and `-batch-size` keep their Stage 1 meaning. The rebuild reads the datalake sequentially through `NextBook`, so there is no `-workers` flag.
+
+Notes:
+
+- **Why record-before-write:** `indexing.Service.IndexBook` reads the rebuild flag *before* the datamart write. If a rebuild's swap lands between the flag check and the write, the book was already appended to the replay list and the replay runs after the swap — so an update concurrent with a rebuild cannot be dropped, which is what the `POST /index/update` annotation promises. Duplicates in the replay list are harmless: `BookIndexer.IndexBook` is idempotent.
+- **Restart semantics:** the datamart persists, so after a service restart the books are still searchable. `POST /index/rebuild` remains necessary after tokenizer or metadata-parser changes (and the Control Module may still call it after start-up; it is idempotent).
+- **Tests:** `internal/indexing/service_test.go` exercises the rebuild lease, replay and statistics with in-memory fakes of the four ports; `cmd/indexing/indexing_service_test.go` runs the wired service against a live datamart and skips when none is reachable.
+
+## Search Service — use case in `internal/search`, query in `internal/mongodb`
+
+The search use case is `search.Service` (`internal/search`). It trims and validates the request, splits `q` into at most 10 distinct terms with the indexer's tokenizer, applies the paging and year rules, lower-cases the language filter, and answers an empty page without touching the datamart when every word of `q` is one the index never stores. Only then does it call the `search.Index` port, which `mongodb.SearchIndex` implements with one `SearchBooks` aggregation.
+
 ### Field-by-field mapping
 
-| `api.SearchQuery` (validated by the handler) | `mongodb.SearchRequest` | Note |
+| `search.Query` (built by the search core) | `mongodb.SearchRequest` | Note |
 |---|---|---|
-| `Terms` (1–10 distinct terms the handler derived from `q`) | `Terms` | The handler splits `q` with the indexer's tokenizer, the single source of truth for what a term is; the datamart matches each verbatim and requires all of them. `Term` (raw `q`, trimmed) is only echoed in the response. |
+| `Terms` (1–10 distinct terms derived from `q`) | `Terms` | The core splits `q` with the indexer's tokenizer, the single source of truth for what a term is; the datamart matches each verbatim and requires all of them. `Text` (raw `q`, trimmed) is only echoed in the response. |
 | `Filters.Author` (trimmed) | `Author` | Substring, case-insensitive, inside the aggregation. |
-| `Filters.Language` (lower-cased by handler) | `Language` | Matched against each code of the stored comma list. |
+| `Filters.Language` (trimmed, lower-cased) | `Language` | Matched against each code of the stored comma list. |
 | `Filters.Year` (1…9999 or 0) | `Year` | Exact match; 0 means no filter. |
 | `Offset`, `Limit` (1…100) | `Offset`, `Limit` | Passed through; the reader re-validates defensively. |
 
 ### Wiring — `cmd/search/main.go`
 
-1. **Imports:** add `"fmt"` and `"boogle-engine/internal/mongodb"`.
-2. **Replace `run`:**
+`run` connects to the datamart with its own `connectDatamart` / `closeDatamart` pair, equivalent to the Indexing Service's (its log lines carry no bracketed prefix), then shares one `DatamartReader` between the search and catalog use cases:
 
 ```go
-// run wires the service together and serves requests until Ctrl+C or SIGTERM.
-func run(arguments []string) error {
-	address, err := parseAddress(arguments)
-	if err != nil {
-		return err
-	}
-	client, err := connectDatamart()
-	if err != nil {
-		return err
-	}
-	defer closeDatamart(client)
-	searchHandler, err := api.NewSearchHandler(NewDatamartEngine(mongodb.NewDatamartReader(client)))
-	if err != nil {
-		return err
-	}
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
-	return serve(ctx, newServer(address, newRouter(searchHandler)))
+reader := mongodb.NewDatamartReader(client)
+searchHandler, err := buildSearchHandler(mongodb.NewSearchIndex(reader))
+if err != nil {
+	return err
+}
+catalogHandler, err := buildCatalogHandler(reader)
+if err != nil {
+	return err
 }
 ```
 
-3. **Add the same two helpers** as the Indexing Service with the `[SEARCH]` log prefix dropped (this service logs without the bracketed prefix):
+`buildSearchHandler` wraps the index in `search.NewService` and hands it to `searchapi.NewSearchHandler`; `buildCatalogHandler` (`cmd/search/catalog.go`) does the same with `search.NewCatalogService` and `searchapi.NewCatalogHandler`. The CORS policy of `searchapi` wraps the router.
 
-```go
-// connectDatamart opens the MongoDB pool described by MONGO_URI and MONGO_DATABASE and creates
-// the query indexes once; both are idempotent, so every start-up may call them.
-func connectDatamart() (mongodb.Client, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), mongodb.DefaultConnectTimeout)
-	defer cancel()
-	client, err := mongodb.Connect(ctx, mongodb.ConfigFromEnvironment(), mongodb.DefaultConnectTimeout)
-	if err != nil {
-		return mongodb.Client{}, err
-	}
-	if err := client.EnsureIndexes(ctx); err != nil {
-		if closeErr := client.Close(context.Background()); closeErr != nil {
-			slog.Error("close datamart after failed index setup", "error", closeErr)
-		}
-		return mongodb.Client{}, fmt.Errorf("ensure datamart indexes: %w", err)
-	}
-	return client, nil
-}
+Tests: `SearchIndex` depends on the unexported one-method `booksSearcher` interface (satisfied by `DatamartReader`), so `search_index_test.go` unit-tests the mapping without a server; `cmd/search/search_integration_test.go` exercises the wired service against a live datamart and skips when none is reachable. The handler tests use `StubIndex` from `internal/api/searchapi/stub_index_test.go`, an in-memory `search.Index` that exists only in test builds and cannot be compiled into a service binary.
 
-// closeDatamart releases the MongoDB pool when the service shuts down.
-func closeDatamart(client mongodb.Client) {
-	if err := client.Close(context.Background()); err != nil {
-		slog.Error("close datamart", "error", err)
-	}
-}
-```
+## History
 
-4. Optionally update the command's package doc comment (it still says "Until the MongoDB datamart is ready…").
-
-**Status (30 Oct 2026):** landed. `cmd/search/datamart_engine.go` is committed and `run` wires it, sharing one `DatamartReader` with the catalog endpoints. The engine depends on a one-method `bookSearcher` interface (satisfied by `mongodb.DatamartReader`) so `cmd/search/datamart_engine_test.go` can unit-test it without a server; `datamart_engine_integration_test.go` exercises it against a live datamart and skips when none is reachable. `api.StubEngine` now lives in `internal/api/stub_engine_test.go`, so it exists only for the handler tests and cannot be compiled into a service binary.
-
-**Update (31 Oct 2026): multi-word `q`.** `GET /search` now treats `q` as the AND of its words. The handler splits `q` with the indexer's tokenizer into at most 10 distinct terms (stop words, single letters and Roman numerals dropped), answers 400 `invalid_parameter` when `q` has no word or more than 10 distinct terms, and answers 200 with an empty page without querying the datamart when every word is one the index never stores. The engine passes `Terms` straight to `SearchRequest.Terms`. The Bridge B code block above is the original single-keyword handoff (`ProcessText(Term)[0]`); `cmd/search/datamart_engine.go` holds the current code.
+- **Handoff (October 2026).** The datamart reached the services through two bridge files in the composition roots: `cmd/indexing/datamart_index.go` (`DatamartIndex`, implementing `api.BookIndex`) and `cmd/search/datamart_engine.go` (`DatamartEngine`, implementing `api.SearchEngine`). The search stub lived in `internal/api/stub_engine_test.go`.
+- **Multi-word `q` (31 Oct 2026).** `GET /search` treats `q` as the AND of its words: at most 10 distinct terms (stop words, single letters and Roman numerals dropped), `400 invalid_parameter` when `q` has no word or more than 10 distinct terms, and `200` with an empty page, without querying the datamart, when every word is one the index never stores. `SearchRequest.Term` became `SearchRequest.Terms`.
+- **Hexagonal refactor (Nov 2026).** The bridges were dissolved. Their use-case logic moved into the cores (`indexing.Service`: rebuild lease, replay, statistics; `search.Service` and `search.CatalogService`: query rules and filter-value rule) and their MongoDB-specific parts into this package (`RebuildLocker`, `CountPublishedBooks`, `DataSizeBytes`, `SearchIndex`, `DistinctFilterValues`). The unused `PostingsForTerms` and `BooksByID` readers were removed; `BenchmarkPostingsForTerms` keeps measuring the posting fetch through a test-only helper. Stored documents and HTTP responses did not change.
 
 ## Operational semantics at a glance
 
@@ -457,8 +177,8 @@ func closeDatamart(client mongodb.Client) {
 | Concurrent rebuild | One at a time across replicas (`locks` lease, renewed every 30 s and expiring 2 min after a crash; `ErrRebuildInProgress` → HTTP 409); updates during a rebuild are recorded by the rebuilding process and replayed after the swap. A deployment with several replicas should route updates to the rebuild owner, or retry them after the 200, because the replay bookkeeping is per process. |
 | Update concurrency | The `POST /index/update` handler owns a queue of `-max-concurrent-updates` slots (8 by default): a request waits for a free slot and passes the request context down to the datamart writes, so a caller that disconnects while queued never reaches the index and one that disconnects mid-write cancels its own update. |
 | Year filter | `publication_year` is the original publication year, or the Gutenberg release year when the header has no original date; both are 0 only when neither is readable, and search ignores books with year 0. |
-| Concurrency | One `Client` per process; `BookIndexer` and `DatamartReader` hold no mutable state, so handlers and workers share them freely. |
-| Failure of the datamart | Writers return wrapped errors (→ HTTP 500 with the documented JSON body); `Stats` reports zeros and logs instead of failing `GET /index/status`. |
+| Concurrency | One `Client` per process; `BookIndexer`, `RebuildLocker`, `DatamartReader` and `SearchIndex` hold no mutable state, so handlers and workers share them freely. The only mutable indexing state (rebuild flag, replay list, last-update time) lives in `indexing.Service`. |
+| Failure of the datamart | Writers return wrapped errors (→ HTTP 500 with the documented JSON body); `IndexMetrics` errors are turned into zeros and a log line by `indexing.Service.Stats` instead of failing `GET /index/status`. |
 | Stage 3 readiness | Every address/name comes from `MONGO_URI`/`MONGO_DATABASE`; no local path or port is hard-coded in the package. |
 
 ## Stage 3 layout proposal
@@ -490,7 +210,7 @@ go test -v ./internal/mongodb/
 
 Recorded at handoff: 34 tests passing against `mongo:7` and none skipped — 14 write-path/connection/config/rebuild plus 16 readers and search (with 4 invalid-request subtests), of the `internal/mongodb` package, plus `gofmt -l .`, `go vet ./...` and `go build ./...` clean over the whole repository.
 
-**End-to-end smoke of both bridges** (compiled into the real `cmd/` files, seeded datamart, service on `:7013`):
+**End-to-end smoke** (recorded at handoff, with the bridges of that time compiled into the `cmd/` files, seeded datamart, service on `:7013`; the refactor kept the HTTP responses unchanged):
 
 ```json
 GET /search?q=adventure
@@ -508,7 +228,7 @@ GET /search?q=the
 {"total":0,"results":[]}          // stop word: the tokenizer never indexes it, answered 200 with an empty page
 ```
 
-**Manual walkthrough** once both services run with the bridges:
+**Manual walkthrough** once both services run:
 
 ```bash
 curl -X POST http://localhost:7002/index/update/1342   # {"book_id":1342,"index":"updated"}
@@ -518,4 +238,4 @@ curl "http://localhost:7003/search?q=adventure&language=en&limit=5"
 
 ## Ownership
 
-`internal/mongodb` (package, tests, this document) is Member 4's deliverable and lives on `feature/mongodb-datamart`. The two bridge files belong to the services that host them — Member 3 owns `cmd/indexing`, Member 5 owns `cmd/search`. Both blocks above compile and ran against a live server as verified in [Verification](#verification); if a bridge is not picked up, Member 4 can land it unchanged, since the wiring requires no edit to any handler or OpenAPI annotation.
+`internal/mongodb` (package, tests, this document) is Member 4's deliverable; it was developed on `feature/mongodb-datamart`. The use cases that drive it belong to the cores of the services that host them — Member 3 owns `internal/indexing` and `cmd/indexing`, Member 5 owns `internal/search` and `cmd/search`. Because the cores reach the datamart only through their ports, a change inside `internal/mongodb` that keeps those ports and the stored document shapes needs no edit to any core, handler or OpenAPI annotation.

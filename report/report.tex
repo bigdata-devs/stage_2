@@ -1301,41 +1301,80 @@ counterpart:
   the structured \code{log/slog} logger.
 \end{itemize}
 
-\Cref{tab:layout} summarises the repository. The services share one skeleton:
-\code{main} parses flags and environment variables, builds the dependencies
-explicitly (constructor injection), mounts the handlers on a
-\code{ServeMux}, starts an \code{http.Server} whose read, header, write and idle
-timeouts are bounded, and shuts down gracefully on \code{SIGINT} or
-\code{SIGTERM} (30~s grace for Ingestion and Indexing, 10~s for Search). HTTP
-handlers depend on narrow interfaces (\code{BookIngester}, \code{BookIndex},
-\code{SearchEngine}), so the handler tests run against in-memory fakes that are
-never compiled into a service binary.
+\Cref{tab:layout} summarises the repository. The Go code follows a
+\textbf{hexagonal (ports and adapters) structure}. Each use case lives in a
+\emph{core} package (\code{internal/ingestion}, \code{internal/indexing},
+\code{internal/search}, \code{internal/control}) that declares, as Go
+interfaces, both the operations it offers and the operations it needs from
+outside. \emph{Adapters} connect the cores to a technology: the HTTP handlers
+call a core through its \emph{driving} ports (\code{BookIngester},
+\code{BookIndex}, \code{Searcher}), while MongoDB, the datalake, the Gutenberg
+client, the HTTP clients of the Control Module and the control-state files
+implement its \emph{driven} ports (for example \code{indexing.IndexWriter} or
+\code{search.Index}). Source dependencies point only into the core: no core
+package imports HTTP, MongoDB or filesystem code, and every adapter asserts at
+compile time the ports it implements. The use cases are therefore tested with
+in-memory fakes, and moving a store to Stage~3 infrastructure means writing a
+new adapter rather than changing a service. The services share one skeleton:
+\code{main}, the composition root, parses flags and environment variables,
+builds the adapters and injects them into the core constructors (constructor
+injection), mounts the handlers on a \code{ServeMux}, starts an
+\code{http.Server} whose read, header, write and idle timeouts are bounded, and
+shuts down gracefully on \code{SIGINT} or \code{SIGTERM} (30~s grace for
+Ingestion and Indexing, 10~s for Search). Test fakes live in \code{\_test.go}
+files and are never compiled into a service binary.
 
 \begin{table}[htbp]
   \centering
   \small
-  \caption{Repository layout (\url{\repourl}).}
+  \caption{Repository layout (\url{\repourl}), grouped by the role of each
+  package in the hexagonal structure.}
   \label{tab:layout}
-  \begin{tabularx}{\textwidth}{@{}>{\raggedright\arraybackslash}p{4.6cm}>{\raggedright\arraybackslash}X@{}}
+  \begin{tabularx}{\textwidth}{@{}>{\raggedright\arraybackslash}p{5.3cm}>{\raggedright\arraybackslash}X@{}}
     \toprule
     Path & Content \\
     \midrule
-    \code{cmd/ingestion}, \code{cmd/indexing}, \code{cmd/search}, \code{cmd/control}
-      & Entry points: configuration, wiring, HTTP server, graceful shutdown;
-      datamart adapters of Indexing and Search \\
-    \code{internal/api} & HTTP handlers, request validation, ingestion coalescer,
-      CORS middleware, JSON errors, OpenAPI annotations \\
-    \code{internal/crawler} & Gutenberg client, header/body splitter, ingester
-      with retries \\
-    \code{internal/datalake} & Batch layout, atomic file writes, listing of
-      complete books \\
+    \multicolumn{2}{@{}l}{\emph{Core: domain model and use cases (no HTTP, MongoDB or filesystem code)}} \\
+    \code{internal/models} & Domain types and the errors shared across
+      boundaries; no serialisation tags \\
     \code{internal/indexer} & Tokenizer and metadata parser shared by Indexing and
       Search \\
+    \code{internal/ingestion} & Ingestion use case: single-flight per book,
+      download slots and budget, retries of transient failures \\
+    \code{internal/indexing} & Indexing use case: one update, rebuild under the
+      lease with replay of concurrent updates, index statistics \\
+    \code{internal/search} & Search use case: query parsing (at most ten terms),
+      paging, year and filter rules; book catalog and filter values \\
+    \code{internal/control} & Orchestrator, book selector, verify, retry-failed,
+      readiness check and discovery \\
+    \addlinespace
+    \multicolumn{2}{@{}l}{\emph{Driving adapters (inbound HTTP)}} \\
+    \code{internal/api} & Shared HTTP kit: JSON error body, book-ID parsing,
+      error codes \\
+    \code{internal/api/ingestionapi} & Ingestion API: handlers, validation,
+      response types, OpenAPI annotations \\
+    \code{internal/api/indexingapi} & Indexing API: the same, plus the slot queue
+      that bounds concurrent index updates \\
+    \code{internal/api/searchapi} & Search API (search, book and filter routes):
+      the same, plus the CORS policy \\
+    \addlinespace
+    \multicolumn{2}{@{}l}{\emph{Driven adapters (outbound)}} \\
+    \code{internal/crawler} & Gutenberg client and header/body splitter \\
+    \code{internal/datalake} & Batch layout, atomic file writes, listing of
+      complete books \\
     \code{internal/mongodb} & Connection, schema and indexes, write path,
-      readers and search aggregation, rebuild and rebuild lease \\
-    \code{internal/control} & Orchestrator, book selector, control state, HTTP
-      clients of the internal APIs \\
-    \code{api/} & Generated OpenAPI~2.0 specifications of the three services \\
+      rebuild and rebuild lease, readers and the search aggregation \\
+    \code{internal/control/httpclient} & HTTP clients of the three service APIs
+      used by the Control Module \\
+    \code{internal/localstate} & \code{flock}-protected control-state files \\
+    \addlinespace
+    \multicolumn{2}{@{}l}{\emph{Composition roots, specifications, deployment and tooling}} \\
+    \code{cmd/ingestion}, \code{cmd/indexing}, \code{cmd/search},
+      \code{cmd/control} & Configuration, wiring of the adapters into the cores,
+      HTTP server and graceful shutdown; command-line interface of the Control
+      Module \\
+    \code{api/ingestion}, \code{api/indexing}, \code{api/search} & Generated
+      OpenAPI~2.0 specifications of the three services \\
     \code{deploy/nginx}, \code{docker-compose*.yml}, \code{Dockerfile} &
       Single-host deployment and replica configuration \\
     \code{test/load}, \code{scripts}, \code{docs} & k6 benchmarks, resource
@@ -1348,19 +1387,21 @@ never compiled into a service binary.
 \subsection{Ingestion Service}
 \label{sec:impl-ingestion}
 
-A request for \route{POST /ingest/\allowbreak\{book\_id\}} flows through three components.
-The \textbf{ingestion coalescer} implements single-flight per book: concurrent
+A request for \route{POST /ingest/\allowbreak\{book\_id\}} flows from the handler into
+the \textbf{ingestion core} (\code{ingestion.Service}) and from there to two
+driven adapters. The core implements single-flight per book: concurrent
 requests for the same ID join one shared ingestion, tracked in an in-flight map
-guarded by a mutex. At most eight books (\code{-workers}) are ingested at the
-same time, bounded by a buffered channel, and each ingestion runs detached from
-the requests that wait for it, under its own 2-minute budget
-(\code{-ingest-timeout}). A caller that disconnects therefore cancels neither
-the shared work nor the other callers. The \textbf{ingester} first checks the
-datalake and answers \code{available} without downloading when the book is
-already complete. Otherwise it downloads
+guarded by a mutex. Each ingestion runs detached from the requests that wait
+for it, under its own 2-minute budget (\code{-ingest-timeout}), so a caller
+that disconnects cancels neither the shared work nor the other callers. The
+core first checks the datalake and answers \code{available} without
+downloading when the book is already complete. Otherwise it waits for one of
+eight download slots (\code{-workers}), a buffered channel, and the
+\textbf{Gutenberg client} downloads
 \code{https://www.gutenberg.org/\allowbreak cache/epub/<id>/pg<id>.txt} through one shared
-\code{http.Client} with connection reuse (30~s per attempt, three attempts,
-backoff of 1~s doubling, retries only for transient errors). The
+\code{http.Client} with connection reuse (30~s per attempt); the core makes up
+to three attempts with a 1~s doubling backoff and retries only the errors the
+client classifies as transient. The
 \textbf{splitter} then separates header and body at the START/END markers;
 a missing marker makes the book \code{unavailable}. Finally the
 \textbf{datalake} stores the body and then the header, each through a
@@ -1376,13 +1417,15 @@ leaves at most a stray temporary file, never a truncated book.
 \route{POST /index/update/\allowbreak\{book\_id\}} first acquires one of eight update slots
 (\code{-max-concurrent-updates}); a request that finds them all busy waits
 until a slot frees or its caller disconnects, so a burst of updates cannot
-exhaust the datamart connection pool. The adapter then reads the book from the
-datalake (\code{404} if incomplete), extracts the metadata from the header
+exhaust the datamart connection pool. The \textbf{indexing core}
+(\code{indexing.Service}) then reads the book from the datalake through its
+\code{BookSource} port (\code{404} if incomplete), extracts the metadata from the header
 (title, author, language mapped to ISO~639 codes, original publication year
 falling back to the Gutenberg release year), and turns the body into terms
 with the Stage~1 tokenizer: lower-casing, keeping the maximal runs of the
-letters a--z, and dropping stop words, single letters and Roman numerals. The MongoDB writer
-stores the book in four ordered, idempotent steps (\cref{fig:lifecycle}):
+letters a--z, and dropping stop words, single letters and Roman numerals. The MongoDB writer,
+which implements the core's \code{IndexWriter} port, stores the book in four
+ordered, idempotent steps (\cref{fig:lifecycle}):
 
 \begin{enumerate}
   \item replace the book's metadata record with \code{status: pending};
@@ -1409,8 +1452,8 @@ grow with the datalake, creates their indexes, and publishes them with two
 \code{renameCollection} commands (index first, then books). Search therefore
 keeps reading the previous complete datamart until the swap. Updates that
 arrive during a rebuild are not blocked: an atomic flag, read \emph{before}
-each datamart write, makes the adapter record the book in a mutex-protected
-replay list, and the list is re-applied to the fresh datamart after the swap,
+each datamart write, makes the indexing core record the book in a
+mutex-protected replay list, and the list is re-applied to the fresh datamart after the swap,
 so no concurrent update is lost. Recording before writing guarantees that a
 swap can never overtake a book that is still being written.
 
@@ -1423,12 +1466,15 @@ probe.
 \subsection{Search Service}
 \label{sec:impl-search}
 
-The handler validates the query string (\cref{tab:search-params}) and splits
-\code{q} into at most ten distinct normalised terms with the indexer's
-tokenizer. When every word of \code{q} is one the index never stores, it
-answers an empty page without querying MongoDB. Otherwise the datamart engine
-issues \textbf{one aggregation} on \code{inverted\_index}, so a request costs a
-single round trip:
+The handler reads the query string and passes it to the \textbf{search core}
+(\code{search.Service}), which validates it (\cref{tab:search-params}) and
+splits \code{q} into at most ten distinct normalised terms with the indexer's
+tokenizer. When every word of \code{q} is one the index never stores, the core
+answers an empty page without querying MongoDB. Otherwise it calls its
+\code{Index} port, which the MongoDB adapter implements with \textbf{one
+aggregation} on \code{inverted\_index}, so a request costs a single round trip
+(keeping matching and ranking in the aggregation is a deliberate choice,
+discussed in \cref{sec:decision-storage}):
 
 \begin{enumerate}
   \item \code{\$match} the term documents (\code{\_id \$in} terms) and
@@ -1445,8 +1491,9 @@ single round trip:
 
 Intersecting the postings before the join means that every additional term
 shrinks the join instead of growing it. \route{GET /books/\{id\}} and
-\route{GET /search/filters} read the same datamart through the same stateless
-reader, restricted to published books. The process holds no mutable state
+\route{GET /search/filters} go through the catalog use case
+(\code{search.CatalogService}) and read the same datamart through the same
+stateless reader, restricted to published books. The process holds no mutable state
 beyond the driver's connection pool, which is why replicas are interchangeable
 and why nginx may route any request to any of them. At start-up the service
 refuses to run if MongoDB is unreachable (fail fast), instead of answering
@@ -1495,14 +1542,14 @@ mechanism that implements it.
       \code{docker-compose.yml}, \code{cmd/*} \\
     Task ownership & Selector gives each book to one worker per run; one
       Control instance at a time; single-flight per book in Ingestion; rebuild
-      lease across replicas & \code{internal/control}, coalescer,
-      \code{rebuild\_lock.go} \\
+      lease across replicas & \code{internal/control},
+      \code{internal/ingestion}, \code{rebuild\_lock.go} \\
     Retries & Control: 3 attempts, 1~s doubling backoff, transient versus
       permanent; Ingestion downloads: 3 attempts, 1~s doubling &
-      \code{orchestrator.go}, \code{ingester.go} \\
+      \code{orchestrator.go}, \code{internal/ingestion} \\
     Idempotency & Ingestion answers \code{available} for complete books;
       index updates replace metadata and converge postings; control records
-      skip known IDs & \code{crawler}, \code{mongodb}, \code{control} \\
+      skip known IDs & \code{ingestion}, \code{mongodb}, \code{control} \\
     Publication & \code{status: published} is the last write of an update;
       rebuild swaps complete collections; updates during a rebuild are replayed
       & \code{book\_indexer.go}, \code{rebuild.go} \\
@@ -1718,6 +1765,22 @@ cross-process lease. The JSON file and folder index of Stage~1 offer none of
 these properties: they would require a single writer, file locking across
 processes, and an in-memory copy of the index inside every Search replica.
 
+\paragraph{Query evaluation stays inside the datamart.}
+In the hexagonal structure (\cref{sec:stack}) the search core decides what a
+query means (its terms, filters and page) but not how it is evaluated. Keeping
+the AND matching of the terms and the relevance ranking (summed term
+frequencies, ties broken by book ID) inside the MongoDB aggregation, behind the
+core's \code{Index} port, is a deliberate architectural performance choice
+rather than an omission. Evaluated on the server, a query costs one round trip
+and returns one page of metadata; evaluated in the Search Service, it would
+transfer every posting of every query term on each request, and the posting
+list of a common term can span most of the corpus. Intersecting the postings
+before the join also keeps the join proportional to the matches. The price is
+that these rules belong to the adapter: they are documented as the contract of
+the port and pinned by the datamart's integration tests, and any future
+\code{Index} adapter, for example one on the (term, book) layout of
+\cref{sec:improvements}, must reproduce them.
+
 \paragraph{Costs of the data model.}
 Storing one document per term with its whole posting list makes reads simple
 but has two costs that the benchmarks expose. The first is \emph{write
@@ -1755,10 +1818,10 @@ agreement is held in MongoDB.
     Mechanism & Where & Protects or bounds & Scope \\
     \midrule
     Goroutine per request & every HTTP server & Request concurrency & process \\
-    Buffered channel (8 slots) & ingestion coalescer & Concurrent Gutenberg downloads & process \\
-    In-flight map + \code{sync.Mutex} & ingestion coalescer & One download per book at a time (single-flight) & process \\
+    Buffered channel (8 slots) & ingestion core & Concurrent Gutenberg downloads & process \\
+    In-flight map + \code{sync.Mutex} & ingestion core & One download per book at a time (single-flight) & process \\
     Buffered channel (8 slots) & indexing handler & Concurrent index updates, hence load on MongoDB & process \\
-    \code{atomic.Bool} + \code{sync.Mutex} & datamart adapter & Rebuild-in-progress flag; replay list of concurrent updates & process \\
+    \code{atomic.Bool} + \code{sync.Mutex} & indexing core & Rebuild-in-progress flag; replay list of concurrent updates & process \\
     \code{sync.RWMutex} & control state & In-memory sets of downloaded, indexed and failed books (read-mostly: every step reads, transitions write) & process \\
     \code{sync.Mutex} & book selector & Claim cursor, so that each book goes to one worker & process \\
     \code{sync.WaitGroup}, \code{context} & orchestrator, all services & Worker lifecycle; cancellation and deadlines propagated to MongoDB & process \\
