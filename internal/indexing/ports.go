@@ -6,6 +6,12 @@ import (
 	"boogle-engine/internal/models"
 )
 
+type BookIndex interface {
+	IndexBook(ctx context.Context, bookID models.BookID) error
+	Rebuild(ctx context.Context) (RebuildReport, error)
+	Stats() IndexStats
+}
+
 type BookSource interface {
 	ReadBook(bookID models.BookID) (models.Book, error)
 	ListBookIDs() ([]models.BookID, error)

@@ -19,6 +19,7 @@ import (
 	"boogle-engine/internal/api"
 	"boogle-engine/internal/crawler"
 	"boogle-engine/internal/datalake"
+	"boogle-engine/internal/ingestion"
 )
 
 const (
@@ -35,8 +36,8 @@ type serviceConfig struct {
 	batchSize      int
 	baseURL        string
 	requestTimeout time.Duration
-	retry          crawler.RetryPolicy
-	limits         api.IngestionLimits
+	retry          ingestion.RetryPolicy
+	limits         ingestion.Limits
 }
 
 // @title				Boogle Engine Ingestion API
@@ -81,11 +82,11 @@ func buildIngestionHandler(config serviceConfig) (api.IngestionHandler, error) {
 		return api.IngestionHandler{}, err
 	}
 	client := crawler.NewGutenbergClient(config.baseURL, config.requestTimeout)
-	ingester, err := crawler.NewIngester(client, lake, config.retry)
+	service, err := ingestion.NewService(ingestion.Ports{Fetcher: client, Store: lake}, config.retry, config.limits)
 	if err != nil {
 		return api.IngestionHandler{}, err
 	}
-	return api.NewIngestionHandler(ingester, lake, config.limits)
+	return api.NewIngestionHandler(service, service)
 }
 
 func parseConfig(arguments []string) (serviceConfig, error) {

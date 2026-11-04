@@ -17,6 +17,8 @@ const statsTimeout = 5 * time.Second
 
 var ErrMissingPort = errors.New("indexing service needs a book source, an index writer, a rebuild locker and index metrics")
 
+var _ BookIndex = (*Service)(nil)
+
 type Service struct {
 	ports        Ports
 	pendingMutex sync.Mutex

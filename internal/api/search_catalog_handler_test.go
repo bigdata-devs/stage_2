@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"boogle-engine/internal/models"
+	"boogle-engine/internal/search"
 )
 
 type fakeCatalog struct {
@@ -35,7 +36,7 @@ func (catalog *fakeCatalog) FilterOptions(context.Context) (models.FilterValues,
 	return catalog.values, nil
 }
 
-func sendCatalog(t *testing.T, catalog BookCatalog, method, target string) *httptest.ResponseRecorder {
+func sendCatalog(t *testing.T, catalog search.BookCatalog, method, target string) *httptest.ResponseRecorder {
 	t.Helper()
 	handler, err := NewCatalogHandler(catalog)
 	if err != nil {

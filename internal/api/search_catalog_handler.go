@@ -1,24 +1,15 @@
 package api
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
 
-	"boogle-engine/internal/models"
+	"boogle-engine/internal/search"
 )
 
 var ErrMissingCatalog = errors.New("catalog handler needs a book catalog")
-
-type BookCatalog interface {
-	// PublishedBook reports the metadata of a published book; found is false when the book
-	// does not exist or has not been published yet.
-	PublishedBook(ctx context.Context, bookID models.BookID) (models.BookMetadata, bool, error)
-	// FilterOptions lists the distinct filter values of the published books.
-	FilterOptions(ctx context.Context) (models.FilterValues, error)
-}
 
 type FilterValuesResponse struct {
 	// ISO 639 language codes of the published books, sorted ascending; never null
@@ -28,10 +19,10 @@ type FilterValuesResponse struct {
 }
 
 type CatalogHandler struct {
-	catalog BookCatalog
+	catalog search.BookCatalog
 }
 
-func NewCatalogHandler(catalog BookCatalog) (CatalogHandler, error) {
+func NewCatalogHandler(catalog search.BookCatalog) (CatalogHandler, error) {
 	if catalog == nil {
 		return CatalogHandler{}, ErrMissingCatalog
 	}

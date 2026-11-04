@@ -22,12 +22,6 @@ const bytesPerMegabyte = 1 << 20
 
 var ErrMissingIndex = errors.New("indexing handler needs a book index")
 
-type BookIndex interface {
-	IndexBook(ctx context.Context, bookID models.BookID) error
-	Rebuild(ctx context.Context) (indexing.RebuildReport, error)
-	Stats() indexing.IndexStats
-}
-
 type IndexOutcome string
 
 const IndexUpdated IndexOutcome = "updated"
@@ -54,12 +48,12 @@ type IndexStatusResponse struct {
 }
 
 type IndexingHandler struct {
-	index          BookIndex
+	index          indexing.BookIndex
 	rebuildTimeout time.Duration
 	updateSlots    chan struct{}
 }
 
-func NewIndexingHandler(index BookIndex, rebuildTimeout time.Duration, maxConcurrentUpdates int) (IndexingHandler, error) {
+func NewIndexingHandler(index indexing.BookIndex, rebuildTimeout time.Duration, maxConcurrentUpdates int) (IndexingHandler, error) {
 	if index == nil {
 		return IndexingHandler{}, ErrMissingIndex
 	}

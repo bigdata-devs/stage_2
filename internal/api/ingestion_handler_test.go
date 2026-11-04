@@ -14,8 +14,8 @@ import (
 	"testing"
 	"time"
 
-	"boogle-engine/internal/crawler"
 	"boogle-engine/internal/datalake"
+	"boogle-engine/internal/ingestion"
 	"boogle-engine/internal/models"
 )
 
@@ -65,11 +65,8 @@ func newIngestionFixtureAt(t *testing.T, gutenberg *fakeGutenberg, datalakeDir s
 	if err != nil {
 		t.Fatalf("datalake.New: %v", err)
 	}
-	ingester, err := crawler.NewIngester(gutenberg, lake, crawler.RetryPolicy{MaxAttempts: 1})
-	if err != nil {
-		t.Fatalf("crawler.NewIngester: %v", err)
-	}
-	handler, err := NewIngestionHandler(ingester, lake, IngestionLimits{Timeout: 5 * time.Second, MaxConcurrentDownloads: 2})
+	service := newIngestionService(t, gutenberg, lake)
+	handler, err := NewIngestionHandler(service, service)
 	if err != nil {
 		t.Fatalf("NewIngestionHandler: %v", err)
 	}
@@ -253,76 +250,29 @@ func TestRoutesRejectWrongMethods(t *testing.T) {
 	}
 }
 
-type heldIngester struct {
-	release chan struct{}
-	calls   atomic.Int32
-}
-
-func (ingester *heldIngester) Ingest(_ context.Context, bookID models.BookID) models.IngestionResult {
-	ingester.calls.Add(1)
-	<-ingester.release
-	return models.IngestionResult{BookID: bookID, Status: models.StatusDownloaded, Path: "datalake/" + bookID.String()}
-}
-
-func TestCoalescerJoinsTheIngestionInProgress(t *testing.T) {
-	ingester := &heldIngester{release: make(chan struct{})}
-	coalescer := newIngestionCoalescer(ingester, IngestionLimits{Timeout: time.Second, MaxConcurrentDownloads: 4})
-
-	first, second, otherBook := coalescer.join(1342), coalescer.join(1342), coalescer.join(84)
-	close(ingester.release)
-	<-first.done
-	<-otherBook.done
-
-	if first != second || first == otherBook {
-		t.Errorf("same book must share one ingestion and different books must not")
+func newIngestionService(t *testing.T, gutenberg *fakeGutenberg, lake datalake.Datalake) *ingestion.Service {
+	t.Helper()
+	service, err := ingestion.NewService(
+		ingestion.Ports{Fetcher: gutenberg, Store: lake},
+		ingestion.RetryPolicy{MaxAttempts: 1},
+		ingestion.Limits{Timeout: 5 * time.Second, MaxConcurrentDownloads: 2},
+	)
+	if err != nil {
+		t.Fatalf("ingestion.NewService: %v", err)
 	}
-	if calls := ingester.calls.Load(); calls != 2 {
-		t.Errorf("ingester calls = %d, want 2 (one per distinct book)", calls)
-	}
-}
-
-func TestCoalescerReportsTransientFailureWhenNoSlotFreesUpInTime(t *testing.T) {
-	ingester := &heldIngester{release: make(chan struct{})}
-	coalescer := newIngestionCoalescer(ingester, IngestionLimits{Timeout: 20 * time.Millisecond, MaxConcurrentDownloads: 1})
-	coalescer.slots <- struct{}{}
-
-	result, err := coalescer.Ingest(context.Background(), 1342)
-
-	if err != nil || result.Status != models.StatusFailed || !errors.Is(result.Err, models.ErrTransient) {
-		t.Errorf("result = %+v, err = %v; want a transient failed result", result, err)
-	}
-	if calls := ingester.calls.Load(); calls != 0 {
-		t.Errorf("ingester calls = %d, want 0 while no slot is free", calls)
-	}
-}
-
-func TestCoalescerLetsCallerStopWaitingWithoutCancellingTheIngestion(t *testing.T) {
-	ingester := &heldIngester{release: make(chan struct{})}
-	coalescer := newIngestionCoalescer(ingester, IngestionLimits{Timeout: time.Second, MaxConcurrentDownloads: 1})
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel()
-
-	if _, err := coalescer.Ingest(ctx, 1342); !errors.Is(err, context.Canceled) {
-		t.Errorf("err = %v, want context.Canceled", err)
-	}
-	retry := coalescer.join(1342)
-	close(ingester.release)
-	<-retry.done
-
-	if retry.result.Status != models.StatusDownloaded || ingester.calls.Load() != 1 {
-		t.Errorf("result = %+v, calls = %d; want the detached ingestion to finish once", retry.result, ingester.calls.Load())
-	}
+	return service
 }
 
 func TestNewIngestionHandlerValidatesItsDependencies(t *testing.T) {
-	lake, _ := datalake.New(t.TempDir(), datalake.DefaultBatchSize)
-	limits := IngestionLimits{Timeout: time.Second, MaxConcurrentDownloads: 1}
-	if _, err := NewIngestionHandler(nil, lake, limits); !errors.Is(err, ErrMissingIngestionDependency) {
+	lake, err := datalake.New(t.TempDir(), datalake.DefaultBatchSize)
+	if err != nil {
+		t.Fatalf("datalake.New: %v", err)
+	}
+	service := newIngestionService(t, &fakeGutenberg{}, lake)
+	if _, err := NewIngestionHandler(nil, service); !errors.Is(err, ErrMissingIngestionDependency) {
 		t.Errorf("missing ingester: err = %v, want ErrMissingIngestionDependency", err)
 	}
-	for _, invalid := range []IngestionLimits{{MaxConcurrentDownloads: 1}, {Timeout: time.Second}} {
-		if _, err := NewIngestionHandler(&heldIngester{}, lake, invalid); err == nil {
-			t.Errorf("limits %+v were accepted", invalid)
-		}
+	if _, err := NewIngestionHandler(service, nil); !errors.Is(err, ErrMissingIngestionDependency) {
+		t.Errorf("missing datalake reader: err = %v, want ErrMissingIngestionDependency", err)
 	}
 }

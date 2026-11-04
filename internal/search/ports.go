@@ -10,8 +10,18 @@ type Searcher interface {
 	Search(ctx context.Context, request Request) (Result, error)
 }
 
+type BookCatalog interface {
+	PublishedBook(ctx context.Context, bookID models.BookID) (models.BookMetadata, bool, error)
+	FilterOptions(ctx context.Context) (models.FilterValues, error)
+}
+
 type Index interface {
 	Search(ctx context.Context, query Query) (Page, error)
+}
+
+type CatalogStore interface {
+	PublishedBook(ctx context.Context, bookID models.BookID) (models.BookMetadata, bool, error)
+	FilterOptions(ctx context.Context) (models.FilterValues, error)
 }
 
 type Request struct {

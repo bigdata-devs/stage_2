@@ -1,13 +1,13 @@
 package api
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
 	"path/filepath"
 
+	"boogle-engine/internal/ingestion"
 	"boogle-engine/internal/models"
 )
 
@@ -21,15 +21,6 @@ const (
 )
 
 var ErrMissingIngestionDependency = errors.New("ingestion handler needs an ingester and a datalake")
-
-type BookIngester interface {
-	Ingest(ctx context.Context, bookID models.BookID) models.IngestionResult
-}
-
-type DatalakeReader interface {
-	Locate(bookID models.BookID) (models.StoredBook, error)
-	ListBookIDs() ([]models.BookID, error)
-}
 
 type IngestionResponse struct {
 	BookID models.BookID `json:"book_id" swaggertype:"integer" example:"1342"`
@@ -52,18 +43,15 @@ type BookListResponse struct {
 }
 
 type IngestionHandler struct {
-	lake      DatalakeReader
-	coalescer *ingestionCoalescer
+	ingester ingestion.BookIngester
+	lake     ingestion.DatalakeReader
 }
 
-func NewIngestionHandler(ingester BookIngester, lake DatalakeReader, limits IngestionLimits) (IngestionHandler, error) {
+func NewIngestionHandler(ingester ingestion.BookIngester, lake ingestion.DatalakeReader) (IngestionHandler, error) {
 	if ingester == nil || lake == nil {
 		return IngestionHandler{}, ErrMissingIngestionDependency
 	}
-	if err := limits.validate(); err != nil {
-		return IngestionHandler{}, err
-	}
-	return IngestionHandler{lake: lake, coalescer: newIngestionCoalescer(ingester, limits)}, nil
+	return IngestionHandler{ingester: ingester, lake: lake}, nil
 }
 
 func (handler IngestionHandler) RegisterRoutes(router *http.ServeMux) {
@@ -117,7 +105,7 @@ func (handler IngestionHandler) Ingest(writer http.ResponseWriter, request *http
 		writeInvalidBookID(writer, err)
 		return
 	}
-	result, err := handler.ensureIngested(request.Context(), bookID)
+	result, err := handler.ingester.Ingest(request.Context(), bookID)
 	if err != nil {
 		slog.Warn("[INGESTION] caller left before the ingestion finished", "book_id", bookID, "error", err)
 		return
@@ -191,13 +179,6 @@ func (handler IngestionHandler) List(writer http.ResponseWriter, _ *http.Request
 	}
 	books := append([]models.BookID{}, bookIDs...)
 	writeJSON(writer, http.StatusOK, BookListResponse{Count: len(books), Books: books})
-}
-
-func (handler IngestionHandler) ensureIngested(ctx context.Context, bookID models.BookID) (models.IngestionResult, error) {
-	if stored, err := handler.lake.Locate(bookID); err == nil {
-		return models.IngestionResult{BookID: bookID, Status: models.StatusAvailable, Path: stored.Directory}, nil
-	}
-	return handler.coalescer.Ingest(ctx, bookID)
 }
 
 func parseBookIDPath(request *http.Request) (models.BookID, error) {

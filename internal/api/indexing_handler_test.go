@@ -88,7 +88,7 @@ func storeSampleBook(t *testing.T, lake datalake.Datalake, bookID models.BookID)
 
 const testMaxConcurrentUpdates = 4
 
-func newIndexingRouter(t *testing.T, index BookIndex, rebuildTimeout time.Duration, maxConcurrentUpdates int) *http.ServeMux {
+func newIndexingRouter(t *testing.T, index indexing.BookIndex, rebuildTimeout time.Duration, maxConcurrentUpdates int) *http.ServeMux {
 	t.Helper()
 	handler, err := NewIndexingHandler(index, rebuildTimeout, maxConcurrentUpdates)
 	if err != nil {

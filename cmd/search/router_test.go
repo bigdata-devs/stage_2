@@ -8,7 +8,6 @@ import (
 	"slices"
 	"testing"
 
-	"boogle-engine/internal/api"
 	"boogle-engine/internal/models"
 	"boogle-engine/internal/search"
 )
@@ -117,9 +116,9 @@ func newTestRouter(t *testing.T, index search.Index) http.Handler {
 	if err != nil {
 		t.Fatalf("buildSearchHandler: %v", err)
 	}
-	catalogHandler, err := api.NewCatalogHandler(emptyCatalog{})
+	catalogHandler, err := buildCatalogHandler(emptyCatalog{})
 	if err != nil {
-		t.Fatalf("NewCatalogHandler: %v", err)
+		t.Fatalf("buildCatalogHandler: %v", err)
 	}
 	return newRouter(searchHandler, catalogHandler)
 }
