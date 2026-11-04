@@ -8,10 +8,11 @@ import (
 
 	"go.mongodb.org/mongo-driver/v2/bson"
 
+	"boogle-engine/internal/indexing"
 	"boogle-engine/internal/models"
 )
 
-func booksOf(books ...models.IndexBookInput) NextBook {
+func booksOf(books ...models.IndexBookInput) indexing.NextBook {
 	position := 0
 	return func(context.Context) (models.IndexBookInput, bool, error) {
 		if position >= len(books) {
@@ -34,15 +35,15 @@ func TestRebuildSwapsInNewDatamart(t *testing.T) {
 		}
 	}
 
-	result, err := indexer.Rebuild(context.Background(), booksOf(
+	processed, err := indexer.Rebuild(context.Background(), booksOf(
 		sampleInput(3, "fresh", "fresh"),
 		sampleInput(4, "fresh"),
 	))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if result.BooksProcessed != 2 {
-		t.Fatalf("expected 2 books processed, got %d", result.BooksProcessed)
+	if processed != 2 {
+		t.Fatalf("expected 2 books processed, got %d", processed)
 	}
 
 	assertPostings(t, fetchPostings(t, client, "fresh"), []models.Posting{
@@ -140,12 +141,12 @@ func TestRebuildWithNoBooksClearsTheDatamart(t *testing.T) {
 		t.Fatalf("seed book: %v", err)
 	}
 
-	result, err := indexer.Rebuild(context.Background(), booksOf())
+	processed, err := indexer.Rebuild(context.Background(), booksOf())
 	if err != nil {
 		t.Fatalf("rebuild of an empty datalake: %v", err)
 	}
-	if result.BooksProcessed != 0 {
-		t.Fatalf("expected 0 books processed, got %d", result.BooksProcessed)
+	if processed != 0 {
+		t.Fatalf("expected 0 books processed, got %d", processed)
 	}
 
 	if _, err := fetchExistingBook(client, 1); err == nil {

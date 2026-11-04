@@ -21,6 +21,7 @@ import (
 	_ "boogle-engine/api/indexing"
 	"boogle-engine/internal/api"
 	"boogle-engine/internal/datalake"
+	"boogle-engine/internal/indexing"
 	"boogle-engine/internal/mongodb"
 )
 
@@ -133,8 +134,20 @@ func buildIndexingHandler(config serviceConfig, client mongodb.Client) (api.Inde
 	if err != nil {
 		return api.IndexingHandler{}, err
 	}
-	index := NewDatamartIndex(lake, client)
-	return api.NewIndexingHandler(index, config.rebuildTimeout, config.maxConcurrentUpdates)
+	service, err := newIndexingService(lake, client)
+	if err != nil {
+		return api.IndexingHandler{}, err
+	}
+	return api.NewIndexingHandler(service, config.rebuildTimeout, config.maxConcurrentUpdates)
+}
+
+func newIndexingService(lake datalake.Datalake, client mongodb.Client) (*indexing.Service, error) {
+	return indexing.NewService(indexing.Ports{
+		Source:  lake,
+		Writer:  mongodb.NewBookIndexer(client),
+		Locker:  mongodb.NewRebuildLocker(client),
+		Metrics: mongodb.NewDatamartReader(client),
+	})
 }
 
 func parseConfig(arguments []string) (serviceConfig, error) {
