@@ -43,7 +43,7 @@ func resetDatamart(t testing.TB, client Client) {
 	}
 }
 
-func fetchPostings(t *testing.T, client Client, term string) []models.Posting {
+func fetchPostings(t *testing.T, client Client, term string) []postingDocument {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -58,7 +58,7 @@ func fetchPostings(t *testing.T, client Client, term string) []models.Posting {
 	if err != nil {
 		t.Fatalf("fetch postings for %q: %v", term, err)
 	}
-	return postingsOf(document.Postings)
+	return document.Postings
 }
 
 func fetchBookStatus(t *testing.T, client Client, bookID models.BookID) string {
@@ -76,7 +76,7 @@ func fetchBookStatus(t *testing.T, client Client, bookID models.BookID) string {
 	return document.Status
 }
 
-func assertPostings(t *testing.T, got []models.Posting, want []models.Posting) {
+func assertPostings(t *testing.T, got []postingDocument, want []postingDocument) {
 	t.Helper()
 	if len(got) != len(want) {
 		t.Fatalf("expected %d postings, got %d: %v", len(want), len(got), got)
@@ -112,8 +112,8 @@ func TestIndexBookStoresTermFrequency(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	assertPostings(t, fetchPostings(t, client, "island"), []models.Posting{{BookID: 42, TF: 3}})
-	assertPostings(t, fetchPostings(t, client, "ship"), []models.Posting{{BookID: 42, TF: 1}})
+	assertPostings(t, fetchPostings(t, client, "island"), []postingDocument{{BookID: 42, TF: 3}})
+	assertPostings(t, fetchPostings(t, client, "ship"), []postingDocument{{BookID: 42, TF: 1}})
 }
 
 func TestIndexBookIsIdempotent(t *testing.T) {
@@ -128,8 +128,8 @@ func TestIndexBookIsIdempotent(t *testing.T) {
 		}
 	}
 
-	assertPostings(t, fetchPostings(t, client, "castaway"), []models.Posting{{BookID: 7, TF: 2}})
-	assertPostings(t, fetchPostings(t, client, "desert"), []models.Posting{{BookID: 7, TF: 1}})
+	assertPostings(t, fetchPostings(t, client, "castaway"), []postingDocument{{BookID: 7, TF: 2}})
+	assertPostings(t, fetchPostings(t, client, "desert"), []postingDocument{{BookID: 7, TF: 1}})
 }
 
 func TestIndexBookUpdatesTermFrequencyWithoutDuplicating(t *testing.T) {
@@ -144,7 +144,7 @@ func TestIndexBookUpdatesTermFrequencyWithoutDuplicating(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	assertPostings(t, fetchPostings(t, client, "island"), []models.Posting{{BookID: 5, TF: 5}})
+	assertPostings(t, fetchPostings(t, client, "island"), []postingDocument{{BookID: 5, TF: 5}})
 }
 
 func TestIndexBookForgetsTermsTheNewVersionDrops(t *testing.T) {
@@ -159,7 +159,7 @@ func TestIndexBookForgetsTermsTheNewVersionDrops(t *testing.T) {
 		t.Fatalf("second version: unexpected error: %v", err)
 	}
 
-	assertPostings(t, fetchPostings(t, client, "island"), []models.Posting{{BookID: 4, TF: 1}})
+	assertPostings(t, fetchPostings(t, client, "island"), []postingDocument{{BookID: 4, TF: 1}})
 	assertPostings(t, fetchPostings(t, client, "wreck"), nil)
 }
 
@@ -174,7 +174,7 @@ func TestIndexBookKeepsPostingsSortedAcrossBooks(t *testing.T) {
 		}
 	}
 
-	assertPostings(t, fetchPostings(t, client, "island"), []models.Posting{
+	assertPostings(t, fetchPostings(t, client, "island"), []postingDocument{
 		{BookID: 3, TF: 1},
 		{BookID: 5, TF: 1},
 		{BookID: 9, TF: 1},
@@ -200,7 +200,7 @@ func TestIndexBookIsConcurrencySafeForSameBook(t *testing.T) {
 		}
 	}
 
-	assertPostings(t, fetchPostings(t, client, "gale"), []models.Posting{{BookID: 30, TF: 2}})
+	assertPostings(t, fetchPostings(t, client, "gale"), []postingDocument{{BookID: 30, TF: 2}})
 	if status := fetchBookStatus(t, client, 30); status != StatusPublished {
 		t.Fatalf("expected status %q, got %q", StatusPublished, status)
 	}

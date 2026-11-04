@@ -46,7 +46,7 @@ func TestRebuildSwapsInNewDatamart(t *testing.T) {
 		t.Fatalf("expected 2 books processed, got %d", processed)
 	}
 
-	assertPostings(t, fetchPostings(t, client, "fresh"), []models.Posting{
+	assertPostings(t, fetchPostings(t, client, "fresh"), []postingDocument{
 		{BookID: 3, TF: 2},
 		{BookID: 4, TF: 1},
 	})
@@ -83,7 +83,7 @@ func TestRebuildStopsWhenTheStreamFails(t *testing.T) {
 	if _, err := fetchExistingBook(client, 1); err != nil {
 		t.Fatalf("previous book disappeared after a failed rebuild: %v", err)
 	}
-	assertPostings(t, fetchPostings(t, client, "kept"), []models.Posting{{BookID: 1, TF: 1}})
+	assertPostings(t, fetchPostings(t, client, "kept"), []postingDocument{{BookID: 1, TF: 1}})
 	if _, err := fetchExistingBook(client, 9); err == nil {
 		t.Fatal("a book of the failed rebuild is visible in the published datamart")
 	}
@@ -126,8 +126,8 @@ func TestRebuildIsIdempotent(t *testing.T) {
 		}
 	}
 
-	assertPostings(t, fetchPostings(t, client, "crusoe"), []models.Posting{{BookID: 21, TF: 2}})
-	assertPostings(t, fetchPostings(t, client, "friday"), []models.Posting{
+	assertPostings(t, fetchPostings(t, client, "crusoe"), []postingDocument{{BookID: 21, TF: 2}})
+	assertPostings(t, fetchPostings(t, client, "friday"), []postingDocument{
 		{BookID: 21, TF: 1},
 		{BookID: 22, TF: 1},
 	})

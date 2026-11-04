@@ -71,7 +71,7 @@ func BenchmarkPostingsForTerms(b *testing.B) {
 
 	b.ResetTimer()
 	for b.Loop() {
-		if _, err := reader.PostingsForTerms(ctx, terms); err != nil {
+		if _, err := postingsForTerms(ctx, reader, terms); err != nil {
 			b.Fatal(err)
 		}
 	}

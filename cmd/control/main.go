@@ -251,6 +251,12 @@ func buildOrchestrator(config serviceConfig, ingestion httpclient.IngestionClien
 	if err != nil {
 		return control.Orchestrator{}, err
 	}
+	slog.Info("[CONTROL] control state loaded",
+		"state_dir", config.stateDir,
+		"downloaded", state.DownloadedCount(),
+		"indexed", state.IndexedCount(),
+		"failed", state.FailedCount(),
+	)
 	return control.NewOrchestrator(control.OrchestratorConfig{
 		Ingestion:  ingestion,
 		Indexing:   indexing,
@@ -277,6 +283,7 @@ func logSummary(summary control.Summary, elapsed time.Duration) {
 		"ingest_step_avg", averageStepDuration(summary.IngestElapsed, pipelineBooks),
 		"index_step_total", summary.IndexElapsed.Round(time.Millisecond),
 		"index_step_avg", averageStepDuration(summary.IndexElapsed, pipelineBooks),
+		"claimed", summary.Total(),
 	)
 }
 

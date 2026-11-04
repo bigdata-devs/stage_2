@@ -41,12 +41,3 @@ func TestBookDocumentKeepsTheStoredSchema(t *testing.T) {
 		t.Errorf("metadata round trip = %+v, want %+v", got, metadata)
 	}
 }
-
-func TestPostingDocumentKeepsTheStoredSchema(t *testing.T) {
-	if keys := storedKeys(t, postingDocument{BookID: 7, TF: 3}); !slices.Equal(keys, []string{"book_id", "tf"}) {
-		t.Errorf("stored keys = %q, want [book_id tf]", keys)
-	}
-	if got := postingsOf([]postingDocument{{BookID: 7, TF: 3}}); !slices.Equal(got, []models.Posting{{BookID: 7, TF: 3}}) {
-		t.Errorf("postings = %+v, want [{7 3}]", got)
-	}
-}

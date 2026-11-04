@@ -329,3 +329,18 @@ func metadataInput(bookID models.BookID, author, language string, year int, toke
 		Tokens: tokens,
 	}
 }
+
+func assertBookIDs(t *testing.T, got []models.BookMetadata, want []models.BookID) {
+	t.Helper()
+	if got == nil {
+		t.Fatal("expected a book list, got nil")
+	}
+	if len(got) != len(want) {
+		t.Fatalf("expected books %v, got %d results: %+v", want, len(got), got)
+	}
+	for i := range want {
+		if got[i].BookID != want[i] {
+			t.Fatalf("result %d: expected book %d, got %d", i, want[i], got[i].BookID)
+		}
+	}
+}
