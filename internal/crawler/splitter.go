@@ -18,11 +18,11 @@ const byteOrderMark = "\uFEFF"
 func SplitBookText(bookID models.BookID, text string) (models.Book, error) {
 	header, bodyAndFooter, found := strings.Cut(text, StartMarker)
 	if !found {
-		return models.Book{}, fmt.Errorf("%w: book %d has no START marker", ErrBookUnavailable, bookID)
+		return models.Book{}, fmt.Errorf("%w: book %d has no START marker", models.ErrBookUnavailable, bookID)
 	}
 	body, _, found := strings.Cut(bodyAndFooter, EndMarker)
 	if !found {
-		return models.Book{}, fmt.Errorf("%w: book %d has no END marker after its START marker", ErrBookUnavailable, bookID)
+		return models.Book{}, fmt.Errorf("%w: book %d has no END marker after its START marker", models.ErrBookUnavailable, bookID)
 	}
 	return models.Book{
 		ID:     bookID,

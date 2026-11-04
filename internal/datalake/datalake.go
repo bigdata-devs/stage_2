@@ -1,7 +1,6 @@
 package datalake
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -16,8 +15,6 @@ const (
 	bodyFileSuffix       = "_body.txt"
 	directoryPermissions = 0o755
 )
-
-var ErrBookNotFound = errors.New("book not found in datalake")
 
 type Datalake struct {
 	root      string
@@ -57,7 +54,7 @@ func (lake Datalake) Locate(bookID models.BookID) (models.StoredBook, error) {
 	if isRegularFile(stored.HeaderPath) && isRegularFile(stored.BodyPath) {
 		return stored, nil
 	}
-	return models.StoredBook{}, fmt.Errorf("%w: book %d in %s", ErrBookNotFound, bookID, stored.Directory)
+	return models.StoredBook{}, fmt.Errorf("%w: book %d in %s", models.ErrBookNotFound, bookID, stored.Directory)
 }
 
 func (lake Datalake) ReadBook(bookID models.BookID) (models.Book, error) {

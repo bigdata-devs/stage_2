@@ -9,8 +9,7 @@ import (
 	"net/http"
 	"time"
 
-	"boogle-engine/internal/datalake"
-	"boogle-engine/internal/indexer"
+	"boogle-engine/internal/indexing"
 	"boogle-engine/internal/models"
 )
 
@@ -25,8 +24,8 @@ var ErrMissingIndex = errors.New("indexing handler needs a book index")
 
 type BookIndex interface {
 	IndexBook(ctx context.Context, bookID models.BookID) error
-	Rebuild(ctx context.Context) (indexer.RebuildReport, error)
-	Stats() indexer.IndexStats
+	Rebuild(ctx context.Context) (indexing.RebuildReport, error)
+	Stats() indexing.IndexStats
 }
 
 type IndexOutcome string
@@ -237,7 +236,7 @@ func (handler IndexingHandler) Status(writer http.ResponseWriter, _ *http.Reques
 }
 
 func writeIndexingFailure(writer http.ResponseWriter, bookID models.BookID, err error) {
-	if errors.Is(err, datalake.ErrBookNotFound) {
+	if errors.Is(err, models.ErrBookNotFound) {
 		message := fmt.Sprintf("book %d is not in the datalake; ingest it before indexing it", bookID)
 		writeJSON(writer, http.StatusNotFound, ErrorResponse{Error: bookNotFoundCode, Message: message})
 		return
@@ -249,7 +248,7 @@ func writeIndexingFailure(writer http.ResponseWriter, bookID models.BookID, err 
 
 func writeRebuildFailure(writer http.ResponseWriter, err error) {
 	switch {
-	case errors.Is(err, indexer.ErrRebuildInProgress):
+	case errors.Is(err, indexing.ErrRebuildInProgress):
 		writeJSON(writer, http.StatusConflict, ErrorResponse{Error: rebuildInProgressCode, Message: err.Error()})
 	case errors.Is(err, context.DeadlineExceeded), errors.Is(err, context.Canceled):
 		slog.Warn("[INDEXING] rebuild interrupted", "error", err)

@@ -8,13 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"boogle-engine/internal/control/httpclient"
 	"boogle-engine/internal/models"
-)
-
-var (
-	ErrBookUnavailable = errors.New("book unavailable")
-	ErrTransientAnswer = errors.New("transient service answer")
 )
 
 type IngestionService interface {
@@ -208,9 +202,9 @@ func ingestOnce(ctx context.Context, ingestion IngestionService, bookID models.B
 	case models.StatusDownloaded, models.StatusAvailable:
 		return nil
 	case models.StatusUnavailable:
-		return fmt.Errorf("%w: service answered %q", ErrBookUnavailable, result.Status)
+		return fmt.Errorf("%w: service answered %q", models.ErrBookUnavailable, result.Status)
 	default:
-		return fmt.Errorf("%w: service answered %q", ErrTransientAnswer, result.Status)
+		return fmt.Errorf("%w: service answered %q", models.ErrTransient, result.Status)
 	}
 }
 
@@ -241,7 +235,7 @@ func (orchestrator Orchestrator) withRetries(ctx context.Context, step string, r
 }
 
 func isPermanent(err error) bool {
-	return errors.Is(err, ErrBookUnavailable) || errors.Is(err, httpclient.ErrPermanent)
+	return errors.Is(err, models.ErrBookUnavailable) || errors.Is(err, models.ErrPermanent)
 }
 
 func (orchestrator Orchestrator) finishBook(ctx context.Context, bookID models.BookID, err error) bookReport {

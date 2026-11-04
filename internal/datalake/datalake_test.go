@@ -87,8 +87,8 @@ func TestLocateReportsIncompleteBookAsNotFound(t *testing.T) {
 	if err := os.Remove(stored.HeaderPath); err != nil {
 		t.Fatalf("remove header: %v", err)
 	}
-	if _, err := lake.Locate(11); !errors.Is(err, ErrBookNotFound) {
-		t.Fatalf("expected ErrBookNotFound, got %v", err)
+	if _, err := lake.Locate(11); !errors.Is(err, models.ErrBookNotFound) {
+		t.Fatalf("expected models.ErrBookNotFound, got %v", err)
 	}
 }
 

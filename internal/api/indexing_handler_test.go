@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"boogle-engine/internal/datalake"
-	"boogle-engine/internal/indexer"
+	"boogle-engine/internal/indexing"
 	"boogle-engine/internal/models"
 )
 
@@ -54,10 +54,10 @@ func (index *fakeIndex) IndexBook(_ context.Context, bookID models.BookID) error
 	return nil
 }
 
-func (index *fakeIndex) Rebuild(_ context.Context) (indexer.RebuildReport, error) {
+func (index *fakeIndex) Rebuild(_ context.Context) (indexing.RebuildReport, error) {
 	bookIDs, err := index.lake.ListBookIDs()
 	if err != nil {
-		return indexer.RebuildReport{}, err
+		return indexing.RebuildReport{}, err
 	}
 	index.mutex.Lock()
 	defer index.mutex.Unlock()
@@ -65,13 +65,13 @@ func (index *fakeIndex) Rebuild(_ context.Context) (indexer.RebuildReport, error
 	for _, bookID := range bookIDs {
 		index.books[bookID] = true
 	}
-	return indexer.RebuildReport{BooksProcessed: len(bookIDs)}, nil
+	return indexing.RebuildReport{BooksProcessed: len(bookIDs)}, nil
 }
 
-func (index *fakeIndex) Stats() indexer.IndexStats {
+func (index *fakeIndex) Stats() indexing.IndexStats {
 	index.mutex.Lock()
 	defer index.mutex.Unlock()
-	return indexer.IndexStats{BooksIndexed: len(index.books), LastUpdate: time.Now()}
+	return indexing.IndexStats{BooksIndexed: len(index.books), LastUpdate: time.Now()}
 }
 
 func storeSampleBook(t *testing.T, lake datalake.Datalake, bookID models.BookID) {
@@ -209,22 +209,22 @@ type scriptedIndex struct {
 	indexErr       error
 	rebuildErr     error
 	waitForContext bool
-	stats          indexer.IndexStats
+	stats          indexing.IndexStats
 }
 
 func (index scriptedIndex) IndexBook(context.Context, models.BookID) error {
 	return index.indexErr
 }
 
-func (index scriptedIndex) Rebuild(ctx context.Context) (indexer.RebuildReport, error) {
+func (index scriptedIndex) Rebuild(ctx context.Context) (indexing.RebuildReport, error) {
 	if index.waitForContext {
 		<-ctx.Done()
-		return indexer.RebuildReport{}, fmt.Errorf("rebuild index: %w", ctx.Err())
+		return indexing.RebuildReport{}, fmt.Errorf("rebuild index: %w", ctx.Err())
 	}
-	return indexer.RebuildReport{}, index.rebuildErr
+	return indexing.RebuildReport{}, index.rebuildErr
 }
 
-func (index scriptedIndex) Stats() indexer.IndexStats {
+func (index scriptedIndex) Stats() indexing.IndexStats {
 	return index.stats
 }
 
@@ -235,7 +235,7 @@ func TestRebuildFailuresKeepTheContract(t *testing.T) {
 		wantStatus int
 		wantCode   string
 	}{
-		{"another rebuild running", indexer.ErrRebuildInProgress, http.StatusConflict, rebuildInProgressCode},
+		{"another rebuild running", indexing.ErrRebuildInProgress, http.StatusConflict, rebuildInProgressCode},
 		{"caller disconnected", fmt.Errorf("rebuild index: %w", context.Canceled), http.StatusServiceUnavailable, rebuildInterruptedCode},
 		{"unreadable datalake", errors.New("list datalake books: permission denied"), http.StatusInternalServerError, internalErrorCode},
 	}
@@ -263,7 +263,7 @@ func TestIndexUpdateFailureReturnsInternalError(t *testing.T) {
 
 func TestStatusMatchesTheContractExample(t *testing.T) {
 	indexSizeMB := 42.7
-	stats := indexer.IndexStats{
+	stats := indexing.IndexStats{
 		BooksIndexed: 1200,
 		LastUpdate:   time.Date(2025, 10, 8, 15, 5, 0, 789_000_000, time.FixedZone("CET", 3600)),
 		SizeBytes:    uint64(indexSizeMB * bytesPerMegabyte),
@@ -303,12 +303,12 @@ func (index *gatedIndex) IndexBook(ctx context.Context, _ models.BookID) error {
 	}
 }
 
-func (index *gatedIndex) Rebuild(context.Context) (indexer.RebuildReport, error) {
-	return indexer.RebuildReport{}, nil
+func (index *gatedIndex) Rebuild(context.Context) (indexing.RebuildReport, error) {
+	return indexing.RebuildReport{}, nil
 }
 
-func (index *gatedIndex) Stats() indexer.IndexStats {
-	return indexer.IndexStats{LastUpdate: time.Now()}
+func (index *gatedIndex) Stats() indexing.IndexStats {
+	return indexing.IndexStats{LastUpdate: time.Now()}
 }
 
 func startUpdate(router *http.ServeMux, target string) <-chan *httptest.ResponseRecorder {

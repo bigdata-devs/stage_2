@@ -6,7 +6,6 @@ import (
 	"sync"
 	"time"
 
-	"boogle-engine/internal/crawler"
 	"boogle-engine/internal/models"
 )
 
@@ -85,7 +84,7 @@ func (coalescer *ingestionCoalescer) ingestInSlot(ctx context.Context, bookID mo
 		defer func() { <-coalescer.slots }()
 		return coalescer.ingester.Ingest(ctx, bookID)
 	case <-ctx.Done():
-		err := fmt.Errorf("%w: book %d waited too long for a download slot: %w", crawler.ErrTransientDownload, bookID, ctx.Err())
+		err := fmt.Errorf("%w: book %d waited too long for a download slot: %w", models.ErrTransient, bookID, ctx.Err())
 		return models.IngestionResult{BookID: bookID, Status: models.StatusFailed, Err: err}
 	}
 }

@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"net/http"
 	"testing"
+
+	"boogle-engine/internal/models"
 )
 
 func TestUpdateReportsIndexedBook(t *testing.T) {
@@ -32,10 +34,10 @@ func TestUpdateClassifiesHTTPAnswers(t *testing.T) {
 		statusCode int
 		want       error
 	}{
-		{http.StatusNotFound, ErrPermanent},
-		{http.StatusBadRequest, ErrPermanent},
-		{http.StatusTooManyRequests, ErrTransient},
-		{http.StatusInternalServerError, ErrTransient},
+		{http.StatusNotFound, models.ErrPermanent},
+		{http.StatusBadRequest, models.ErrPermanent},
+		{http.StatusTooManyRequests, models.ErrTransient},
+		{http.StatusInternalServerError, models.ErrTransient},
 	} {
 		url := serveStatus(t, testCase.statusCode, "")
 		_, err := NewIndexingClient(url, testTimeout).Update(context.Background(), 1)

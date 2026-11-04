@@ -65,14 +65,14 @@ func (ingester Ingester) fetchWithRetry(ctx context.Context, bookID models.BookI
 		}
 		slog.Warn("[CRAWLER] transient failure, retrying", "book_id", bookID, "attempt", attempt, "wait", backoff, "error", err)
 		if err := sleep(ctx, backoff); err != nil {
-			return models.Book{}, fmt.Errorf("%w: book %d: %w", ErrTransientDownload, bookID, err)
+			return models.Book{}, fmt.Errorf("%w: book %d: %w", models.ErrTransient, bookID, err)
 		}
 		backoff *= 2
 	}
 }
 
 func (ingester Ingester) shouldRetry(ctx context.Context, err error, attempt int) bool {
-	isTransient := errors.Is(err, ErrTransientDownload)
+	isTransient := errors.Is(err, models.ErrTransient)
 	return isTransient && attempt < ingester.retry.MaxAttempts && ctx.Err() == nil
 }
 
@@ -89,7 +89,7 @@ func sleep(ctx context.Context, duration time.Duration) error {
 
 func failedResult(bookID models.BookID, err error) models.IngestionResult {
 	status := models.StatusFailed
-	if errors.Is(err, ErrBookUnavailable) {
+	if errors.Is(err, models.ErrBookUnavailable) {
 		status = models.StatusUnavailable
 	}
 	return models.IngestionResult{BookID: bookID, Status: status, Err: err}

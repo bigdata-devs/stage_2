@@ -285,11 +285,11 @@ func TestRebuildStreamsEveryBookOfTheSourceUnderOneLease(t *testing.T) {
 
 func TestRebuildRefusedByAnotherReplicaReportsRebuildInProgress(t *testing.T) {
 	f := newFixture(t, sampleBook(1, "Sample"))
-	f.locker.err = fmt.Errorf("%w: lease held by another replica", indexer.ErrRebuildInProgress)
+	f.locker.err = fmt.Errorf("%w: lease held by another replica", indexing.ErrRebuildInProgress)
 
 	_, err := f.service.Rebuild(context.Background())
 
-	if !errors.Is(err, indexer.ErrRebuildInProgress) {
+	if !errors.Is(err, indexing.ErrRebuildInProgress) {
 		t.Fatalf("Rebuild with a refused lease = %v, want ErrRebuildInProgress", err)
 	}
 	assertEvents(t, f.writer)
@@ -307,7 +307,7 @@ func TestRebuildLeaseFailureIsNotReportedAsRebuildInProgress(t *testing.T) {
 
 	_, err := f.service.Rebuild(context.Background())
 
-	if !errors.Is(err, leaseErr) || errors.Is(err, indexer.ErrRebuildInProgress) {
+	if !errors.Is(err, leaseErr) || errors.Is(err, indexing.ErrRebuildInProgress) {
 		t.Fatalf("Rebuild with a failing locker = %v, want the locker error only", err)
 	}
 }
@@ -321,7 +321,7 @@ func TestRebuildRejectsAnotherRebuildOfTheSameProcess(t *testing.T) {
 		t.Fatalf("outer rebuild: %v", err)
 	}
 
-	if !errors.Is(nestedErr, indexer.ErrRebuildInProgress) {
+	if !errors.Is(nestedErr, indexing.ErrRebuildInProgress) {
 		t.Fatalf("Rebuild while one is running = %v, want ErrRebuildInProgress", nestedErr)
 	}
 	assertLeasesBalanced(t, f.locker, 2)

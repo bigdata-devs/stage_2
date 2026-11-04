@@ -45,7 +45,7 @@ func (client GutenbergClient) downloadText(ctx context.Context, bookID models.Bo
 	request.Header.Set("User-Agent", userAgent)
 	response, err := client.httpClient.Do(request)
 	if err != nil {
-		return "", fmt.Errorf("%w: book %d: %w", ErrTransientDownload, bookID, err)
+		return "", fmt.Errorf("%w: book %d: %w", models.ErrTransient, bookID, err)
 	}
 	defer response.Body.Close()
 	if err := classifyStatus(bookID, response.StatusCode); err != nil {
@@ -57,7 +57,7 @@ func (client GutenbergClient) downloadText(ctx context.Context, bookID models.Bo
 func readText(bookID models.BookID, body io.Reader) (string, error) {
 	content, err := io.ReadAll(body)
 	if err != nil {
-		return "", fmt.Errorf("%w: read book %d: %w", ErrTransientDownload, bookID, err)
+		return "", fmt.Errorf("%w: read book %d: %w", models.ErrTransient, bookID, err)
 	}
 	return string(content), nil
 }
@@ -67,9 +67,9 @@ func classifyStatus(bookID models.BookID, statusCode int) error {
 	case statusCode == http.StatusOK:
 		return nil
 	case isPermanentClientError(statusCode):
-		return fmt.Errorf("%w: book %d (HTTP %d)", ErrBookUnavailable, bookID, statusCode)
+		return fmt.Errorf("%w: book %d (HTTP %d)", models.ErrBookUnavailable, bookID, statusCode)
 	default:
-		return fmt.Errorf("%w: book %d (HTTP %d)", ErrTransientDownload, bookID, statusCode)
+		return fmt.Errorf("%w: book %d (HTTP %d)", models.ErrTransient, bookID, statusCode)
 	}
 }
 

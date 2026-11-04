@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"path/filepath"
 
-	"boogle-engine/internal/crawler"
 	"boogle-engine/internal/models"
 )
 
@@ -231,7 +230,7 @@ func newIngestionResponse(result models.IngestionResult) IngestionResponse {
 }
 
 func writeIngestionFailure(writer http.ResponseWriter, result models.IngestionResult) {
-	if errors.Is(result.Err, crawler.ErrTransientDownload) {
+	if errors.Is(result.Err, models.ErrTransient) {
 		slog.Warn("[INGESTION] download failed", "book_id", result.BookID, "error", result.Err)
 		writeJSON(writer, http.StatusServiceUnavailable, ErrorResponse{Error: downloadFailedCode, Message: result.Err.Error()})
 		return

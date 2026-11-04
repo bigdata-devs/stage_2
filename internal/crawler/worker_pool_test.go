@@ -25,10 +25,10 @@ func (fetcher *fakeFetcher) FetchBook(ctx context.Context, bookID models.BookID)
 	defer fetcher.inFlight.Add(-1)
 	time.Sleep(5 * time.Millisecond)
 	if fetcher.unavailable[bookID] {
-		return models.Book{}, fmt.Errorf("%w: book %d (HTTP 404)", ErrBookUnavailable, bookID)
+		return models.Book{}, fmt.Errorf("%w: book %d (HTTP 404)", models.ErrBookUnavailable, bookID)
 	}
 	if call <= fetcher.transientFirst {
-		return models.Book{}, fmt.Errorf("%w: book %d (HTTP 503)", ErrTransientDownload, bookID)
+		return models.Book{}, fmt.Errorf("%w: book %d (HTTP 503)", models.ErrTransient, bookID)
 	}
 	return SplitBookText(bookID, sampleText)
 }

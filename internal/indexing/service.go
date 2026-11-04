@@ -50,35 +50,35 @@ func (service *Service) IndexBook(ctx context.Context, bookID models.BookID) err
 	return nil
 }
 
-func (service *Service) Rebuild(ctx context.Context) (indexer.RebuildReport, error) {
+func (service *Service) Rebuild(ctx context.Context) (RebuildReport, error) {
 	lease, err := service.ports.Locker.AcquireRebuildLease(ctx)
-	if errors.Is(err, indexer.ErrRebuildInProgress) {
-		return indexer.RebuildReport{}, indexer.ErrRebuildInProgress
+	if errors.Is(err, ErrRebuildInProgress) {
+		return RebuildReport{}, ErrRebuildInProgress
 	}
 	if err != nil {
-		return indexer.RebuildReport{}, fmt.Errorf("claim rebuild lease: %w", err)
+		return RebuildReport{}, fmt.Errorf("claim rebuild lease: %w", err)
 	}
 	defer releaseLease(lease)
 	if !service.rebuilding.CompareAndSwap(false, true) {
-		return indexer.RebuildReport{}, indexer.ErrRebuildInProgress
+		return RebuildReport{}, ErrRebuildInProgress
 	}
 	startedAt := time.Now()
 	processed, err := service.buildFreshIndex(ctx)
 	pending := service.finishRebuild()
 	if err != nil {
-		return indexer.RebuildReport{}, err
+		return RebuildReport{}, err
 	}
 	if err := service.replay(ctx, pending); err != nil {
-		return indexer.RebuildReport{}, err
+		return RebuildReport{}, err
 	}
 	service.markUpdated()
-	return indexer.RebuildReport{BooksProcessed: processed, Elapsed: time.Since(startedAt)}, nil
+	return RebuildReport{BooksProcessed: processed, Elapsed: time.Since(startedAt)}, nil
 }
 
-func (service *Service) Stats() indexer.IndexStats {
+func (service *Service) Stats() IndexStats {
 	ctx, cancel := context.WithTimeout(context.Background(), statsTimeout)
 	defer cancel()
-	return indexer.IndexStats{
+	return IndexStats{
 		BooksIndexed: service.publishedBooks(ctx),
 		LastUpdate:   time.Unix(0, service.lastUpdate.Load()).UTC(),
 		SizeBytes:    service.dataSize(ctx),

@@ -44,7 +44,7 @@ func (gutenberg *fakeGutenberg) waitForRelease(ctx context.Context) error {
 	case <-gutenberg.release:
 		return nil
 	case <-ctx.Done():
-		return fmt.Errorf("%w: %w", crawler.ErrTransientDownload, ctx.Err())
+		return fmt.Errorf("%w: %w", models.ErrTransient, ctx.Err())
 	}
 }
 
@@ -181,7 +181,7 @@ func assertSamePath(t *testing.T, responses []*httptest.ResponseRecorder) {
 }
 
 func TestIngestUnavailableBookReturnsNotFound(t *testing.T) {
-	failure := fmt.Errorf("%w: book 99999 (HTTP 404)", crawler.ErrBookUnavailable)
+	failure := fmt.Errorf("%w: book 99999 (HTTP 404)", models.ErrBookUnavailable)
 	fixture := newIngestionFixture(t, &fakeGutenberg{failure: failure})
 
 	assertErrorCode(t, fixture.send(http.MethodPost, "/ingest/99999"), http.StatusNotFound, bookUnavailableCode)
@@ -189,7 +189,7 @@ func TestIngestUnavailableBookReturnsNotFound(t *testing.T) {
 }
 
 func TestIngestTransientFailureReturnsServiceUnavailable(t *testing.T) {
-	failure := fmt.Errorf("%w: book 1342 (HTTP 503)", crawler.ErrTransientDownload)
+	failure := fmt.Errorf("%w: book 1342 (HTTP 503)", models.ErrTransient)
 	fixture := newIngestionFixture(t, &fakeGutenberg{failure: failure})
 
 	assertErrorCode(t, fixture.send(http.MethodPost, "/ingest/1342"), http.StatusServiceUnavailable, downloadFailedCode)
@@ -288,7 +288,7 @@ func TestCoalescerReportsTransientFailureWhenNoSlotFreesUpInTime(t *testing.T) {
 
 	result, err := coalescer.Ingest(context.Background(), 1342)
 
-	if err != nil || result.Status != models.StatusFailed || !errors.Is(result.Err, crawler.ErrTransientDownload) {
+	if err != nil || result.Status != models.StatusFailed || !errors.Is(result.Err, models.ErrTransient) {
 		t.Errorf("result = %+v, err = %v; want a transient failed result", result, err)
 	}
 	if calls := ingester.calls.Load(); calls != 0 {

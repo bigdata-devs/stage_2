@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"boogle-engine/internal/control/httpclient"
 	"boogle-engine/internal/models"
 )
 
@@ -70,7 +69,7 @@ func updatedAnswer(_ context.Context, bookID models.BookID) (models.IndexUpdateR
 }
 
 func alwaysFailIngest(_ context.Context, _ models.BookID) (models.IngestionResult, error) {
-	return models.IngestionResult{}, httpclient.ErrTransient
+	return models.IngestionResult{}, models.ErrTransient
 }
 
 func newTestOrchestrator(t *testing.T, ingestion IngestionService, indexing IndexingService,
@@ -180,7 +179,7 @@ func TestRunRetriesTransientFailures(t *testing.T) {
 		defer mutex.Unlock()
 		attempts++
 		if attempts == 1 {
-			return models.IngestionResult{}, httpclient.ErrTransient
+			return models.IngestionResult{}, models.ErrTransient
 		}
 		return models.IngestionResult{BookID: bookID, Status: models.StatusDownloaded}, nil
 	})
@@ -199,7 +198,7 @@ func TestRunRetriesTransientFailures(t *testing.T) {
 
 func TestRunAbortsRetriesOnPermanentFailure(t *testing.T) {
 	ingestion := newFakeIngestion(func(_ context.Context, _ models.BookID) (models.IngestionResult, error) {
-		return models.IngestionResult{}, httpclient.ErrPermanent
+		return models.IngestionResult{}, models.ErrPermanent
 	})
 	indexing := newFakeIndexing(updatedAnswer)
 	state := newTestState(t)

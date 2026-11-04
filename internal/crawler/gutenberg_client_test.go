@@ -8,6 +8,8 @@ import (
 	"net/http/httptest"
 	"testing"
 	"time"
+
+	"boogle-engine/internal/models"
 )
 
 func serveStatus(t *testing.T, statusCode int, body string) GutenbergClient {
@@ -41,8 +43,8 @@ func TestFetchBookReturnsSplitBook(t *testing.T) {
 func TestFetchBookClassifiesClientErrorsAsUnavailable(t *testing.T) {
 	for _, statusCode := range []int{400, 403, 404, 410} {
 		_, err := serveStatus(t, statusCode, "").FetchBook(context.Background(), 1)
-		if !errors.Is(err, ErrBookUnavailable) {
-			t.Errorf("HTTP %d: expected ErrBookUnavailable, got %v", statusCode, err)
+		if !errors.Is(err, models.ErrBookUnavailable) {
+			t.Errorf("HTTP %d: expected models.ErrBookUnavailable, got %v", statusCode, err)
 		}
 	}
 }
@@ -50,22 +52,22 @@ func TestFetchBookClassifiesClientErrorsAsUnavailable(t *testing.T) {
 func TestFetchBookClassifiesThrottlingAndServerErrorsAsTransient(t *testing.T) {
 	for _, statusCode := range []int{408, 429, 500, 502, 503} {
 		_, err := serveStatus(t, statusCode, "").FetchBook(context.Background(), 1)
-		if !errors.Is(err, ErrTransientDownload) {
-			t.Errorf("HTTP %d: expected ErrTransientDownload, got %v", statusCode, err)
+		if !errors.Is(err, models.ErrTransient) {
+			t.Errorf("HTTP %d: expected models.ErrTransient, got %v", statusCode, err)
 		}
 	}
 }
 
 func TestFetchBookWithoutMarkersIsUnavailable(t *testing.T) {
 	_, err := serveStatus(t, http.StatusOK, "Just some text").FetchBook(context.Background(), 1)
-	if !errors.Is(err, ErrBookUnavailable) {
-		t.Fatalf("expected ErrBookUnavailable, got %v", err)
+	if !errors.Is(err, models.ErrBookUnavailable) {
+		t.Fatalf("expected models.ErrBookUnavailable, got %v", err)
 	}
 }
 
 func TestFetchBookNetworkErrorIsTransient(t *testing.T) {
 	client := NewGutenbergClient("http://127.0.0.1:1", time.Second)
-	if _, err := client.FetchBook(context.Background(), 1); !errors.Is(err, ErrTransientDownload) {
-		t.Fatalf("expected ErrTransientDownload, got %v", err)
+	if _, err := client.FetchBook(context.Background(), 1); !errors.Is(err, models.ErrTransient) {
+		t.Fatalf("expected models.ErrTransient, got %v", err)
 	}
 }

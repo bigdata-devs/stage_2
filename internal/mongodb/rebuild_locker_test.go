@@ -5,7 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	"boogle-engine/internal/indexer"
+	"boogle-engine/internal/indexing"
 )
 
 func TestRebuildLockerReportsALeaseHeldElsewhereAsRebuildInProgress(t *testing.T) {
@@ -19,7 +19,7 @@ func TestRebuildLockerReportsALeaseHeldElsewhereAsRebuildInProgress(t *testing.T
 
 	lease, err := locker.AcquireRebuildLease(context.Background())
 
-	if !errors.Is(err, indexer.ErrRebuildInProgress) || !errors.Is(err, ErrRebuildLocked) {
+	if !errors.Is(err, indexing.ErrRebuildInProgress) || !errors.Is(err, ErrRebuildLocked) {
 		t.Fatalf("AcquireRebuildLease while held = %v, want ErrRebuildInProgress wrapping ErrRebuildLocked", err)
 	}
 	if lease != nil {

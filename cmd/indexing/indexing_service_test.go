@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"boogle-engine/internal/datalake"
-	"boogle-engine/internal/indexer"
 	"boogle-engine/internal/indexing"
 	"boogle-engine/internal/models"
 	"boogle-engine/internal/mongodb"
@@ -189,8 +188,8 @@ func TestIndexingServiceMissingBookFails(t *testing.T) {
 	index := newWiredService(t, lake, client)
 
 	err := index.IndexBook(context.Background(), 999)
-	if !errors.Is(err, datalake.ErrBookNotFound) {
-		t.Fatalf("IndexBook of a missing book = %v, want datalake.ErrBookNotFound", err)
+	if !errors.Is(err, models.ErrBookNotFound) {
+		t.Fatalf("IndexBook of a missing book = %v, want models.ErrBookNotFound", err)
 	}
 	if count := index.Stats().BooksIndexed; count != 0 {
 		t.Errorf("books_indexed = %d after a failed update, want 0", count)
@@ -255,8 +254,8 @@ func TestRebuildRejectsWhileAnotherReplicaHoldsTheLock(t *testing.T) {
 		t.Fatalf("acquire the datamart rebuild lock: %v", err)
 	}
 
-	if _, err := index.Rebuild(context.Background()); !errors.Is(err, indexer.ErrRebuildInProgress) {
-		t.Fatalf("Rebuild while another replica holds the lease = %v, want indexer.ErrRebuildInProgress", err)
+	if _, err := index.Rebuild(context.Background()); !errors.Is(err, indexing.ErrRebuildInProgress) {
+		t.Fatalf("Rebuild while another replica holds the lease = %v, want indexing.ErrRebuildInProgress", err)
 	}
 
 	if err := lock.Release(); err != nil {

@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 
-	"boogle-engine/internal/indexer"
 	"boogle-engine/internal/indexing"
 )
 
@@ -20,7 +19,7 @@ func NewRebuildLocker(client Client) RebuildLocker {
 func (locker RebuildLocker) AcquireRebuildLease(ctx context.Context) (indexing.RebuildLease, error) {
 	lock, err := locker.client.AcquireRebuildLock(ctx)
 	if errors.Is(err, ErrRebuildLocked) {
-		return nil, fmt.Errorf("%w: %w", indexer.ErrRebuildInProgress, err)
+		return nil, fmt.Errorf("%w: %w", indexing.ErrRebuildInProgress, err)
 	}
 	if err != nil {
 		return nil, err
