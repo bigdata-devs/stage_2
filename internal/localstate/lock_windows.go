@@ -1,6 +1,6 @@
 //go:build windows
 
-package control
+package localstate
 
 import (
 	"fmt"

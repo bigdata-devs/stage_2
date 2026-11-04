@@ -14,6 +14,7 @@ import (
 
 	"boogle-engine/internal/control"
 	"boogle-engine/internal/control/httpclient"
+	"boogle-engine/internal/localstate"
 	"boogle-engine/internal/models"
 )
 
@@ -69,14 +70,14 @@ func run(arguments []string) error {
 		if config.searchURL == "" {
 			return fmt.Errorf("verify mode requires -search-url or SEARCH_URL")
 		}
-		state, err := control.LoadState(config.stateDir)
+		state, err := localstate.Load(config.stateDir)
 		if err != nil {
 			return fmt.Errorf("load control state for verify: %w", err)
 		}
 		return verifyIndexed(ctx, config.searchURL, config.requestTimeout, state)
 	}
 	if config.retryFailed {
-		state, err := control.LoadState(config.stateDir)
+		state, err := localstate.Load(config.stateDir)
 		if err != nil {
 			return fmt.Errorf("load control state for retry-failed: %w", err)
 		}
@@ -247,7 +248,7 @@ func resolveCandidates(ctx context.Context, config serviceConfig, ingestion http
 }
 
 func buildOrchestrator(config serviceConfig, ingestion httpclient.IngestionClient, indexing httpclient.IndexingClient) (control.Orchestrator, error) {
-	state, err := control.LoadState(config.stateDir)
+	state, err := localstate.Load(config.stateDir)
 	if err != nil {
 		return control.Orchestrator{}, err
 	}
@@ -260,7 +261,7 @@ func buildOrchestrator(config serviceConfig, ingestion httpclient.IngestionClien
 	return control.NewOrchestrator(control.OrchestratorConfig{
 		Ingestion:  ingestion,
 		Indexing:   indexing,
-		State:      state,
+		Progress:   state,
 		Candidates: config.bookIDs,
 		Workers:    config.workers,
 		Retry: control.RetryPolicy{

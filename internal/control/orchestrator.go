@@ -11,13 +11,7 @@ import (
 	"boogle-engine/internal/models"
 )
 
-type IngestionService interface {
-	Ingest(ctx context.Context, bookID models.BookID) (models.IngestionResult, error)
-}
-
-type IndexingService interface {
-	Update(ctx context.Context, bookID models.BookID) error
-}
+var ErrMissingDependency = errors.New("orchestrator needs an ingestion service, an indexing service and a progress store")
 
 type RetryPolicy struct {
 	MaxAttempts    int
@@ -72,7 +66,7 @@ func (summary *Summary) add(report bookReport) {
 type OrchestratorConfig struct {
 	Ingestion  IngestionService
 	Indexing   IndexingService
-	State      *ControlState
+	Progress   ProgressStore
 	Candidates []models.BookID
 	Workers    int
 	Retry      RetryPolicy
@@ -81,13 +75,16 @@ type OrchestratorConfig struct {
 type Orchestrator struct {
 	ingestion IngestionService
 	indexing  IndexingService
-	state     *ControlState
+	progress  ProgressStore
 	selector  *BookSelector
 	workers   int
 	retry     RetryPolicy
 }
 
 func NewOrchestrator(config OrchestratorConfig) (Orchestrator, error) {
+	if config.Ingestion == nil || config.Indexing == nil || config.Progress == nil {
+		return Orchestrator{}, ErrMissingDependency
+	}
 	if config.Workers < 1 {
 		return Orchestrator{}, fmt.Errorf("workers must be a positive integer, got %d", config.Workers)
 	}
@@ -101,7 +98,7 @@ func NewOrchestrator(config OrchestratorConfig) (Orchestrator, error) {
 	return Orchestrator{
 		ingestion: config.Ingestion,
 		indexing:  config.Indexing,
-		state:     config.State,
+		progress:  config.Progress,
 		selector:  &selector,
 		workers:   config.Workers,
 		retry:     config.Retry,
@@ -136,10 +133,10 @@ func (orchestrator Orchestrator) runWorker(ctx context.Context) Summary {
 }
 
 func (orchestrator Orchestrator) processCandidate(ctx context.Context, bookID models.BookID) bookReport {
-	if orchestrator.state.IsIndexed(bookID) {
+	if orchestrator.progress.IsIndexed(bookID) {
 		return bookReport{outcome: OutcomeSkipped}
 	}
-	if reason, failed := orchestrator.state.FailureReason(bookID); failed {
+	if reason, failed := orchestrator.progress.FailureReason(bookID); failed {
 		slog.Info("[CONTROL] skipping previously failed book", "book_id", bookID, "reason", reason)
 		return bookReport{outcome: OutcomeSkipped}
 	}
@@ -167,7 +164,7 @@ func (orchestrator Orchestrator) processBook(ctx context.Context, bookID models.
 }
 
 func (orchestrator Orchestrator) ensureDownloaded(ctx context.Context, bookID models.BookID) error {
-	if orchestrator.state.IsDownloaded(bookID) {
+	if orchestrator.progress.IsDownloaded(bookID) {
 		return nil
 	}
 	err := orchestrator.withRetries(ctx, "ingest book", func(ctx context.Context) error {
@@ -176,11 +173,11 @@ func (orchestrator Orchestrator) ensureDownloaded(ctx context.Context, bookID mo
 	if err != nil {
 		return err
 	}
-	return orchestrator.state.RecordDownloaded(bookID)
+	return orchestrator.progress.RecordDownloaded(bookID)
 }
 
 func (orchestrator Orchestrator) ensureIndexed(ctx context.Context, bookID models.BookID) error {
-	if orchestrator.state.IsIndexed(bookID) {
+	if orchestrator.progress.IsIndexed(bookID) {
 		return nil
 	}
 	err := orchestrator.withRetries(ctx, "index book", func(ctx context.Context) error {
@@ -189,7 +186,7 @@ func (orchestrator Orchestrator) ensureIndexed(ctx context.Context, bookID model
 	if err != nil {
 		return err
 	}
-	return orchestrator.state.RecordIndexed(bookID)
+	return orchestrator.progress.RecordIndexed(bookID)
 }
 
 func ingestOnce(ctx context.Context, ingestion IngestionService, bookID models.BookID) error {
@@ -243,7 +240,7 @@ func (orchestrator Orchestrator) finishBook(ctx context.Context, bookID models.B
 		return bookReport{outcome: OutcomePending}
 	}
 	slog.Warn("[CONTROL] book failed", "book_id", bookID, "error", err)
-	if recordErr := orchestrator.state.RecordFailed(bookID, err.Error()); recordErr != nil {
+	if recordErr := orchestrator.progress.RecordFailed(bookID, err.Error()); recordErr != nil {
 		slog.Error("[CONTROL] could not record failure", "book_id", bookID, "error", recordErr)
 	}
 	return bookReport{outcome: OutcomeFailed}

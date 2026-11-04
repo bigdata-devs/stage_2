@@ -1,4 +1,4 @@
-package control
+package localstate
 
 import (
 	"os"
@@ -11,9 +11,9 @@ import (
 	"boogle-engine/internal/models"
 )
 
-func newTestState(t *testing.T) *ControlState {
+func newTestState(t *testing.T) *Store {
 	t.Helper()
-	state, err := LoadState(filepath.Join(t.TempDir(), "control"))
+	state, err := Load(filepath.Join(t.TempDir(), "control"))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -40,7 +40,7 @@ func TestRecordsRoundTripThroughFiles(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	reloaded, err := LoadState(state.directory)
+	reloaded, err := Load(state.directory)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -71,7 +71,7 @@ func TestLoadStateSkipsMalformedLines(t *testing.T) {
 	writeControlFile(t, state.directory, downloadedFileName, "1342\n\nfoo\n0042\n84\n")
 	writeControlFile(t, state.directory, failedFileName, "5\tunavailable\nbroken\n-3\tboom\n")
 
-	reloaded, err := LoadState(state.directory)
+	reloaded, err := Load(state.directory)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -94,7 +94,7 @@ func TestLastFailureReasonWinsOnLoad(t *testing.T) {
 	state := newTestState(t)
 	writeControlFile(t, state.directory, failedFileName, "5\tfirst\n5\tsecond\n")
 
-	reloaded, err := LoadState(state.directory)
+	reloaded, err := Load(state.directory)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -180,7 +180,7 @@ func TestWipeFailuresClearsAndReturnsClearedIDs(t *testing.T) {
 		t.Fatalf("expected empty failed_books.txt after wipe, got %q", content)
 	}
 
-	reloaded, err := LoadState(state.directory)
+	reloaded, err := Load(state.directory)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -324,15 +324,15 @@ func BenchmarkLoadState(b *testing.B) {
 	}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		if _, err := LoadState(state.directory); err != nil {
+		if _, err := Load(state.directory); err != nil {
 			b.Fatalf("unexpected error: %v", err)
 		}
 	}
 }
 
-func newBenchmarkState(b *testing.B) *ControlState {
+func newBenchmarkState(b *testing.B) *Store {
 	b.Helper()
-	state, err := LoadState(filepath.Join(b.TempDir(), "control"))
+	state, err := Load(filepath.Join(b.TempDir(), "control"))
 	if err != nil {
 		b.Fatalf("unexpected error: %v", err)
 	}

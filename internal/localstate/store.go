@@ -1,4 +1,4 @@
-package control
+package localstate
 
 import (
 	"fmt"
@@ -10,7 +10,7 @@ import (
 	"boogle-engine/internal/models"
 )
 
-type ControlState struct {
+type Store struct {
 	mutex      sync.RWMutex
 	directory  string
 	downloaded map[models.BookID]struct{}
@@ -18,7 +18,7 @@ type ControlState struct {
 	failed     map[models.BookID]string
 }
 
-func LoadState(directory string) (*ControlState, error) {
+func Load(directory string) (*Store, error) {
 	if err := os.MkdirAll(directory, directoryPermissions); err != nil {
 		return nil, fmt.Errorf("create control directory: %w", err)
 	}
@@ -34,7 +34,7 @@ func LoadState(directory string) (*ControlState, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &ControlState{
+	return &Store{
 		directory:  directory,
 		downloaded: downloaded,
 		indexed:    indexed,
@@ -42,7 +42,7 @@ func LoadState(directory string) (*ControlState, error) {
 	}, nil
 }
 
-func (state *ControlState) RecordDownloaded(bookID models.BookID) error {
+func (state *Store) RecordDownloaded(bookID models.BookID) error {
 	state.mutex.Lock()
 	defer state.mutex.Unlock()
 	if _, recorded := state.downloaded[bookID]; recorded {
@@ -56,7 +56,7 @@ func (state *ControlState) RecordDownloaded(bookID models.BookID) error {
 	return nil
 }
 
-func (state *ControlState) RecordIndexed(bookID models.BookID) error {
+func (state *Store) RecordIndexed(bookID models.BookID) error {
 	state.mutex.Lock()
 	defer state.mutex.Unlock()
 	if _, recorded := state.indexed[bookID]; recorded {
@@ -70,7 +70,7 @@ func (state *ControlState) RecordIndexed(bookID models.BookID) error {
 	return nil
 }
 
-func (state *ControlState) RecordFailed(bookID models.BookID, reason string) error {
+func (state *Store) RecordFailed(bookID models.BookID, reason string) error {
 	state.mutex.Lock()
 	defer state.mutex.Unlock()
 	if _, recorded := state.failed[bookID]; recorded {
@@ -85,46 +85,46 @@ func (state *ControlState) RecordFailed(bookID models.BookID, reason string) err
 	return nil
 }
 
-func (state *ControlState) IsDownloaded(bookID models.BookID) bool {
+func (state *Store) IsDownloaded(bookID models.BookID) bool {
 	state.mutex.RLock()
 	defer state.mutex.RUnlock()
 	_, recorded := state.downloaded[bookID]
 	return recorded
 }
 
-func (state *ControlState) IsIndexed(bookID models.BookID) bool {
+func (state *Store) IsIndexed(bookID models.BookID) bool {
 	state.mutex.RLock()
 	defer state.mutex.RUnlock()
 	_, recorded := state.indexed[bookID]
 	return recorded
 }
 
-func (state *ControlState) FailureReason(bookID models.BookID) (string, bool) {
+func (state *Store) FailureReason(bookID models.BookID) (string, bool) {
 	state.mutex.RLock()
 	defer state.mutex.RUnlock()
 	reason, recorded := state.failed[bookID]
 	return reason, recorded
 }
 
-func (state *ControlState) DownloadedCount() int {
+func (state *Store) DownloadedCount() int {
 	state.mutex.RLock()
 	defer state.mutex.RUnlock()
 	return len(state.downloaded)
 }
 
-func (state *ControlState) IndexedCount() int {
+func (state *Store) IndexedCount() int {
 	state.mutex.RLock()
 	defer state.mutex.RUnlock()
 	return len(state.indexed)
 }
 
-func (state *ControlState) FailedCount() int {
+func (state *Store) FailedCount() int {
 	state.mutex.RLock()
 	defer state.mutex.RUnlock()
 	return len(state.failed)
 }
 
-func (state *ControlState) IndexedIDs() []models.BookID {
+func (state *Store) IndexedIDs() []models.BookID {
 	state.mutex.RLock()
 	defer state.mutex.RUnlock()
 	ids := make([]models.BookID, 0, len(state.indexed))
@@ -135,7 +135,7 @@ func (state *ControlState) IndexedIDs() []models.BookID {
 	return ids
 }
 
-func (state *ControlState) WipeFailures() ([]models.BookID, error) {
+func (state *Store) WipeFailures() ([]models.BookID, error) {
 	state.mutex.Lock()
 	defer state.mutex.Unlock()
 	if len(state.failed) == 0 {

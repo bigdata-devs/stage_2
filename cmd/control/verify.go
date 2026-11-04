@@ -8,11 +8,11 @@ import (
 	"net/http"
 	"time"
 
-	"boogle-engine/internal/control"
+	"boogle-engine/internal/localstate"
 	"boogle-engine/internal/models"
 )
 
-func verifyIndexed(ctx context.Context, searchURL string, perBook time.Duration, state *control.ControlState) error {
+func verifyIndexed(ctx context.Context, searchURL string, perBook time.Duration, state *localstate.Store) error {
 	indexed := state.IndexedIDs()
 	if len(indexed) == 0 {
 		slog.Info("[CONTROL] verify: nothing indexed, nothing to reconcile")
