@@ -1,12 +1,14 @@
 package main
 
 import (
-	"boogle-engine/internal/api"
-	"boogle-engine/internal/mongodb"
+	"boogle-engine/internal/api/searchapi"
+	"boogle-engine/internal/search"
 )
 
-// buildCatalogHandler performs the dependency injection: the datamart reader supplies the book
-// metadata and filter values behind the optional catalog endpoints of the front-end contract.
-func buildCatalogHandler(reader mongodb.DatamartReader) (api.CatalogHandler, error) {
-	return api.NewCatalogHandler(reader)
+func buildCatalogHandler(store search.CatalogStore) (searchapi.CatalogHandler, error) {
+	catalog, err := search.NewCatalogService(store)
+	if err != nil {
+		return searchapi.CatalogHandler{}, err
+	}
+	return searchapi.NewCatalogHandler(catalog)
 }

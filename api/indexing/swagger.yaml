@@ -9,7 +9,7 @@ definitions:
         example: query parameter "limit" must be an integer between 1 and 100
         type: string
     type: object
-  api.IndexStatusResponse:
+  indexingapi.IndexStatusResponse:
     properties:
       books_indexed:
         description: Books in the published metadata catalog
@@ -27,7 +27,7 @@ definitions:
         format: date-time
         type: string
     type: object
-  api.IndexUpdateResponse:
+  indexingapi.IndexUpdateResponse:
     properties:
       book_id:
         example: 1342
@@ -38,7 +38,7 @@ definitions:
         example: updated
         type: string
     type: object
-  api.RebuildResponse:
+  indexingapi.RebuildResponse:
     properties:
       books_processed:
         description: Books of the datalake that the published index was rebuilt from
@@ -90,7 +90,7 @@ paths:
         "200":
           description: The rebuilt index is published
           schema:
-            $ref: '#/definitions/api.RebuildResponse'
+            $ref: '#/definitions/indexingapi.RebuildResponse'
         "409":
           description: 'rebuild_in_progress: another rebuild is running'
           schema:
@@ -135,7 +135,7 @@ paths:
         "200":
           description: Statistics of the published index
           schema:
-            $ref: '#/definitions/api.IndexStatusResponse'
+            $ref: '#/definitions/indexingapi.IndexStatusResponse'
       summary: Report indexing statistics
       tags:
       - indexing
@@ -187,7 +187,7 @@ paths:
         "200":
           description: The book is in the published index
           schema:
-            $ref: '#/definitions/api.IndexUpdateResponse'
+            $ref: '#/definitions/indexingapi.IndexUpdateResponse'
         "400":
           description: 'invalid_book_id: book_id is not a positive integer'
           schema:

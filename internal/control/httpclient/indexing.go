@@ -10,14 +10,22 @@ import (
 	"boogle-engine/internal/models"
 )
 
-// IndexingClient calls the internal API of the Indexing Service.
+type IndexStatus struct {
+	BooksIndexed int     `json:"books_indexed"`
+	LastUpdate   string  `json:"last_update"`
+	IndexSizeMB  float64 `json:"index_size_MB"`
+}
+
+type indexUpdateAnswer struct {
+	BookID models.BookID `json:"book_id"`
+	Index  string        `json:"index"`
+}
+
 type IndexingClient struct {
 	baseURL    string
 	httpClient *http.Client
 }
 
-// NewIndexingClient returns a client for the Indexing Service at baseURL
-// with a per-call timeout covering the whole request and answer.
 func NewIndexingClient(baseURL string, requestTimeout time.Duration) IndexingClient {
 	return IndexingClient{
 		baseURL:    strings.TrimRight(baseURL, "/"),
@@ -25,25 +33,22 @@ func NewIndexingClient(baseURL string, requestTimeout time.Duration) IndexingCli
 	}
 }
 
-// Update asks the Indexing Service to read a book from the datalake and update
-// metadata and inverted index. The call is idempotent, so a repeated update of an
-// already processed book never creates duplicates. A 2xx status means the update
-// has been published and the book is searchable.
-func (client IndexingClient) Update(ctx context.Context, bookID models.BookID) (models.IndexUpdateResult, error) {
-	var result models.IndexUpdateResult
-	if err := doJSON(ctx, client.httpClient, http.MethodPost, client.updateURL(bookID), &result); err != nil {
-		return models.IndexUpdateResult{}, err
-	}
-	return result, nil
+func (client IndexingClient) Update(ctx context.Context, bookID models.BookID) error {
+	var answer indexUpdateAnswer
+	return doJSON(ctx, client.httpClient, http.MethodPost, client.updateURL(bookID), &answer)
 }
 
-// Stats fetches the indexing progress reported by GET /index/status.
-func (client IndexingClient) Stats(ctx context.Context) (models.IndexStats, error) {
-	var stats models.IndexStats
+func (client IndexingClient) Stats(ctx context.Context) (IndexStatus, error) {
+	var stats IndexStatus
 	if err := doJSON(ctx, client.httpClient, http.MethodGet, client.statsURL(), &stats); err != nil {
-		return models.IndexStats{}, err
+		return IndexStatus{}, err
 	}
 	return stats, nil
+}
+
+func (client IndexingClient) Ready(ctx context.Context) error {
+	_, err := client.Stats(ctx)
+	return err
 }
 
 func (client IndexingClient) updateURL(bookID models.BookID) string {

@@ -2,12 +2,12 @@ package control
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
-	"boogle-engine/internal/control/httpclient"
 	"boogle-engine/internal/models"
 )
 
@@ -17,9 +17,64 @@ type fakeIngestion struct {
 	respond func(context.Context, models.BookID) (models.IngestionResult, error)
 }
 
-// fakeServiceLatency is the wait every successful fake answer performs, so measured step
-// durations are never zero on hosts whose clock only advances in millisecond steps.
 const fakeServiceLatency = 5 * time.Millisecond
+
+type memoryProgress struct {
+	mutex      sync.Mutex
+	downloaded map[models.BookID]bool
+	indexed    map[models.BookID]bool
+	failed     map[models.BookID]string
+}
+
+func newMemoryProgress() *memoryProgress {
+	return &memoryProgress{
+		downloaded: map[models.BookID]bool{},
+		indexed:    map[models.BookID]bool{},
+		failed:     map[models.BookID]string{},
+	}
+}
+
+func (progress *memoryProgress) IsDownloaded(bookID models.BookID) bool {
+	progress.mutex.Lock()
+	defer progress.mutex.Unlock()
+	return progress.downloaded[bookID]
+}
+
+func (progress *memoryProgress) IsIndexed(bookID models.BookID) bool {
+	progress.mutex.Lock()
+	defer progress.mutex.Unlock()
+	return progress.indexed[bookID]
+}
+
+func (progress *memoryProgress) FailureReason(bookID models.BookID) (string, bool) {
+	progress.mutex.Lock()
+	defer progress.mutex.Unlock()
+	reason, failed := progress.failed[bookID]
+	return reason, failed
+}
+
+func (progress *memoryProgress) RecordDownloaded(bookID models.BookID) error {
+	progress.mutex.Lock()
+	defer progress.mutex.Unlock()
+	progress.downloaded[bookID] = true
+	return nil
+}
+
+func (progress *memoryProgress) RecordIndexed(bookID models.BookID) error {
+	progress.mutex.Lock()
+	defer progress.mutex.Unlock()
+	progress.indexed[bookID] = true
+	return nil
+}
+
+func (progress *memoryProgress) RecordFailed(bookID models.BookID, reason string) error {
+	progress.mutex.Lock()
+	defer progress.mutex.Unlock()
+	if _, recorded := progress.failed[bookID]; !recorded {
+		progress.failed[bookID] = reason
+	}
+	return nil
+}
 
 func newFakeIngestion(respond func(context.Context, models.BookID) (models.IngestionResult, error)) *fakeIngestion {
 	return &fakeIngestion{calls: map[models.BookID]int{}, respond: respond}
@@ -41,14 +96,14 @@ func (fake *fakeIngestion) callCount(bookID models.BookID) int {
 type fakeIndexing struct {
 	mutex   sync.Mutex
 	calls   map[models.BookID]int
-	respond func(context.Context, models.BookID) (models.IndexUpdateResult, error)
+	respond func(context.Context, models.BookID) error
 }
 
-func newFakeIndexing(respond func(context.Context, models.BookID) (models.IndexUpdateResult, error)) *fakeIndexing {
+func newFakeIndexing(respond func(context.Context, models.BookID) error) *fakeIndexing {
 	return &fakeIndexing{calls: map[models.BookID]int{}, respond: respond}
 }
 
-func (fake *fakeIndexing) Update(ctx context.Context, bookID models.BookID) (models.IndexUpdateResult, error) {
+func (fake *fakeIndexing) Update(ctx context.Context, bookID models.BookID) error {
 	fake.mutex.Lock()
 	fake.calls[bookID]++
 	fake.mutex.Unlock()
@@ -61,31 +116,27 @@ func (fake *fakeIndexing) callCount(bookID models.BookID) int {
 	return fake.calls[bookID]
 }
 
-// downloadedAnswer answers like the real Ingestion Service, waiting fakeServiceLatency
-// so the ingestion step measures a positive duration.
 func downloadedAnswer(_ context.Context, bookID models.BookID) (models.IngestionResult, error) {
 	time.Sleep(fakeServiceLatency)
 	return models.IngestionResult{BookID: bookID, Status: models.StatusDownloaded}, nil
 }
 
-// updatedAnswer answers like the real Indexing Service, waiting fakeServiceLatency
-// so the indexing step measures a positive duration.
-func updatedAnswer(_ context.Context, bookID models.BookID) (models.IndexUpdateResult, error) {
+func updatedAnswer(context.Context, models.BookID) error {
 	time.Sleep(fakeServiceLatency)
-	return models.IndexUpdateResult{BookID: bookID, Index: "updated"}, nil
+	return nil
 }
 
 func alwaysFailIngest(_ context.Context, _ models.BookID) (models.IngestionResult, error) {
-	return models.IngestionResult{}, httpclient.ErrTransient
+	return models.IngestionResult{}, models.ErrTransient
 }
 
 func newTestOrchestrator(t *testing.T, ingestion IngestionService, indexing IndexingService,
-	state *ControlState, candidates []models.BookID, workers int) Orchestrator {
+	progress ProgressStore, candidates []models.BookID, workers int) Orchestrator {
 	t.Helper()
 	orchestrator, err := NewOrchestrator(OrchestratorConfig{
 		Ingestion:  ingestion,
 		Indexing:   indexing,
-		State:      state,
+		Progress:   progress,
 		Candidates: candidates,
 		Workers:    workers,
 		Retry:      RetryPolicy{MaxAttempts: 3, InitialBackoff: time.Millisecond},
@@ -99,7 +150,7 @@ func newTestOrchestrator(t *testing.T, ingestion IngestionService, indexing Inde
 func TestRunIngestsIndexesAndRecords(t *testing.T) {
 	ingestion := newFakeIngestion(downloadedAnswer)
 	indexing := newFakeIndexing(updatedAnswer)
-	state := newTestState(t)
+	state := newMemoryProgress()
 
 	summary := newTestOrchestrator(t, ingestion, indexing, state, []models.BookID{1342}, 1).Run(context.Background())
 
@@ -122,7 +173,7 @@ func TestRunIngestsIndexesAndRecords(t *testing.T) {
 func TestRunSkipsAlreadyIndexedBooks(t *testing.T) {
 	ingestion := newFakeIngestion(downloadedAnswer)
 	indexing := newFakeIndexing(updatedAnswer)
-	state := newTestState(t)
+	state := newMemoryProgress()
 	if err := state.RecordIndexed(1342); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -144,7 +195,7 @@ func TestRunSkipsAlreadyIndexedBooks(t *testing.T) {
 func TestRunSkipsPreviouslyFailedBooks(t *testing.T) {
 	ingestion := newFakeIngestion(downloadedAnswer)
 	indexing := newFakeIndexing(updatedAnswer)
-	state := newTestState(t)
+	state := newMemoryProgress()
 	if err := state.RecordFailed(5, "book unavailable"); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -162,7 +213,7 @@ func TestRunSkipsPreviouslyFailedBooks(t *testing.T) {
 func TestRunResumesFromDownloadedState(t *testing.T) {
 	ingestion := newFakeIngestion(downloadedAnswer)
 	indexing := newFakeIndexing(updatedAnswer)
-	state := newTestState(t)
+	state := newMemoryProgress()
 	if err := state.RecordDownloaded(1342); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -186,12 +237,12 @@ func TestRunRetriesTransientFailures(t *testing.T) {
 		defer mutex.Unlock()
 		attempts++
 		if attempts == 1 {
-			return models.IngestionResult{}, httpclient.ErrTransient
+			return models.IngestionResult{}, models.ErrTransient
 		}
 		return models.IngestionResult{BookID: bookID, Status: models.StatusDownloaded}, nil
 	})
 	indexing := newFakeIndexing(updatedAnswer)
-	state := newTestState(t)
+	state := newMemoryProgress()
 
 	summary := newTestOrchestrator(t, ingestion, indexing, state, []models.BookID{1342}, 1).Run(context.Background())
 
@@ -205,10 +256,10 @@ func TestRunRetriesTransientFailures(t *testing.T) {
 
 func TestRunAbortsRetriesOnPermanentFailure(t *testing.T) {
 	ingestion := newFakeIngestion(func(_ context.Context, _ models.BookID) (models.IngestionResult, error) {
-		return models.IngestionResult{}, httpclient.ErrPermanent
+		return models.IngestionResult{}, models.ErrPermanent
 	})
 	indexing := newFakeIndexing(updatedAnswer)
-	state := newTestState(t)
+	state := newMemoryProgress()
 
 	summary := newTestOrchestrator(t, ingestion, indexing, state, []models.BookID{1342}, 1).Run(context.Background())
 
@@ -227,7 +278,7 @@ func TestRunAbortsRetriesOnPermanentFailure(t *testing.T) {
 func TestRunGivesUpAfterMaxAttempts(t *testing.T) {
 	ingestion := newFakeIngestion(alwaysFailIngest)
 	indexing := newFakeIndexing(updatedAnswer)
-	state := newTestState(t)
+	state := newMemoryProgress()
 
 	summary := newTestOrchestrator(t, ingestion, indexing, state, []models.BookID{1342}, 1).Run(context.Background())
 
@@ -244,7 +295,7 @@ func TestRunReportsUnavailableBookAsFailed(t *testing.T) {
 		return models.IngestionResult{BookID: bookID, Status: models.StatusUnavailable}, nil
 	})
 	indexing := newFakeIndexing(updatedAnswer)
-	state := newTestState(t)
+	state := newMemoryProgress()
 
 	summary := newTestOrchestrator(t, ingestion, indexing, state, []models.BookID{1342}, 1).Run(context.Background())
 
@@ -267,7 +318,7 @@ func TestRunLeavesBooksPendingOnShutdown(t *testing.T) {
 		return models.IngestionResult{}, ctx.Err()
 	})
 	indexing := newFakeIndexing(updatedAnswer)
-	state := newTestState(t)
+	state := newMemoryProgress()
 
 	summary := newTestOrchestrator(t, ingestion, indexing, state, []models.BookID{1342}, 1).Run(ctx)
 
@@ -290,7 +341,7 @@ func TestRunProcessesEveryCandidateAcrossWorkers(t *testing.T) {
 	}
 	ingestion := newFakeIngestion(downloadedAnswer)
 	indexing := newFakeIndexing(updatedAnswer)
-	state := newTestState(t)
+	state := newMemoryProgress()
 
 	summary := newTestOrchestrator(t, ingestion, indexing, state, candidates, 4).Run(context.Background())
 
@@ -309,7 +360,7 @@ func TestNewOrchestratorValidatesConfig(t *testing.T) {
 	valid := OrchestratorConfig{
 		Ingestion: newFakeIngestion(downloadedAnswer),
 		Indexing:  newFakeIndexing(updatedAnswer),
-		State:     newTestState(t),
+		Progress:  newMemoryProgress(),
 		Workers:   1,
 		Retry:     RetryPolicy{MaxAttempts: 1},
 	}
@@ -326,5 +377,25 @@ func TestNewOrchestratorValidatesConfig(t *testing.T) {
 	}
 	if _, err := NewOrchestrator(valid); err != nil {
 		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestNewOrchestratorRejectsMissingDependencies(t *testing.T) {
+	for name, drop := range map[string]func(*OrchestratorConfig){
+		"ingestion":      func(config *OrchestratorConfig) { config.Ingestion = nil },
+		"indexing":       func(config *OrchestratorConfig) { config.Indexing = nil },
+		"progress store": func(config *OrchestratorConfig) { config.Progress = nil },
+	} {
+		config := OrchestratorConfig{
+			Ingestion: newFakeIngestion(downloadedAnswer),
+			Indexing:  newFakeIndexing(updatedAnswer),
+			Progress:  newMemoryProgress(),
+			Workers:   1,
+			Retry:     RetryPolicy{MaxAttempts: 1},
+		}
+		drop(&config)
+		if _, err := NewOrchestrator(config); !errors.Is(err, ErrMissingDependency) {
+			t.Errorf("missing %s: err = %v, want ErrMissingDependency", name, err)
+		}
 	}
 }

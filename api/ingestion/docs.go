@@ -29,7 +29,7 @@ const docTemplate = `{
                     "200": {
                         "description": "Complete books in ascending order",
                         "schema": {
-                            "$ref": "#/definitions/api.BookListResponse"
+                            "$ref": "#/definitions/ingestionapi.BookListResponse"
                         }
                     },
                     "500": {
@@ -73,7 +73,7 @@ const docTemplate = `{
                     "200": {
                         "description": "Both files of the book are in the datalake",
                         "schema": {
-                            "$ref": "#/definitions/api.BookStatusResponse"
+                            "$ref": "#/definitions/ingestionapi.BookStatusResponse"
                         }
                     },
                     "400": {
@@ -123,7 +123,7 @@ const docTemplate = `{
                     "200": {
                         "description": "The book is complete in the datalake",
                         "schema": {
-                            "$ref": "#/definitions/api.IngestionResponse"
+                            "$ref": "#/definitions/ingestionapi.IngestionResponse"
                         }
                     },
                     "400": {
@@ -162,7 +162,20 @@ const docTemplate = `{
         }
     },
     "definitions": {
-        "api.BookListResponse": {
+        "api.ErrorResponse": {
+            "type": "object",
+            "properties": {
+                "error": {
+                    "type": "string",
+                    "example": "invalid_parameter"
+                },
+                "message": {
+                    "type": "string",
+                    "example": "query parameter \"limit\" must be an integer between 1 and 100"
+                }
+            }
+        },
+        "ingestionapi.BookListResponse": {
             "type": "object",
             "properties": {
                 "books": {
@@ -184,7 +197,7 @@ const docTemplate = `{
                 }
             }
         },
-        "api.BookStatusResponse": {
+        "ingestionapi.BookStatusResponse": {
             "type": "object",
             "properties": {
                 "book_id": {
@@ -200,20 +213,7 @@ const docTemplate = `{
                 }
             }
         },
-        "api.ErrorResponse": {
-            "type": "object",
-            "properties": {
-                "error": {
-                    "type": "string",
-                    "example": "invalid_parameter"
-                },
-                "message": {
-                    "type": "string",
-                    "example": "query parameter \"limit\" must be an integer between 1 and 100"
-                }
-            }
-        },
-        "api.IngestionResponse": {
+        "ingestionapi.IngestionResponse": {
             "type": "object",
             "properties": {
                 "book_id": {

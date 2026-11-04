@@ -8,53 +8,25 @@ import (
 	"sync"
 	"time"
 
-	"boogle-engine/internal/control/httpclient"
 	"boogle-engine/internal/models"
 )
 
-var (
-	// ErrBookUnavailable marks a book the pipeline can never deliver, e.g. removed
-	// from Project Gutenberg; repeating the step cannot succeed.
-	ErrBookUnavailable = errors.New("book unavailable")
-	// ErrTransientAnswer marks a service answer that may succeed if the step is
-	// repeated later.
-	ErrTransientAnswer = errors.New("transient service answer")
-)
+var ErrMissingDependency = errors.New("control use case is missing one of its dependencies")
 
-// IngestionService downloads books into the datalake; httpclient.IngestionClient implements it.
-type IngestionService interface {
-	Ingest(ctx context.Context, bookID models.BookID) (models.IngestionResult, error)
-}
-
-// IndexingService updates metadata and inverted index; httpclient.IndexingClient implements it.
-type IndexingService interface {
-	Update(ctx context.Context, bookID models.BookID) (models.IndexUpdateResult, error)
-}
-
-// RetryPolicy controls how often a failed step of one book is retried inside a run.
-// The wait doubles after every transient failure, starting at InitialBackoff.
 type RetryPolicy struct {
 	MaxAttempts    int
 	InitialBackoff time.Duration
 }
 
-// BookOutcome classifies what happened to one candidate book during a run.
 type BookOutcome string
 
 const (
-	// OutcomeIndexed means the book went through the whole pipeline in this run.
 	OutcomeIndexed BookOutcome = "indexed"
-	// OutcomeSkipped means the book was already indexed or already failed before.
 	OutcomeSkipped BookOutcome = "skipped"
-	// OutcomeFailed means the book exhausted its retries or was permanently rejected.
-	OutcomeFailed BookOutcome = "failed"
-	// OutcomePending means the run was interrupted before the book could finish;
-	// the next run picks it up again.
+	OutcomeFailed  BookOutcome = "failed"
 	OutcomePending BookOutcome = "pending"
 )
 
-// Summary counts the outcomes of one orchestrator run and sums the wall-clock time
-// its pipeline steps waited on the services: the coordination cost of the run.
 type Summary struct {
 	Indexed int
 	Skipped int
@@ -66,13 +38,10 @@ type Summary struct {
 	IndexElapsed time.Duration
 }
 
-// Total returns how many candidate books were claimed during the run.
 func (summary Summary) Total() int {
 	return summary.Indexed + summary.Skipped + summary.Failed + summary.Pending
 }
 
-// bookReport is the outcome of one claimed book together with the wall-clock time
-// of each pipeline step it executed.
 type bookReport struct {
 	outcome       BookOutcome
 	ingestElapsed time.Duration
@@ -94,32 +63,28 @@ func (summary *Summary) add(report bookReport) {
 	summary.IndexElapsed += report.indexElapsed
 }
 
-// OrchestratorConfig gathers everything one orchestration run needs.
 type OrchestratorConfig struct {
 	Ingestion  IngestionService
 	Indexing   IndexingService
-	State      *ControlState
+	Progress   ProgressStore
 	Candidates []models.BookID
 	Workers    int
 	Retry      RetryPolicy
 }
 
-// Orchestrator runs the ingestion-then-indexing pipeline over a list of candidate
-// books: it never indexes a book before its ingestion has completed, and it records
-// every step in the ControlState so a restarted run resumes instead of duplicating
-// work. Methods are safe for concurrent use.
 type Orchestrator struct {
 	ingestion IngestionService
 	indexing  IndexingService
-	state     *ControlState
+	progress  ProgressStore
 	selector  *BookSelector
 	workers   int
 	retry     RetryPolicy
 }
 
-// NewOrchestrator wires the services, the state and the candidate list under the
-// configured worker count and retry policy.
 func NewOrchestrator(config OrchestratorConfig) (Orchestrator, error) {
+	if config.Ingestion == nil || config.Indexing == nil || config.Progress == nil {
+		return Orchestrator{}, ErrMissingDependency
+	}
 	if config.Workers < 1 {
 		return Orchestrator{}, fmt.Errorf("workers must be a positive integer, got %d", config.Workers)
 	}
@@ -133,16 +98,13 @@ func NewOrchestrator(config OrchestratorConfig) (Orchestrator, error) {
 	return Orchestrator{
 		ingestion: config.Ingestion,
 		indexing:  config.Indexing,
-		state:     config.State,
+		progress:  config.Progress,
 		selector:  &selector,
 		workers:   config.Workers,
 		retry:     config.Retry,
 	}, nil
 }
 
-// Run processes every candidate book with the configured number of workers and returns
-// the combined outcome counts. Cancelling ctx stops claiming new books; books already
-// in flight run until their current step returns.
 func (orchestrator Orchestrator) Run(ctx context.Context) Summary {
 	summaries := make(chan Summary, orchestrator.workers)
 	var group sync.WaitGroup
@@ -170,20 +132,17 @@ func (orchestrator Orchestrator) runWorker(ctx context.Context) Summary {
 	return summary
 }
 
-// processCandidate skips books that need no work and runs the pipeline for the rest.
 func (orchestrator Orchestrator) processCandidate(ctx context.Context, bookID models.BookID) bookReport {
-	if orchestrator.state.IsIndexed(bookID) {
+	if orchestrator.progress.IsIndexed(bookID) {
 		return bookReport{outcome: OutcomeSkipped}
 	}
-	if reason, failed := orchestrator.state.FailureReason(bookID); failed {
+	if reason, failed := orchestrator.progress.FailureReason(bookID); failed {
 		slog.Info("[CONTROL] skipping previously failed book", "book_id", bookID, "reason", reason)
 		return bookReport{outcome: OutcomeSkipped}
 	}
 	return orchestrator.processBook(ctx, bookID)
 }
 
-// processBook runs the ingestion and indexing steps back to back and reports how long
-// each step waited on the services; the durations feed the coordination metrics.
 func (orchestrator Orchestrator) processBook(ctx context.Context, bookID models.BookID) bookReport {
 	slog.Info("[CONTROL] processing book", "book_id", bookID)
 	ingestStart := time.Now()
@@ -204,10 +163,8 @@ func (orchestrator Orchestrator) processBook(ctx context.Context, bookID models.
 	return bookReport{outcome: OutcomeIndexed, ingestElapsed: ingestElapsed, indexElapsed: indexElapsed}
 }
 
-// ensureDownloaded brings a book into the datalake and records the fact. A book the
-// services report as unavailable is a permanent failure; everything else is retried.
 func (orchestrator Orchestrator) ensureDownloaded(ctx context.Context, bookID models.BookID) error {
-	if orchestrator.state.IsDownloaded(bookID) {
+	if orchestrator.progress.IsDownloaded(bookID) {
 		return nil
 	}
 	err := orchestrator.withRetries(ctx, "ingest book", func(ctx context.Context) error {
@@ -216,26 +173,22 @@ func (orchestrator Orchestrator) ensureDownloaded(ctx context.Context, bookID mo
 	if err != nil {
 		return err
 	}
-	return orchestrator.state.RecordDownloaded(bookID)
+	return orchestrator.progress.RecordDownloaded(bookID)
 }
 
-// ensureIndexed updates the index for a book and records the publication.
 func (orchestrator Orchestrator) ensureIndexed(ctx context.Context, bookID models.BookID) error {
-	if orchestrator.state.IsIndexed(bookID) {
+	if orchestrator.progress.IsIndexed(bookID) {
 		return nil
 	}
 	err := orchestrator.withRetries(ctx, "index book", func(ctx context.Context) error {
-		_, updateErr := orchestrator.indexing.Update(ctx, bookID)
-		return updateErr
+		return orchestrator.indexing.Update(ctx, bookID)
 	})
 	if err != nil {
 		return err
 	}
-	return orchestrator.state.RecordIndexed(bookID)
+	return orchestrator.progress.RecordIndexed(bookID)
 }
 
-// ingestOnce performs one ingestion call and translates the answer into an error the
-// retry loop can classify.
 func ingestOnce(ctx context.Context, ingestion IngestionService, bookID models.BookID) error {
 	result, err := ingestion.Ingest(ctx, bookID)
 	if err != nil {
@@ -245,14 +198,12 @@ func ingestOnce(ctx context.Context, ingestion IngestionService, bookID models.B
 	case models.StatusDownloaded, models.StatusAvailable:
 		return nil
 	case models.StatusUnavailable:
-		return fmt.Errorf("%w: service answered %q", ErrBookUnavailable, result.Status)
+		return fmt.Errorf("%w: service answered %q", models.ErrBookUnavailable, result.Status)
 	default:
-		return fmt.Errorf("%w: service answered %q", ErrTransientAnswer, result.Status)
+		return fmt.Errorf("%w: service answered %q", models.ErrTransient, result.Status)
 	}
 }
 
-// withRetries runs step up to MaxAttempts times; permanent failures abort immediately
-// and transient ones wait a doubling backoff between attempts.
 func (orchestrator Orchestrator) withRetries(ctx context.Context, step string, runStep func(context.Context) error) error {
 	backoff := orchestrator.retry.InitialBackoff
 	var err error
@@ -279,20 +230,17 @@ func (orchestrator Orchestrator) withRetries(ctx context.Context, step string, r
 	return fmt.Errorf("%s failed after %d attempts: %w", step, orchestrator.retry.MaxAttempts, err)
 }
 
-// isPermanent reports whether repeating the same step cannot succeed.
 func isPermanent(err error) bool {
-	return errors.Is(err, ErrBookUnavailable) || errors.Is(err, httpclient.ErrPermanent)
+	return errors.Is(err, models.ErrBookUnavailable) || errors.Is(err, models.ErrPermanent)
 }
 
-// finishBook classifies a book that hit an error: an interrupted run leaves it pending
-// for the next execution, while a real failure is recorded so it is not retried.
 func (orchestrator Orchestrator) finishBook(ctx context.Context, bookID models.BookID, err error) bookReport {
 	if ctx.Err() != nil {
 		slog.Info("[CONTROL] book left pending by shutdown", "book_id", bookID, "error", err)
 		return bookReport{outcome: OutcomePending}
 	}
 	slog.Warn("[CONTROL] book failed", "book_id", bookID, "error", err)
-	if recordErr := orchestrator.state.RecordFailed(bookID, err.Error()); recordErr != nil {
+	if recordErr := orchestrator.progress.RecordFailed(bookID, err.Error()); recordErr != nil {
 		slog.Error("[CONTROL] could not record failure", "book_id", bookID, "error", recordErr)
 	}
 	return bookReport{outcome: OutcomeFailed}

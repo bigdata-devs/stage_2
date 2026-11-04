@@ -6,9 +6,11 @@ import (
 	"fmt"
 	"net/http"
 	"testing"
+
+	"boogle-engine/internal/models"
 )
 
-func TestUpdateReportsIndexedBook(t *testing.T) {
+func TestUpdatePostsTheBook(t *testing.T) {
 	url := serveHandler(t, func(writer http.ResponseWriter, request *http.Request) {
 		if request.Method != http.MethodPost {
 			t.Errorf("expected POST, got %s", request.Method)
@@ -18,12 +20,8 @@ func TestUpdateReportsIndexedBook(t *testing.T) {
 		}
 		fmt.Fprint(writer, `{"book_id":1342,"index":"updated"}`)
 	})
-	result, err := NewIndexingClient(url, testTimeout).Update(context.Background(), 1342)
-	if err != nil {
+	if err := NewIndexingClient(url, testTimeout).Update(context.Background(), 1342); err != nil {
 		t.Fatalf("unexpected error: %v", err)
-	}
-	if result.BookID != 1342 || result.Index != "updated" {
-		t.Fatalf("unexpected result %+v", result)
 	}
 }
 
@@ -32,13 +30,13 @@ func TestUpdateClassifiesHTTPAnswers(t *testing.T) {
 		statusCode int
 		want       error
 	}{
-		{http.StatusNotFound, ErrPermanent},
-		{http.StatusBadRequest, ErrPermanent},
-		{http.StatusTooManyRequests, ErrTransient},
-		{http.StatusInternalServerError, ErrTransient},
+		{http.StatusNotFound, models.ErrPermanent},
+		{http.StatusBadRequest, models.ErrPermanent},
+		{http.StatusTooManyRequests, models.ErrTransient},
+		{http.StatusInternalServerError, models.ErrTransient},
 	} {
 		url := serveStatus(t, testCase.statusCode, "")
-		_, err := NewIndexingClient(url, testTimeout).Update(context.Background(), 1)
+		err := NewIndexingClient(url, testTimeout).Update(context.Background(), 1)
 		if !errors.Is(err, testCase.want) {
 			t.Errorf("HTTP %d: expected %v, got %v", testCase.statusCode, testCase.want, err)
 		}

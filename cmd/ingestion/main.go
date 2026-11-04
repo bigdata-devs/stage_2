@@ -1,27 +1,6 @@
-// Command ingestion is the entry point of the Boogle Engine Ingestion Service. It exposes the
-// internal REST API that the Control Module calls to bring Project Gutenberg books into the
-// batch-based datalake (datalake/batch_<LOW>_<HIGH>/<book_id>/), plus its OpenAPI documentation.
-//
-// Usage:
-//
-//	go run ./cmd/ingestion
-//	go run ./cmd/ingestion -addr :7001 -datalake datalake -workers 8 -ingest-timeout 2m
-//
-// Then call it from the Control Module or by hand:
-//
-//	curl -X POST http://localhost:7001/ingest/1342
-//	curl http://localhost:7001/ingest/status/1342
-//	curl http://localhost:7001/ingest/list
-//
-// The interactive documentation lives at http://localhost:7001/swagger/index.html.
-// Run "go run ./cmd/ingestion -h" to list every option.
-//
-// After changing any swag annotation, regenerate the specification in api/ingestion with:
-//
-//	go generate ./cmd/ingestion
 package main
 
-//go:generate go run github.com/swaggo/swag/cmd/swag@v1.16.6 init -g main.go -d ./,../../internal/api -o ../../api/ingestion -t ingestion
+//go:generate go run github.com/swaggo/swag/cmd/swag@v1.16.6 init -g main.go -d ./,../../internal/api/ingestionapi,../../internal/api -o ../../api/ingestion -t ingestion
 
 import (
 	"context"
@@ -37,44 +16,39 @@ import (
 	httpSwagger "github.com/swaggo/http-swagger/v2"
 
 	_ "boogle-engine/api/ingestion"
-	"boogle-engine/internal/api"
+	"boogle-engine/internal/api/ingestionapi"
 	"boogle-engine/internal/crawler"
 	"boogle-engine/internal/datalake"
+	"boogle-engine/internal/ingestion"
 )
 
 const (
 	defaultAddress       = ":7001"
 	defaultWorkers       = 8
 	defaultIngestTimeout = 2 * time.Minute
-	// responseMargin keeps the server write deadline above the ingestion budget, so a response
-	// for an ingestion that ends right at its deadline is never cut off.
-	responseMargin      = 10 * time.Second
-	shutdownGracePeriod = 30 * time.Second
+	responseMargin       = 10 * time.Second
+	shutdownGracePeriod  = 30 * time.Second
 )
 
-// serviceConfig gathers every setting of the Ingestion Service.
 type serviceConfig struct {
 	address        string
 	datalakeDir    string
 	batchSize      int
 	baseURL        string
 	requestTimeout time.Duration
-	retry          crawler.RetryPolicy
-	limits         api.IngestionLimits
+	retry          ingestion.RetryPolicy
+	limits         ingestion.Limits
 }
 
-// main starts the Ingestion Service. The annotations below are the general information of the
-// OpenAPI specification generated in api/ingestion.
-//
-//	@title				Boogle Engine Ingestion API
-//	@version			1.0.0
-//	@description		Internal API of the Boogle Engine Ingestion Service. Provider: Ingestion Service.
-//	@description		Intended consumer: the Control Module, which orchestrates ingestion, indexing and publication.
-//	@description		It is not part of the front-end contract.
-//	@BasePath			/
-//	@schemes			http
-//	@tag.name			ingestion
-//	@tag.description	Internal API. Provider: Ingestion Service. Consumer: Control Module.
+// @title				Boogle Engine Ingestion API
+// @version			1.0.0
+// @description		Internal API of the Boogle Engine Ingestion Service. Provider: Ingestion Service.
+// @description		Intended consumer: the Control Module, which orchestrates ingestion, indexing and publication.
+// @description		It is not part of the front-end contract.
+// @BasePath			/
+// @schemes			http
+// @tag.name			ingestion
+// @tag.description	Internal API. Provider: Ingestion Service. Consumer: Control Module.
 func main() {
 	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo})))
 	err := run(os.Args[1:])
@@ -87,7 +61,6 @@ func main() {
 	}
 }
 
-// run wires the service together and serves requests until Ctrl+C or SIGTERM.
 func run(arguments []string) error {
 	config, err := parseConfig(arguments)
 	if err != nil {
@@ -103,19 +76,17 @@ func run(arguments []string) error {
 	return serve(ctx, newServer(config, newRouter(ingestionHandler)))
 }
 
-// buildIngestionHandler performs the dependency injection: the Gutenberg client and the datalake
-// go into the ingester, and the ingester and the datalake go into the HTTP handler.
-func buildIngestionHandler(config serviceConfig) (api.IngestionHandler, error) {
+func buildIngestionHandler(config serviceConfig) (ingestionapi.IngestionHandler, error) {
 	lake, err := datalake.New(config.datalakeDir, config.batchSize)
 	if err != nil {
-		return api.IngestionHandler{}, err
+		return ingestionapi.IngestionHandler{}, err
 	}
 	client := crawler.NewGutenbergClient(config.baseURL, config.requestTimeout)
-	ingester, err := crawler.NewIngester(client, lake, config.retry)
+	service, err := ingestion.NewService(ingestion.Ports{Fetcher: client, Store: lake}, config.retry, config.limits)
 	if err != nil {
-		return api.IngestionHandler{}, err
+		return ingestionapi.IngestionHandler{}, err
 	}
-	return api.NewIngestionHandler(ingester, lake, config.limits)
+	return ingestionapi.NewIngestionHandler(service, service)
 }
 
 func parseConfig(arguments []string) (serviceConfig, error) {
@@ -142,16 +113,13 @@ func registerFlags(flags *flag.FlagSet) *serviceConfig {
 	return config
 }
 
-// newRouter mounts the ingestion endpoints and the Swagger UI.
-func newRouter(ingestionHandler api.IngestionHandler) *http.ServeMux {
+func newRouter(ingestionHandler ingestionapi.IngestionHandler) *http.ServeMux {
 	router := http.NewServeMux()
 	ingestionHandler.RegisterRoutes(router)
 	router.Handle("GET /swagger/", httpSwagger.Handler(httpSwagger.URL("/swagger/doc.json")))
 	return router
 }
 
-// newServer bounds every phase of a connection. A POST /ingest response may legitimately take as
-// long as a whole ingestion, so the write deadline follows the ingestion budget.
 func newServer(config serviceConfig, router http.Handler) *http.Server {
 	return &http.Server{
 		Addr:              config.address,
@@ -173,9 +141,6 @@ func logStartup(config serviceConfig) {
 	)
 }
 
-// serve runs the server until ctx is cancelled, then gives in-flight requests a grace period.
-// An ingestion cut short by shutdown leaves no partial book behind, because files are written
-// atomically, and the caller simply retries its idempotent request.
 func serve(ctx context.Context, server *http.Server) error {
 	listenErrors := make(chan error, 1)
 	go func() { listenErrors <- server.ListenAndServe() }()

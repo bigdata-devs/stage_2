@@ -44,31 +44,31 @@ func TestIngestClassifiesHTTPAnswers(t *testing.T) {
 	for _, statusCode := range []int{400, 401, 404} {
 		url := serveStatus(t, statusCode, "")
 		_, err := NewIngestionClient(url, testTimeout).Ingest(context.Background(), 1)
-		if !errors.Is(err, ErrPermanent) {
-			t.Errorf("HTTP %d: expected ErrPermanent, got %v", statusCode, err)
+		if !errors.Is(err, models.ErrPermanent) {
+			t.Errorf("HTTP %d: expected models.ErrPermanent, got %v", statusCode, err)
 		}
 	}
 	for _, statusCode := range []int{408, 429, 500, 503} {
 		url := serveStatus(t, statusCode, "")
 		_, err := NewIngestionClient(url, testTimeout).Ingest(context.Background(), 1)
-		if !errors.Is(err, ErrTransient) {
-			t.Errorf("HTTP %d: expected ErrTransient, got %v", statusCode, err)
+		if !errors.Is(err, models.ErrTransient) {
+			t.Errorf("HTTP %d: expected models.ErrTransient, got %v", statusCode, err)
 		}
 	}
 }
 
 func TestIngestTreatsNetworkFailureAsTransient(t *testing.T) {
 	client := NewIngestionClient("http://127.0.0.1:1", testTimeout)
-	if _, err := client.Ingest(context.Background(), 1); !errors.Is(err, ErrTransient) {
-		t.Fatalf("expected ErrTransient, got %v", err)
+	if _, err := client.Ingest(context.Background(), 1); !errors.Is(err, models.ErrTransient) {
+		t.Fatalf("expected models.ErrTransient, got %v", err)
 	}
 }
 
 func TestIngestTreatsMalformedAnswerAsTransient(t *testing.T) {
 	url := serveStatus(t, http.StatusOK, "not json")
 	_, err := NewIngestionClient(url, testTimeout).Ingest(context.Background(), 1)
-	if !errors.Is(err, ErrTransient) {
-		t.Fatalf("expected ErrTransient, got %v", err)
+	if !errors.Is(err, models.ErrTransient) {
+		t.Fatalf("expected models.ErrTransient, got %v", err)
 	}
 }
 

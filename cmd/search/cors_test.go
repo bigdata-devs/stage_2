@@ -9,9 +9,9 @@ import (
 	"strings"
 	"testing"
 
-	"boogle-engine/internal/api"
+	"boogle-engine/internal/api/searchapi"
 	"boogle-engine/internal/models"
-	"boogle-engine/internal/mongodb"
+	"boogle-engine/internal/search"
 )
 
 func TestCORSPolicyFromEnvironment(t *testing.T) {
@@ -37,7 +37,7 @@ func TestCORSPolicyFromEnvironment(t *testing.T) {
 
 			policy, err := corsPolicyFromEnvironment()
 			if testCase.wantErr {
-				if !errors.Is(err, api.ErrInvalidAllowedOrigins) || !strings.Contains(err.Error(), corsEnvironmentVariable) {
+				if !errors.Is(err, searchapi.ErrInvalidAllowedOrigins) || !strings.Contains(err.Error(), corsEnvironmentVariable) {
 					t.Errorf("error = %v, want ErrInvalidAllowedOrigins naming %s", err, corsEnvironmentVariable)
 				}
 				return
@@ -52,16 +52,14 @@ func TestCORSPolicyFromEnvironment(t *testing.T) {
 	}
 }
 
-// TestSearchRoutesAnswerCrossOriginBrowsers drives the production router behind the policy that
-// run() builds, from a front-end on another origin.
 func TestSearchRoutesAnswerCrossOriginBrowsers(t *testing.T) {
 	setCORSEnvironment(t, ptr("https://boogle.example.com"))
 	cors, err := corsPolicyFromEnvironment()
 	if err != nil {
 		t.Fatalf("corsPolicyFromEnvironment: %v", err)
 	}
-	searcher := &fakeSearcher{result: mongodb.SearchResult{Total: 1, Books: []models.BookMetadata{{BookID: 2701, Title: "Moby Dick"}}}}
-	router := cors.Wrap(newTestRouter(t, searcher))
+	index := &fakeIndex{page: search.Page{Total: 1, Books: []models.BookMetadata{{BookID: 2701, Title: "Moby Dick"}}}}
+	router := cors.Wrap(newTestRouter(t, index))
 	cases := []struct {
 		name       string
 		method     string
@@ -107,8 +105,6 @@ func TestSearchRoutesAnswerCrossOriginBrowsers(t *testing.T) {
 	}
 }
 
-// setCORSEnvironment sets CORS_ALLOWED_ORIGIN for one test, or unsets it when value is nil, and
-// restores the previous state afterwards.
 func setCORSEnvironment(t *testing.T, value *string) {
 	t.Helper()
 	t.Setenv(corsEnvironmentVariable, "")

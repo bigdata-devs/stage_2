@@ -4,94 +4,64 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"slices"
-	"strings"
 
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"
 
-	"boogle-engine/internal/indexer"
 	"boogle-engine/internal/models"
+	"boogle-engine/internal/search"
 )
 
-// PublishedBook returns the metadata of one published book. found is false when the datamart
-// holds no published record under that ID: an unknown book and a book still awaiting publication
-// are both hidden from readers, exactly like GET /search hides them.
 func (reader DatamartReader) PublishedBook(ctx context.Context, bookID models.BookID) (models.BookMetadata, bool, error) {
-	var book models.BookMetadata
+	var document bookDocument
 	err := reader.books().FindOne(ctx, bson.D{
 		{Key: "_id", Value: bookID},
 		{Key: "status", Value: StatusPublished},
-	}).Decode(&book)
+	}).Decode(&document)
 	if errors.Is(err, mongo.ErrNoDocuments) {
 		return models.BookMetadata{}, false, nil
 	}
 	if err != nil {
 		return models.BookMetadata{}, false, fmt.Errorf("find published book %d: %w", bookID, err)
 	}
-	return book, true, nil
+	return document.metadata(), true, nil
 }
 
-// FilterOptions returns the distinct filter values of the published books: every ISO 639 code of
-// their comma-separated language lists and every known original publication year, each sorted
-// ascending. Values that a reader could never match through GET /search are left out: the
-// "Unknown" placeholder of books without a language and the year 0 of books without a date.
-func (reader DatamartReader) FilterOptions(ctx context.Context) (models.FilterValues, error) {
-	values := models.FilterValues{Languages: []string{}, Years: []int{}}
+func (reader DatamartReader) DistinctFilterValues(ctx context.Context) (search.StoredFilterValues, error) {
 	published := bson.D{{Key: "status", Value: StatusPublished}}
 
 	var rawLanguages []any
 	err := reader.books().Distinct(ctx, "language", published).Decode(&rawLanguages)
 	if err != nil && !errors.Is(err, mongo.ErrNoDocuments) {
-		return models.FilterValues{}, fmt.Errorf("list distinct languages: %w", err)
+		return search.StoredFilterValues{}, fmt.Errorf("list distinct languages: %w", err)
 	}
-	values.Languages = flattenLanguages(rawLanguages)
 
 	var rawYears []any
 	err = reader.books().Distinct(ctx, "publication_year", published).Decode(&rawYears)
 	if err != nil && !errors.Is(err, mongo.ErrNoDocuments) {
-		return models.FilterValues{}, fmt.Errorf("list distinct publication years: %w", err)
+		return search.StoredFilterValues{}, fmt.Errorf("list distinct publication years: %w", err)
 	}
-	values.Years = knownYears(rawYears)
-	return values, nil
+	return search.StoredFilterValues{LanguageLists: stringValues(rawLanguages), Years: integerValues(rawYears)}, nil
 }
 
-// flattenLanguages splits the stored language lists ("en,fr") into their single codes, drops the
-// empty and the "Unknown" placeholder values, de-duplicates the codes and sorts them.
-func flattenLanguages(rawValues []any) []string {
-	seen := map[string]bool{}
-	codes := []string{}
+func stringValues(rawValues []any) []string {
+	values := make([]string, 0, len(rawValues))
 	for _, rawValue := range rawValues {
-		list, ok := rawValue.(string)
-		if !ok {
-			continue
-		}
-		for _, code := range strings.Split(list, ",") {
-			code = strings.TrimSpace(code)
-			if code == "" || code == indexer.UnknownValue || seen[code] {
-				continue
-			}
-			seen[code] = true
-			codes = append(codes, code)
+		if value, ok := rawValue.(string); ok {
+			values = append(values, value)
 		}
 	}
-	slices.Sort(codes)
-	return codes
+	return values
 }
 
-// knownYears collects the publication years the datamart stores as integers, drops the unknown
-// value 0 and sorts the rest ascending. BSON integers reach the driver as int32 or int64.
-func knownYears(rawValues []any) []int {
-	years := []int{}
+func integerValues(rawValues []any) []int {
+	values := make([]int, 0, len(rawValues))
 	for _, rawValue := range rawValues {
-		year, ok := asInt(rawValue)
-		if !ok || year == 0 {
-			continue
+		if value, ok := asInt(rawValue); ok {
+			values = append(values, value)
 		}
-		years = append(years, year)
 	}
-	slices.Sort(years)
-	return years
+	return values
 }
 
 func asInt(rawValue any) (int, bool) {

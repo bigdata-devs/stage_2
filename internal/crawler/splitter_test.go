@@ -4,9 +4,10 @@ import (
 	"errors"
 	"strings"
 	"testing"
+
+	"boogle-engine/internal/models"
 )
 
-// Same fixture as tests/test_datalake/fakes.py and the Stage 1 Go splitter tests.
 const (
 	sampleHeader = "Title: Sample Book\nAuthor: Jane Doe"
 	sampleBody   = "It was a bright cold day in April."
@@ -40,14 +41,14 @@ func TestSplitBookTextRemovesByteOrderMark(t *testing.T) {
 }
 
 func TestSplitBookTextWithoutStartMarkerIsUnavailable(t *testing.T) {
-	if _, err := SplitBookText(1, "no markers at all"); !errors.Is(err, ErrBookUnavailable) {
-		t.Fatalf("expected ErrBookUnavailable, got %v", err)
+	if _, err := SplitBookText(1, "no markers at all"); !errors.Is(err, models.ErrBookUnavailable) {
+		t.Fatalf("expected models.ErrBookUnavailable, got %v", err)
 	}
 }
 
 func TestSplitBookTextWithEndMarkerBeforeStartIsUnavailable(t *testing.T) {
 	text := EndMarker + " ***\nheader\n" + StartMarker + " ***\nbody"
-	if _, err := SplitBookText(1, text); !errors.Is(err, ErrBookUnavailable) {
-		t.Fatalf("expected ErrBookUnavailable, got %v", err)
+	if _, err := SplitBookText(1, text); !errors.Is(err, models.ErrBookUnavailable) {
+		t.Fatalf("expected models.ErrBookUnavailable, got %v", err)
 	}
 }

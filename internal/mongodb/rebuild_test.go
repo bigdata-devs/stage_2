@@ -8,11 +8,11 @@ import (
 
 	"go.mongodb.org/mongo-driver/v2/bson"
 
+	"boogle-engine/internal/indexing"
 	"boogle-engine/internal/models"
 )
 
-// booksOf feeds the given books to Rebuild in order.
-func booksOf(books ...models.IndexBookInput) NextBook {
+func booksOf(books ...models.IndexBookInput) indexing.NextBook {
 	position := 0
 	return func(context.Context) (models.IndexBookInput, bool, error) {
 		if position >= len(books) {
@@ -35,18 +35,18 @@ func TestRebuildSwapsInNewDatamart(t *testing.T) {
 		}
 	}
 
-	result, err := indexer.Rebuild(context.Background(), booksOf(
+	processed, err := indexer.Rebuild(context.Background(), booksOf(
 		sampleInput(3, "fresh", "fresh"),
 		sampleInput(4, "fresh"),
 	))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if result.BooksProcessed != 2 {
-		t.Fatalf("expected 2 books processed, got %d", result.BooksProcessed)
+	if processed != 2 {
+		t.Fatalf("expected 2 books processed, got %d", processed)
 	}
 
-	assertPostings(t, fetchPostings(t, client, "fresh"), []models.Posting{
+	assertPostings(t, fetchPostings(t, client, "fresh"), []postingDocument{
 		{BookID: 3, TF: 2},
 		{BookID: 4, TF: 1},
 	})
@@ -80,11 +80,10 @@ func TestRebuildStopsWhenTheStreamFails(t *testing.T) {
 		t.Fatal("expected the failing stream to fail the rebuild")
 	}
 
-	// The half-built collections are never published: the previous index still answers.
 	if _, err := fetchExistingBook(client, 1); err != nil {
 		t.Fatalf("previous book disappeared after a failed rebuild: %v", err)
 	}
-	assertPostings(t, fetchPostings(t, client, "kept"), []models.Posting{{BookID: 1, TF: 1}})
+	assertPostings(t, fetchPostings(t, client, "kept"), []postingDocument{{BookID: 1, TF: 1}})
 	if _, err := fetchExistingBook(client, 9); err == nil {
 		t.Fatal("a book of the failed rebuild is visible in the published datamart")
 	}
@@ -127,8 +126,8 @@ func TestRebuildIsIdempotent(t *testing.T) {
 		}
 	}
 
-	assertPostings(t, fetchPostings(t, client, "crusoe"), []models.Posting{{BookID: 21, TF: 2}})
-	assertPostings(t, fetchPostings(t, client, "friday"), []models.Posting{
+	assertPostings(t, fetchPostings(t, client, "crusoe"), []postingDocument{{BookID: 21, TF: 2}})
+	assertPostings(t, fetchPostings(t, client, "friday"), []postingDocument{
 		{BookID: 21, TF: 1},
 		{BookID: 22, TF: 1},
 	})
@@ -142,12 +141,12 @@ func TestRebuildWithNoBooksClearsTheDatamart(t *testing.T) {
 		t.Fatalf("seed book: %v", err)
 	}
 
-	result, err := indexer.Rebuild(context.Background(), booksOf())
+	processed, err := indexer.Rebuild(context.Background(), booksOf())
 	if err != nil {
 		t.Fatalf("rebuild of an empty datalake: %v", err)
 	}
-	if result.BooksProcessed != 0 {
-		t.Fatalf("expected 0 books processed, got %d", result.BooksProcessed)
+	if processed != 0 {
+		t.Fatalf("expected 0 books processed, got %d", processed)
 	}
 
 	if _, err := fetchExistingBook(client, 1); err == nil {

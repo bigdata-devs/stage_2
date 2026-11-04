@@ -29,7 +29,7 @@ const docTemplate = `{
                     "200": {
                         "description": "The rebuilt index is published",
                         "schema": {
-                            "$ref": "#/definitions/api.RebuildResponse"
+                            "$ref": "#/definitions/indexingapi.RebuildResponse"
                         }
                     },
                     "409": {
@@ -74,7 +74,7 @@ const docTemplate = `{
                     "200": {
                         "description": "Statistics of the published index",
                         "schema": {
-                            "$ref": "#/definitions/api.IndexStatusResponse"
+                            "$ref": "#/definitions/indexingapi.IndexStatusResponse"
                         }
                     }
                 },
@@ -112,7 +112,7 @@ const docTemplate = `{
                     "200": {
                         "description": "The book is in the published index",
                         "schema": {
-                            "$ref": "#/definitions/api.IndexUpdateResponse"
+                            "$ref": "#/definitions/indexingapi.IndexUpdateResponse"
                         }
                     },
                     "400": {
@@ -158,7 +158,7 @@ const docTemplate = `{
                 }
             }
         },
-        "api.IndexStatusResponse": {
+        "indexingapi.IndexStatusResponse": {
             "type": "object",
             "properties": {
                 "books_indexed": {
@@ -179,7 +179,7 @@ const docTemplate = `{
                 }
             }
         },
-        "api.IndexUpdateResponse": {
+        "indexingapi.IndexUpdateResponse": {
             "type": "object",
             "properties": {
                 "book_id": {
@@ -195,7 +195,7 @@ const docTemplate = `{
                 }
             }
         },
-        "api.RebuildResponse": {
+        "indexingapi.RebuildResponse": {
             "type": "object",
             "properties": {
                 "books_processed": {
