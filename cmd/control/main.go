@@ -80,12 +80,13 @@ func run(arguments []string) error {
 	}
 	ingestion := httpclient.NewIngestionClient(config.ingestionURL, config.ingestTimeout)
 	indexing := httpclient.NewIndexingClient(config.indexingURL, config.requestTimeout)
-	if err := checkServices(ctx, ingestion, indexing); err != nil {
+	if err := checkReadiness(ctx, ingestion, indexing); err != nil {
 		return err
 	}
-	config.bookIDs, err = resolveCandidates(ctx, config, ingestion)
-	if err != nil {
-		return err
+	if config.discover {
+		if config.bookIDs, err = discoverBooks(ctx, config.bookIDs, ingestion); err != nil {
+			return err
+		}
 	}
 	orchestrator, err := buildOrchestrator(config, ingestion, indexing, state)
 	if err != nil {
@@ -234,37 +235,23 @@ func bookIDRange(firstID int, lastID int) ([]models.BookID, error) {
 	return bookIDs, nil
 }
 
-func checkServices(ctx context.Context, ingestion httpclient.IngestionClient, indexing httpclient.IndexingClient) error {
-	readinessCtx, cancel := context.WithTimeout(ctx, readinessTimeout)
-	defer cancel()
-	if _, err := ingestion.List(readinessCtx); err != nil {
-		return fmt.Errorf("ingestion service is not ready: %w", err)
+func checkReadiness(ctx context.Context, ingestion httpclient.IngestionClient, indexing httpclient.IndexingClient) error {
+	readiness, err := control.NewReadinessCheck(ingestion, indexing, readinessTimeout)
+	if err != nil {
+		return err
 	}
-	if _, err := indexing.Stats(readinessCtx); err != nil {
-		return fmt.Errorf("indexing service is not ready: %w", err)
-	}
-	return nil
+	return readiness.Check(ctx)
 }
 
-func resolveCandidates(ctx context.Context, config serviceConfig, ingestion httpclient.IngestionClient) ([]models.BookID, error) {
-	if !config.discover {
-		return config.bookIDs, nil
-	}
-	list, err := ingestion.List(ctx)
+func discoverBooks(ctx context.Context, candidates []models.BookID, ingestion httpclient.IngestionClient) ([]models.BookID, error) {
+	discoverer, err := control.NewDiscoverer(ingestion)
 	if err != nil {
-		return nil, fmt.Errorf("discover pending books: %w", err)
+		return nil, err
 	}
-	slog.Info("[CONTROL] discovered complete books", "count", list.Count)
-	return append(config.bookIDs, list.Books...), nil
+	return discoverer.Discover(ctx, candidates)
 }
 
 func buildOrchestrator(config serviceConfig, ingestion httpclient.IngestionClient, indexing httpclient.IndexingClient, state *localstate.Store) (control.Orchestrator, error) {
-	slog.Info("[CONTROL] control state loaded",
-		"state_dir", config.stateDir,
-		"downloaded", state.DownloadedCount(),
-		"indexed", state.IndexedCount(),
-		"failed", state.FailedCount(),
-	)
 	return control.NewOrchestrator(control.OrchestratorConfig{
 		Ingestion:  ingestion,
 		Indexing:   indexing,

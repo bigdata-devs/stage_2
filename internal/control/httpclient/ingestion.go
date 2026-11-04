@@ -61,6 +61,19 @@ func (client IngestionClient) List(ctx context.Context) (BookList, error) {
 	return list, nil
 }
 
+func (client IngestionClient) Ready(ctx context.Context) error {
+	_, err := client.List(ctx)
+	return err
+}
+
+func (client IngestionClient) ListDatalakeBooks(ctx context.Context) ([]models.BookID, error) {
+	list, err := client.List(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return list.Books, nil
+}
+
 func (client IngestionClient) bookURL(bookID models.BookID) string {
 	return fmt.Sprintf("%s/ingest/%s", client.baseURL, bookID.String())
 }

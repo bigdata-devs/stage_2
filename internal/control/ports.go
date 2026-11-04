@@ -34,3 +34,11 @@ type IndexedBookLister interface {
 type FailureResetter interface {
 	WipeFailures() ([]models.BookID, error)
 }
+
+type ReadinessProbe interface {
+	Ready(ctx context.Context) error
+}
+
+type DatalakeBookLister interface {
+	ListDatalakeBooks(ctx context.Context) ([]models.BookID, error)
+}

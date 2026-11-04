@@ -46,6 +46,11 @@ func (client IndexingClient) Stats(ctx context.Context) (IndexStatus, error) {
 	return stats, nil
 }
 
+func (client IndexingClient) Ready(ctx context.Context) error {
+	_, err := client.Stats(ctx)
+	return err
+}
+
 func (client IndexingClient) updateURL(bookID models.BookID) string {
 	return fmt.Sprintf("%s/index/update/%s", client.baseURL, bookID.String())
 }

@@ -2,6 +2,7 @@ package localstate
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"slices"
@@ -34,12 +35,19 @@ func Load(directory string) (*Store, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Store{
+	store := &Store{
 		directory:  directory,
 		downloaded: downloaded,
 		indexed:    indexed,
 		failed:     failed,
-	}, nil
+	}
+	slog.Info("[CONTROL] control state loaded",
+		"state_dir", directory,
+		"downloaded", store.DownloadedCount(),
+		"indexed", store.IndexedCount(),
+		"failed", store.FailedCount(),
+	)
+	return store, nil
 }
 
 func (state *Store) RecordDownloaded(bookID models.BookID) error {
