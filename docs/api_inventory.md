@@ -62,6 +62,15 @@ Internal API that the Control Module consumes; not reachable from the front-end.
 
 - **Semantics:** synchronous (`200` = files fully written, atomic temp+rename), idempotent,
   concurrent calls for the same book are coalesced into one download.
+- **Caller behaviour:** allow a timeout above the service budget of 2 min (the Control Module
+  uses `-ingest-timeout 150s`); retry only `503 download_failed` with exponential backoff and
+  never a `404 book_unavailable`.
+- **Example:**
+
+```console
+$ curl -X POST http://localhost:7001/ingest/1342
+{"book_id":1342,"status":"available","path":"/data/datalake/batch_1000_1999/1342"}
+```
 
 ### `GET /ingest/status/{book_id}` — audience: operational
 
@@ -99,6 +108,15 @@ Internal API that the Control Module consumes; not reachable from the front-end.
 - **Semantics:** synchronous, idempotent (re-indexing replaces the book's metadata and
   postings); at most `-max-concurrent-updates` (default 8) books index at once, the rest
   queue; updates that arrive during a rebuild are replayed after the swap.
+- **Caller behaviour:** a timeout of at least 30 s for a typical book (the Control Module
+  uses `-timeout 30s`; a real novel can take longer under load); retry `500` after a
+  transient outage, never `404 book_not_found` without ingesting the book first.
+- **Example:**
+
+```console
+$ curl -X POST http://localhost:7002/index/update/1342
+{"book_id":1342,"index":"updated"}
+```
 
 ### `POST /index/rebuild` — audience: operational
 
@@ -139,6 +157,12 @@ re-resolution; the requests below therefore reach a Search container through the
   `400 missing_parameter` (`q` absent) · `400 invalid_parameter` (no word in `q`, more
   than 10 distinct words, or malformed `year`/`offset`/`limit`) · `500 internal_error`.
   A query made only of stop words returns `200` with an empty page.
+- **Example:**
+
+```console
+$ curl "http://localhost:7003/search?q=adventure&limit=1"
+{"query":"adventure","filters":{},"total":160,"offset":0,"limit":1,"results":[{"book_id":169,"title":"The Well at the World's End: A Tale","author":"William Morris","language":"en","year":1994}]}
+```
 
 ### `GET /books/{book_id}` — audience: front-end
 
@@ -187,6 +211,14 @@ and Indexing APIs are never exposed to pages.
 
 ## Notes
 
+- **No non-HTTP interactions.** The coordination mechanism is classical orchestration over
+  the HTTP endpoints above: there is no message broker, no scheduled coordination and no
+  shared-memory region, so no event, schedule or shared-state contract applies. The only
+  state outside HTTP is the Control Module's pipeline progress in `control/`
+  files — append-only records under `flock`, owned and written only by the Control Module,
+  whose layout and recovery rules are specified in
+  [`docs/control.md`](control.md); this agrees with the diagrams in
+  [`docs/architecture.md`](architecture.md).
 - The **Control Module** (`cmd/control`) is an on-demand CLI, not an HTTP provider: it
   consumes `POST /ingest/{book_id}`, `GET /ingest/list`, `POST /index/update/{book_id}`,
   `GET /index/status` (and `GET /books/{book_id}` in `-verify` mode) and persists its

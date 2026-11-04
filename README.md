@@ -179,7 +179,7 @@ test/load/sample_host.sh docs/evidence/host_search.csv 360              # whole-
 **Report figures** from the recorded results:
 
 ```bash
-python3 scripts/plot_benchmarks.py                  # writes docs/evidence/figures/ (PNG + PDF)
+python3 scripts/generate_charts.py                  # writes docs/figures/ (PNG + PDF)
 ```
 
 ## API specifications
@@ -196,7 +196,9 @@ The OpenAPI specifications are generated from the Go annotations with `swaggo/sw
 Each specification documents the provider, the intended consumers, parameters, response schemas,
 status codes, idempotency and completion semantics; front-end-facing, internal and operational
 routes are marked with `x-` extension fields. Changing an endpoint requires updating its
-annotation and regenerating the specification in the same commit.
+annotation and regenerating the specification in the same commit. The consolidated endpoint
+inventory with audiences, examples, CORS policy and caller rules is
+[`docs/api_inventory.md`](docs/api_inventory.md).
 
 Further documentation: [`docs/control.md`](docs/control.md) (Control Module runbook),
 [`docs/mongodb.md`](docs/mongodb.md) (datamart design), [`docs/architecture.md`](docs/architecture.md)
