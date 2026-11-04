@@ -13,10 +13,15 @@ selected by the Stage 1 benchmarks. Section 6 of the report justifies the deviat
 
 ## Repository layout
 
+The code follows a hexagonal (ports and adapters) layout: every use case lives in a core
+package that declares the interfaces it needs, and every technology sits behind an adapter —
+the full map with driving and driven ports is in
+[`docs/architecture.md`](docs/architecture.md#code-structure-hexagonal-layout).
+
 | Path | Contents |
 |---|---|
-| `cmd/ingestion`, `cmd/indexing`, `cmd/search`, `cmd/control` | Entry points of the four processes |
-| `internal/` | Private logic: crawler, datalake, tokenizer, indexer, MongoDB datamart, HTTP clients, orchestration |
+| `cmd/ingestion`, `cmd/indexing`, `cmd/search`, `cmd/control` | Composition roots: the four processes, which wire cores and adapters together |
+| `internal/` | Hexagonal layout: cores `search`, `ingestion`, `indexing`, `control` (use cases and ports) and adapters `mongodb`, `localstate`, `crawler`, `datalake`, `api/*` |
 | `api/` | OpenAPI specifications (Swagger 2.0, YAML and JSON) generated from the code annotations |
 | `docs/` | Runbooks, architecture diagrams, replica/thread notes and benchmark evidence |
 | `scripts/` | End-to-end and API validation scripts |
