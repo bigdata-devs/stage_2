@@ -32,7 +32,7 @@
 % ---------------------------------------------------------------------------
 % Page layout
 % ---------------------------------------------------------------------------
-\usepackage[a4paper,top=2.5cm,bottom=2.5cm,left=2.4cm,right=2.4cm,headheight=14pt]{geometry}
+\usepackage[a4paper,top=2.1cm,bottom=2.1cm,left=2cm,right=2cm,headheight=14pt]{geometry}
 \usepackage{fancyhdr}
 \setlength{\parskip}{0.35em}
 \setlength{\parindent}{0pt}
@@ -47,9 +47,13 @@
 \setcounter{totalnumber}{5}
 \makeatletter
 \setlength{\@fptop}{0pt}
-\setlength{\@fpsep}{16pt plus 6pt}
+\setlength{\@fpsep}{12pt plus 4pt}
 \setlength{\@fpbot}{0pt plus 1fil}
 \makeatother
+\usepackage{titlesec}
+\titlespacing*{\section}{0pt}{2.2ex plus .3ex}{1.4ex plus .2ex}
+\titlespacing*{\subsection}{0pt}{1.8ex plus .2ex}{1ex plus .1ex}
+\titlespacing*{\subsubsection}{0pt}{1.5ex plus .2ex}{0.8ex plus .1ex}
 
 % ---------------------------------------------------------------------------
 % Mathematics, tables, floats, lists, listings
@@ -57,7 +61,7 @@
 \usepackage{amsmath,amssymb}
 \usepackage{array,booktabs,tabularx,longtable,multirow,makecell}
 \usepackage{float}
-\usepackage[font=small,labelfont=bf,skip=6pt]{caption}
+\usepackage[font=small,labelfont=bf,skip=4pt]{caption}
 \usepackage{enumitem}
 \setlist{itemsep=0.15em,topsep=0.3em}
 \usepackage[table]{xcolor}
@@ -1007,22 +1011,6 @@ result, \code{404 book\_not\_found} when no \emph{published} book has that ID
 \subsection{Internal contracts}
 \label{sec:internal-contracts}
 
-The internal operations have no request body; their responses are small
-JSON documents. The following exchanges are taken from the committed evidence
-(\code{docs/evidence/\allowbreak rebuild\_replica.md} and the service
-specifications):
-
-\begin{lstlisting}
-POST /ingest/1342           -> 200 {"book_id":1342,"status":"downloaded",
-                                    "path":"/data/datalake/batch_1000_1999/1342"}
-POST /index/update/1342     -> 200 {"book_id":1342,"index":"updated"}
-POST /index/rebuild         -> 200 {"books_processed":383,"elapsed_time":"8m0.945s"}
-POST /index/rebuild         -> 409 {"error":"rebuild_in_progress",
-   (lease held elsewhere)           "message":"an index rebuild is already running"}
-GET  /index/status          -> 200 {"books_indexed":300,"last_update":"2026-11-01T16:39:23Z",
-                                    "index_size_MB":61.1}
-\end{lstlisting}
-
 \paragraph{Ingestion.}
 \route{POST /ingest/\allowbreak\{book\_id\}} answers \code{downloaded}, or
 \code{available} when the book was already complete, in which case nothing is
@@ -1041,13 +1029,14 @@ and its postings, including the removal of terms the new version no longer
 contains, so the index ends up exactly as after the first call. If a rebuild is
 running, the update is not blocked: it is recorded and replayed on the rebuilt
 index right after the swap. \route{POST /index/rebuild} builds a new catalogue
-and index aside and publishes them in one step (the 383-book figure above is
-the run of \cref{sec:bench-indexing}); it answers \code{409
+and index aside and publishes them in one step; it answers \code{409
 rebuild\_in\_progress} while another replica holds the rebuild lease and
 \code{503 rebuild\_interrupted} if its budget (10~minutes by default) runs out,
 in which case the previous index stays published. \route{GET /index/status}
 reports the published books, the time of the last change and the document
-bytes of the datamart (\code{dbStats.dataSize}).
+bytes of the datamart (\code{dbStats.dataSize}). The literal request and
+response bodies of every internal operation are recorded in
+\code{docs/api\_inventory.md} and the service specifications under \code{api/}.
 
 \paragraph{Timeouts and retries expected of the caller.}
 The specification states, per operation, the timeout and failure behaviour
@@ -1301,88 +1290,50 @@ counterpart:
   the structured \code{log/slog} logger.
 \end{itemize}
 
-\Cref{tab:layout} summarises the repository. The Go code follows a
-\textbf{hexagonal (ports and adapters) structure}. Each use case lives in a
-\emph{core} package (\code{internal/ingestion}, \code{internal/indexing},
-\code{internal/search}, \code{internal/control}) that declares, as Go
-interfaces, both the operations it offers and the operations it needs from
-outside. \emph{Adapters} connect the cores to a technology: the HTTP handlers
-call a core through its \emph{driving} ports (\code{BookIngester},
-\code{BookIndex}, \code{Searcher}), while MongoDB, the datalake, the Gutenberg
-client, the HTTP clients of the Control Module and the control-state files
-implement its \emph{driven} ports (for example \code{indexing.IndexWriter} or
-\code{search.Index}). Source dependencies point only into the core: no core
-package imports HTTP, MongoDB or filesystem code, and every adapter asserts at
-compile time the ports it implements. The use cases are therefore tested with
-in-memory fakes, and moving a store to Stage~3 infrastructure means writing a
-new adapter rather than changing a service. The services share one skeleton:
-\code{main}, the composition root, parses flags and environment variables,
-builds the adapters and injects them into the core constructors (constructor
-injection), mounts the handlers on a \code{ServeMux}, starts an
-\code{http.Server} whose read, header, write and idle timeouts are bounded, and
-shuts down gracefully on \code{SIGINT} or \code{SIGTERM} (30~s grace for
-Ingestion and Indexing, 10~s for Search). Test fakes live in \code{\_test.go}
-files and are never compiled into a service binary.
+\paragraph{Repository layout.}
+The Go code follows a \textbf{hexagonal (ports and adapters) structure}. Each
+use case lives in a \emph{core} package (\code{internal/ingestion},
+\code{internal/indexing}, \code{internal/search}, \code{internal/control})
+that declares, as Go interfaces, both the operations it offers and the
+operations it needs from outside. \emph{Adapters} connect the cores to a
+technology: the HTTP handlers call a core through its \emph{driving} ports
+(\code{BookIngester}, \code{BookIndex}, \code{Searcher}), while MongoDB, the
+datalake, the Gutenberg client, the HTTP clients of the Control Module and the
+control-state files implement its \emph{driven} ports (for example
+\code{indexing.IndexWriter} or \code{search.Index}). Source dependencies point
+only into the core: no core package imports HTTP, MongoDB or filesystem code,
+and every adapter asserts at compile time the ports it implements. The use
+cases are therefore tested with in-memory fakes, and moving a store to
+Stage~3 infrastructure means writing a new adapter rather than changing a
+service. The full package-to-role table lives in
+\code{docs/architecture.md}; in summary:
 
-\begin{table}[htbp]
-  \centering
-  \small
-  \caption{Repository layout (\url{\repourl}), grouped by the role of each
-  package in the hexagonal structure.}
-  \label{tab:layout}
-  \begin{tabularx}{\textwidth}{@{}>{\raggedright\arraybackslash}p{5.3cm}>{\raggedright\arraybackslash}X@{}}
-    \toprule
-    Path & Content \\
-    \midrule
-    \multicolumn{2}{@{}l}{\emph{Core: domain model and use cases (no HTTP, MongoDB or filesystem code)}} \\
-    \code{internal/models} & Domain types and the errors shared across
-      boundaries; no serialisation tags \\
-    \code{internal/indexer} & Tokenizer and metadata parser shared by Indexing and
-      Search \\
-    \code{internal/ingestion} & Ingestion use case: single-flight per book,
-      download slots and budget, retries of transient failures \\
-    \code{internal/indexing} & Indexing use case: one update, rebuild under the
-      lease with replay of concurrent updates, index statistics \\
-    \code{internal/search} & Search use case: query parsing (at most ten terms),
-      paging, year and filter rules; book catalog and filter values \\
-    \code{internal/control} & Orchestrator, book selector, verify, retry-failed,
-      readiness check and discovery \\
-    \addlinespace
-    \multicolumn{2}{@{}l}{\emph{Driving adapters (inbound HTTP)}} \\
-    \code{internal/api} & Shared HTTP kit: JSON error body, book-ID parsing,
-      error codes \\
-    \code{internal/api/ingestionapi} & Ingestion API: handlers, validation,
-      response types, OpenAPI annotations \\
-    \code{internal/api/indexingapi} & Indexing API: the same, plus the slot queue
-      that bounds concurrent index updates \\
-    \code{internal/api/searchapi} & Search API (search, book and filter routes):
-      the same, plus the CORS policy \\
-    \addlinespace
-    \multicolumn{2}{@{}l}{\emph{Driven adapters (outbound)}} \\
-    \code{internal/crawler} & Gutenberg client and header/body splitter \\
-    \code{internal/datalake} & Batch layout, atomic file writes, listing of
-      complete books \\
-    \code{internal/mongodb} & Connection, schema and indexes, write path,
-      rebuild and rebuild lease, readers and the search aggregation \\
-    \code{internal/control/httpclient} & HTTP clients of the three service APIs
-      used by the Control Module \\
-    \code{internal/localstate} & \code{flock}-protected control-state files \\
-    \addlinespace
-    \multicolumn{2}{@{}l}{\emph{Composition roots, specifications, deployment and tooling}} \\
-    \code{cmd/ingestion}, \code{cmd/indexing}, \code{cmd/search},
-      \code{cmd/control} & Configuration, wiring of the adapters into the cores,
-      HTTP server and graceful shutdown; command-line interface of the Control
-      Module \\
-    \code{api/ingestion}, \code{api/indexing}, \code{api/search} & Generated
-      OpenAPI~2.0 specifications of the three services \\
-    \code{deploy/nginx}, \code{docker-compose*.yml}, \code{Dockerfile} &
-      Single-host deployment and replica configuration \\
-    \code{test/load}, \code{scripts}, \code{docs} & k6 benchmarks, resource
-      samplers, corpus seeding; validation and end-to-end scripts; runbooks and
-      evidence \\
-    \bottomrule
-  \end{tabularx}
-\end{table}
+\begin{itemize}
+  \item \emph{Cores} (no HTTP, MongoDB or filesystem code): \code{internal/models}
+    (domain and shared errors), \code{internal/indexer} (tokenizer and metadata
+    parser), and the use cases in \code{internal/ingestion},
+    \code{internal/indexing}, \code{internal/search} and
+    \code{internal/control}.
+  \item \emph{Driving adapters} (inbound HTTP): \code{internal/api} (shared
+    kit) and \code{internal/api/\{ingestion,indexing,search\}api} (handlers,
+    DTOs, CORS).
+  \item \emph{Driven adapters} (outbound): \code{internal/crawler},
+    \code{internal/datalake}, \code{internal/mongodb},
+    \code{internal/control/httpclient} and \code{internal/localstate} (the
+    \code{flock}-protected state files).
+  \item \emph{Composition roots, specifications and deployment}: \code{cmd/*},
+    \code{api/*}, \code{deploy/nginx}, \code{docker-compose*.yml},
+    \code{test/load}, \code{scripts} and \code{docs}.
+\end{itemize}
+
+The services share one skeleton: \code{main}, the composition root, parses
+flags and environment variables, builds the adapters and injects them into the
+core constructors (constructor injection), mounts the handlers on a
+\code{ServeMux}, starts an \code{http.Server} whose read, header, write and
+idle timeouts are bounded, and shuts down gracefully on \code{SIGINT} or
+\code{SIGTERM} (30~s grace for Ingestion and Indexing, 10~s for Search). Test
+fakes live in \code{\_test.go} files and are never compiled into a service
+binary.
 
 \subsection{Ingestion Service}
 \label{sec:impl-ingestion}
@@ -1963,23 +1914,22 @@ behaviour.
     \toprule
     Component & Value \\
     \midrule
-    CPU & Intel Core i7-10750H @ 2.60~GHz: 6 cores, 12 threads; 12 logical CPUs
-      visible to WSL2 \\
-    Memory & 15.8~GB on the Windows host; 9.7~GiB allocated to the WSL2
-      distribution that runs Docker (container limit reported by
-      \code{docker stats}: 9.712~GiB) \\
-    Storage & Repository on Windows NTFS (\code{/mnt/c}, 1.9~TB); Docker
-      volumes on the WSL2 ext4 root file system (1007~GB) \\
-    Operating system & Windows with the ``High performance'' power plan; WSL2,
-      Linux 6.18.33.2-microsoft-standard-WSL2; machine otherwise idle, on AC power \\
-    Containers & Docker Engine 29.1.3 (native in WSL2), Docker Compose 2.40.3;
-      no CPU or memory limits on any container \\
-    Services & Go binaries built with \code{golang:1.25-alpine}, run on
-      \code{alpine:3.21}; \code{GOMAXPROCS} = 12 (runtime default) \\
-    Datamart and proxy & MongoDB 7.0.45 (\code{mongo:7}), a fresh
-      \code{boogle\_bench} database per k6 run; nginx 1.28 (\code{alpine}) \\
-    Load generation & k6 v2.3.0, running on the same host; Go 1.27.2
-      (\code{linux/amd64}) for tests and micro-benchmarks \\
+    CPU & Intel Core i7-10750H @ 2.60~GHz: 6 cores / 12 threads (12 logical CPUs
+      visible to WSL2) \\
+    Memory & 15.8~GB Windows host; 9.7~GiB for the WSL2 distribution that runs
+      Docker (container limit 9.712~GiB) \\
+    Storage & Repository on Windows NTFS (1.9~TB); Docker volumes on the WSL2
+      ext4 root (1007~GB) \\
+    OS and power & WSL2, Linux 6.18; Windows ``High performance'' plan; machine
+      idle on AC during the session \\
+    Containers & Docker Engine 29.1.3 (native in WSL2), Compose 2.40.3; no CPU
+      or memory limits \\
+    Services & Go binaries on \code{alpine:3.21}; \code{GOMAXPROCS} = 12 (runtime
+      default) \\
+    Datamart and proxy & MongoDB 7.0.45, a fresh \code{boogle\_bench} database per
+      k6 run; nginx 1.28 \\
+    Load generation & k6 v2.3.0 on the same host; Go 1.27.2 for tests and
+      micro-benchmarks \\
     \bottomrule
   \end{tabularx}
 \end{table}
@@ -2181,31 +2131,7 @@ In the rebuild-lease experiment, replica A rebuilt the 383-book datalake in
 8~min 0.9~s (0.80~books/s through the single-writer rebuild path). Replica B's
 overlapping request was answered \code{409 rebuild\_in\_progress} in under a
 second, and its retry after the lease was released succeeded in 7~min 54.5~s
-(0.81~books/s). \Cref{tab:indexing-summary} collects every indexing throughput
-measured.
-
-\begin{table}[htbp]
-  \centering
-  \footnotesize
-  \caption{Indexing throughput across experiments. The rows differ in corpus,
-  datamart state and, for the last row, session, so they are not directly
-  comparable.}
-  \label{tab:indexing-summary}
-  \begin{tabularx}{\textwidth}{@{}>{\raggedright\arraybackslash}p{4.1cm}>{\raggedright\arraybackslash}p{3.2cm}>{\raggedright\arraybackslash}p{2.5cm}>{\raggedright\arraybackslash}X@{}}
-    \toprule
-    Experiment & Configuration & Books/s & Context \\
-    \midrule
-    k6 steady-state re-indexing & 1 / 5 / 10 concurrent updates & 1.10 / 3.60 / 5.33 &
-      official session; 20-book corpus \\
-    Full rebuild (lease holder) & 1 writer, 383 books & 0.80 & official; 480.9~s;
-      retry on the second replica 474.5~s \\
-    Write-path micro-benchmark & sequential, book 1342 & 1.57 & official; 636.9~ms
-      per book, empty datamart \\
-    Control Module pipeline (ingest + index) & 1 / 2 / 4 / 8 workers & 0.44 / 0.42 / 0.93 / 1.10 &
-      pre-official; first-time indexing (\cref{sec:bench-coordination}) \\
-    \bottomrule
-  \end{tabularx}
-\end{table}
+(0.81~books/s).
 
 % -----------------------------------------------------------------------------
 \subsection{Query latency and concurrency}
@@ -2722,23 +2648,14 @@ off.
 \subsection{Reproducibility and provenance}
 \label{sec:provenance}
 
-Every number and figure in this section can be regenerated from the repository.
-The official session follows \code{docs/evidence/\allowbreak benchmark\_protocol.md}; in
-short:
-
-\begin{lstlisting}[language=bash]
-docker compose up -d --build                     # mongo, three services, nginx
-test/load/seed_corpus.sh 300                     # >= 300 published books
-test/load/sample_containers.sh docs/evidence/search_resources.csv 360 &
-k6 run test/load/search_benchmark.js             # 1 Search replica
-docker compose up -d --scale search=2            # same stack, 2 replicas
-k6 run test/load/search_benchmark.js
-MONGO_DATABASE=boogle_bench k6 run test/load/indexing_benchmark.js
-go test -run '^$' -bench . -benchmem -count 10 -cpu 1,2,4,8 ./internal/indexer/
-go test -run '^$' -bench . -benchmem -count 10 ./internal/mongodb/
-scripts/api_validation.sh --record docs/evidence/api_validation_results.md
-python3 scripts/generate_charts.py               # figures 1-5 + chart_data.csv
-\end{lstlisting}
+Every number and figure in this section can be regenerated from the repository:
+the runbook \code{docs/evidence/\allowbreak benchmark\_protocol.md} holds the exact
+commands of the official session, and
+\code{docs/evidence/\allowbreak README.md} the per-result steps. In short, the
+session brings the stack up with \code{docker compose}, seeds the datamart,
+drives it with the k6 scripts of \cref{tab:workloads}, samples the containers
+and the host, and regenerates the micro-benchmarks with
+\code{go test -bench} --- all from the repository root.
 
 \Cref{tab:provenance} maps every table and figure to its raw evidence. The k6
 outputs in \code{test/load/results/} are byte-identical to the copies in
@@ -2863,8 +2780,9 @@ single fact.
   frequency (\cref{sec:validity}).
 \end{itemize}
 
-\subsection{From the measurements to the Stage 3 design}
+\subsection{From the measurements to the Stage 3 evolution}
 \label{sec:evidence-to-design}
+\label{sec:stage3}
 
 A single-machine experiment cannot show how the system will scale on a cluster,
 and this report does not claim that it does. What the figures can do is rule
@@ -2916,12 +2834,6 @@ same figure, so that Stage~3 is evaluated against Stage~2 like for like.
       frequency &
       Cost per query constant across load levels \\
     \addlinespace
-    Memory below 0.7~GiB of 9.7~GiB (\cref{fig:cpu}b) &
-      Not a constraint at 300 books; the working set will grow with the corpus &
-      Size the WiredTiger cache to the posting working set; monitor cache
-      evictions &
-      Memory panel of \cref{fig:cpu} at the Stage~3 corpus size \\
-    \addlinespace
     Orchestrator overhead $\le 2.6\%$; index step $4.7\times$ longer with 8
       workers (\cref{tab:coordination-runs}) &
       Central coordination is an availability problem, not a throughput one &
@@ -2967,9 +2879,6 @@ by a hashed term key spreads the writes over data nodes, and partitioning
 indexing tasks by book ID across Indexing replicas keeps each book's update on
 one writer. The acceptance criterion is the metric of \cref{fig:indexing}b: the
 CPU cost per book must stay flat as concurrent updates increase.
-
-\subsection{Evolution towards the Stage 3 cluster}
-\label{sec:stage3}
 
 \paragraph{Cross-machine communication.}
 The HTTP/JSON contracts carry over unchanged, because every address already
