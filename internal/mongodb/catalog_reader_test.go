@@ -2,6 +2,7 @@ package mongodb
 
 import (
 	"context"
+	"slices"
 	"testing"
 
 	"boogle-engine/internal/models"
@@ -41,7 +42,7 @@ func TestPublishedBookReturnsOnlyPublishedBooks(t *testing.T) {
 	}
 }
 
-func TestFilterOptionsListsPublishedValues(t *testing.T) {
+func TestDistinctFilterValuesReturnsTheStoredValuesOfPublishedBooks(t *testing.T) {
 	client := liveClient(t)
 	resetDatamart(t, client)
 	indexer := NewBookIndexer(client)
@@ -49,6 +50,7 @@ func TestFilterOptionsListsPublishedValues(t *testing.T) {
 		metadataInput(1, "Jane Austen", "en", 1813, "adventure"),
 		metadataInput(2, "Alex Dumas", "en,fr", 1850, "adventure"),
 		metadataInput(4, "Unknown Author", "es", 0, "adventure"),
+		metadataInput(5, "Anonymous", "Unknown", 1900, "adventure"),
 	}
 	for _, input := range published {
 		if err := indexer.IndexBook(context.Background(), input); err != nil {
@@ -57,30 +59,32 @@ func TestFilterOptionsListsPublishedValues(t *testing.T) {
 	}
 	seedPendingBook(t, client, metadataInput(3, "Mark Twain", "de", 1901, "castaway"))
 
-	values, err := NewDatamartReader(client).FilterOptions(context.Background())
+	stored, err := NewDatamartReader(client).DistinctFilterValues(context.Background())
 	if err != nil {
-		t.Fatalf("filter options: %v", err)
+		t.Fatalf("distinct filter values: %v", err)
 	}
-	if len(values.Languages) != 3 || values.Languages[0] != "en" || values.Languages[1] != "es" || values.Languages[2] != "fr" {
-		t.Errorf("languages = %v, want [en es fr]", values.Languages)
+	slices.Sort(stored.LanguageLists)
+	slices.Sort(stored.Years)
+	if want := []string{"Unknown", "en", "en,fr", "es"}; !slices.Equal(stored.LanguageLists, want) {
+		t.Errorf("language lists = %q, want the stored values of published books %q", stored.LanguageLists, want)
 	}
-	if len(values.Years) != 2 || values.Years[0] != 1813 || values.Years[1] != 1850 {
-		t.Errorf("years = %v, want [1813 1850]", values.Years)
+	if want := []int{0, 1813, 1850, 1900}; !slices.Equal(stored.Years, want) {
+		t.Errorf("years = %v, want the stored values of published books %v", stored.Years, want)
 	}
 }
 
-func TestFilterOptionsOnAnEmptyDatamartReturnsEmptyLists(t *testing.T) {
+func TestDistinctFilterValuesOnAnEmptyDatamartReturnsEmptyLists(t *testing.T) {
 	client := liveClient(t)
 	resetDatamart(t, client)
 
-	values, err := NewDatamartReader(client).FilterOptions(context.Background())
+	stored, err := NewDatamartReader(client).DistinctFilterValues(context.Background())
 	if err != nil {
-		t.Fatalf("filter options: %v", err)
+		t.Fatalf("distinct filter values: %v", err)
 	}
-	if values.Languages == nil || values.Years == nil {
-		t.Fatalf("nil slices must serialize as [], got %+v", values)
+	if stored.LanguageLists == nil || stored.Years == nil {
+		t.Fatalf("nil slices must serialize as [], got %+v", stored)
 	}
-	if len(values.Languages) != 0 || len(values.Years) != 0 {
-		t.Errorf("expected empty filter values, got %+v", values)
+	if len(stored.LanguageLists) != 0 || len(stored.Years) != 0 {
+		t.Errorf("expected empty filter values, got %+v", stored)
 	}
 }

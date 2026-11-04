@@ -3,7 +3,10 @@ package search
 import (
 	"context"
 	"errors"
+	"slices"
+	"strings"
 
+	"boogle-engine/internal/indexer"
 	"boogle-engine/internal/models"
 )
 
@@ -27,5 +30,43 @@ func (catalog *CatalogService) PublishedBook(ctx context.Context, bookID models.
 }
 
 func (catalog *CatalogService) FilterOptions(ctx context.Context) (models.FilterValues, error) {
-	return catalog.store.FilterOptions(ctx)
+	stored, err := catalog.store.DistinctFilterValues(ctx)
+	if err != nil {
+		return models.FilterValues{}, err
+	}
+	return models.FilterValues{
+		Languages: selectableLanguages(stored.LanguageLists),
+		Years:     selectableYears(stored.Years),
+	}, nil
+}
+
+func selectableLanguages(languageLists []string) []string {
+	seen := map[string]bool{}
+	codes := []string{}
+	for _, list := range languageLists {
+		for _, code := range strings.Split(list, ",") {
+			code = strings.TrimSpace(code)
+			if code == "" || code == indexer.UnknownValue || seen[code] {
+				continue
+			}
+			seen[code] = true
+			codes = append(codes, code)
+		}
+	}
+	slices.Sort(codes)
+	return codes
+}
+
+func selectableYears(storedYears []int) []int {
+	seen := map[int]bool{}
+	years := []int{}
+	for _, year := range storedYears {
+		if year < MinYear || year > MaxYear || seen[year] {
+			continue
+		}
+		seen[year] = true
+		years = append(years, year)
+	}
+	slices.Sort(years)
+	return years
 }

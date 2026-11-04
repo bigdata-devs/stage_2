@@ -31,8 +31,8 @@ func (emptyCatalog) PublishedBook(context.Context, models.BookID) (models.BookMe
 	return models.BookMetadata{}, false, nil
 }
 
-func (emptyCatalog) FilterOptions(context.Context) (models.FilterValues, error) {
-	return models.FilterValues{Languages: []string{}, Years: []int{}}, nil
+func (emptyCatalog) DistinctFilterValues(context.Context) (search.StoredFilterValues, error) {
+	return search.StoredFilterValues{}, nil
 }
 
 func TestSearchRouteIsServedThroughTheSearchCore(t *testing.T) {

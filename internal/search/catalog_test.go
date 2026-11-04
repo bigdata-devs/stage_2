@@ -3,7 +3,7 @@ package search_test
 import (
 	"context"
 	"errors"
-	"reflect"
+	"slices"
 	"testing"
 
 	"boogle-engine/internal/models"
@@ -13,7 +13,7 @@ import (
 type fakeCatalogStore struct {
 	book   models.BookMetadata
 	found  bool
-	values models.FilterValues
+	stored search.StoredFilterValues
 	err    error
 }
 
@@ -21,8 +21,8 @@ func (store fakeCatalogStore) PublishedBook(context.Context, models.BookID) (mod
 	return store.book, store.found, store.err
 }
 
-func (store fakeCatalogStore) FilterOptions(context.Context) (models.FilterValues, error) {
-	return store.values, store.err
+func (store fakeCatalogStore) DistinctFilterValues(context.Context) (search.StoredFilterValues, error) {
+	return store.stored, store.err
 }
 
 func newCatalog(t *testing.T, store search.CatalogStore) *search.CatalogService {
@@ -51,14 +51,34 @@ func TestCatalogReportsThePublishedBookOfTheStore(t *testing.T) {
 	}
 }
 
-func TestCatalogReportsTheFilterValuesOfTheStore(t *testing.T) {
-	values := models.FilterValues{Languages: []string{"en", "fr"}, Years: []int{1813}}
-	catalog := newCatalog(t, fakeCatalogStore{values: values})
+func TestFilterOptionsListsOnlyTheValuesASearchCanMatch(t *testing.T) {
+	stored := search.StoredFilterValues{
+		LanguageLists: []string{"fr", "en,fr", " de , en ", "Unknown", "", "en,Unknown"},
+		Years:         []int{1850, 0, 1813, 1850, search.MaxYear + 1, -5},
+	}
+	catalog := newCatalog(t, fakeCatalogStore{stored: stored})
 
 	got, err := catalog.FilterOptions(context.Background())
 
-	if err != nil || !reflect.DeepEqual(got, values) {
-		t.Errorf("FilterOptions = %+v, %v; want %+v, nil", got, err, values)
+	if err != nil {
+		t.Fatalf("FilterOptions: %v", err)
+	}
+	if want := []string{"de", "en", "fr"}; !slices.Equal(got.Languages, want) {
+		t.Errorf("languages = %q, want %q (codes flattened, de-duplicated and sorted, without Unknown)", got.Languages, want)
+	}
+	if want := []int{1813, 1850}; !slices.Equal(got.Years, want) {
+		t.Errorf("years = %v, want %v (only years GET /search accepts, de-duplicated and sorted)", got.Years, want)
+	}
+}
+
+func TestFilterOptionsOfAnEmptyCatalogAreEmptyLists(t *testing.T) {
+	got, err := newCatalog(t, fakeCatalogStore{}).FilterOptions(context.Background())
+
+	if err != nil {
+		t.Fatalf("FilterOptions: %v", err)
+	}
+	if got.Languages == nil || got.Years == nil || len(got.Languages) != 0 || len(got.Years) != 0 {
+		t.Errorf("FilterOptions = %+v, want empty non-nil lists", got)
 	}
 }
 

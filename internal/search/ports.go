@@ -21,7 +21,12 @@ type Index interface {
 
 type CatalogStore interface {
 	PublishedBook(ctx context.Context, bookID models.BookID) (models.BookMetadata, bool, error)
-	FilterOptions(ctx context.Context) (models.FilterValues, error)
+	DistinctFilterValues(ctx context.Context) (StoredFilterValues, error)
+}
+
+type StoredFilterValues struct {
+	LanguageLists []string
+	Years         []int
 }
 
 type Request struct {

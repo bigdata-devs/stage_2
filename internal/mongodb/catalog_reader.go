@@ -4,14 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"slices"
-	"strings"
 
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"
 
-	"boogle-engine/internal/indexer"
 	"boogle-engine/internal/models"
+	"boogle-engine/internal/search"
 )
 
 func (reader DatamartReader) PublishedBook(ctx context.Context, bookID models.BookID) (models.BookMetadata, bool, error) {
@@ -29,58 +27,41 @@ func (reader DatamartReader) PublishedBook(ctx context.Context, bookID models.Bo
 	return document.metadata(), true, nil
 }
 
-func (reader DatamartReader) FilterOptions(ctx context.Context) (models.FilterValues, error) {
-	values := models.FilterValues{Languages: []string{}, Years: []int{}}
+func (reader DatamartReader) DistinctFilterValues(ctx context.Context) (search.StoredFilterValues, error) {
 	published := bson.D{{Key: "status", Value: StatusPublished}}
 
 	var rawLanguages []any
 	err := reader.books().Distinct(ctx, "language", published).Decode(&rawLanguages)
 	if err != nil && !errors.Is(err, mongo.ErrNoDocuments) {
-		return models.FilterValues{}, fmt.Errorf("list distinct languages: %w", err)
+		return search.StoredFilterValues{}, fmt.Errorf("list distinct languages: %w", err)
 	}
-	values.Languages = flattenLanguages(rawLanguages)
 
 	var rawYears []any
 	err = reader.books().Distinct(ctx, "publication_year", published).Decode(&rawYears)
 	if err != nil && !errors.Is(err, mongo.ErrNoDocuments) {
-		return models.FilterValues{}, fmt.Errorf("list distinct publication years: %w", err)
+		return search.StoredFilterValues{}, fmt.Errorf("list distinct publication years: %w", err)
 	}
-	values.Years = knownYears(rawYears)
-	return values, nil
+	return search.StoredFilterValues{LanguageLists: stringValues(rawLanguages), Years: integerValues(rawYears)}, nil
 }
 
-func flattenLanguages(rawValues []any) []string {
-	seen := map[string]bool{}
-	codes := []string{}
+func stringValues(rawValues []any) []string {
+	values := make([]string, 0, len(rawValues))
 	for _, rawValue := range rawValues {
-		list, ok := rawValue.(string)
-		if !ok {
-			continue
-		}
-		for _, code := range strings.Split(list, ",") {
-			code = strings.TrimSpace(code)
-			if code == "" || code == indexer.UnknownValue || seen[code] {
-				continue
-			}
-			seen[code] = true
-			codes = append(codes, code)
+		if value, ok := rawValue.(string); ok {
+			values = append(values, value)
 		}
 	}
-	slices.Sort(codes)
-	return codes
+	return values
 }
 
-func knownYears(rawValues []any) []int {
-	years := []int{}
+func integerValues(rawValues []any) []int {
+	values := make([]int, 0, len(rawValues))
 	for _, rawValue := range rawValues {
-		year, ok := asInt(rawValue)
-		if !ok || year == 0 {
-			continue
+		if value, ok := asInt(rawValue); ok {
+			values = append(values, value)
 		}
-		years = append(years, year)
 	}
-	slices.Sort(years)
-	return years
+	return values
 }
 
 func asInt(rawValue any) (int, bool) {
