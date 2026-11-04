@@ -7,28 +7,29 @@ import (
 	"strings"
 
 	"boogle-engine/internal/models"
+	"boogle-engine/internal/search"
 )
 
-type StubEngine struct {
+type StubIndex struct {
 	catalog []models.BookMetadata
 }
 
-func NewStubEngine() StubEngine {
+func NewStubIndex() StubIndex {
 	catalog := sampleCatalog()
 	slices.SortFunc(catalog, func(first, second models.BookMetadata) int {
 		return cmp.Compare(first.BookID, second.BookID)
 	})
-	return StubEngine{catalog: catalog}
+	return StubIndex{catalog: catalog}
 }
 
-func (engine StubEngine) Search(_ context.Context, query SearchQuery) (SearchPage, error) {
-	matches := engine.matchingBooks(query)
-	return SearchPage{Total: len(matches), Books: pageOf(matches, query.Offset, query.Limit)}, nil
+func (index StubIndex) Search(_ context.Context, query search.Query) (search.Page, error) {
+	matches := index.matchingBooks(query)
+	return search.Page{Total: len(matches), Books: pageOf(matches, query.Offset, query.Limit)}, nil
 }
 
-func (engine StubEngine) matchingBooks(query SearchQuery) []models.BookMetadata {
+func (index StubIndex) matchingBooks(query search.Query) []models.BookMetadata {
 	matches := []models.BookMetadata{}
-	for _, book := range engine.catalog {
+	for _, book := range index.catalog {
 		if titleContainsEveryTerm(book.Title, query.Terms) && matchesFilters(book, query.Filters) {
 			matches = append(matches, book)
 		}
@@ -45,7 +46,7 @@ func titleContainsEveryTerm(title string, terms []string) bool {
 	return true
 }
 
-func matchesFilters(book models.BookMetadata, filters SearchFilters) bool {
+func matchesFilters(book models.BookMetadata, filters search.Filters) bool {
 	return matchesAuthor(book, filters.Author) &&
 		matchesLanguage(book, filters.Language) &&
 		matchesYear(book, filters.Year)

@@ -14,6 +14,7 @@ import (
 	"boogle-engine/internal/indexer"
 	"boogle-engine/internal/models"
 	"boogle-engine/internal/mongodb"
+	"boogle-engine/internal/search"
 )
 
 func searchDatamartStart(t *testing.T) mongodb.Client {
@@ -64,7 +65,7 @@ func markPending(t *testing.T, client mongodb.Client, bookID models.BookID) {
 	}
 }
 
-func pageIDs(page api.SearchPage) []models.BookID {
+func pageIDs(page search.Page) []models.BookID {
 	ids := make([]models.BookID, 0, len(page.Books))
 	for _, book := range page.Books {
 		ids = append(ids, book.BookID)
@@ -72,7 +73,7 @@ func pageIDs(page api.SearchPage) []models.BookID {
 	return ids
 }
 
-func TestDatamartEngineAgainstLiveDatamart(t *testing.T) {
+func TestSearchAgainstLiveDatamart(t *testing.T) {
 	client := searchDatamartStart(t)
 	indexBody(t, client,
 		models.BookMetadata{BookID: 1, Title: "Island Adventure", Author: "Jane Austen", Language: "en", PublicationYear: 1813},
@@ -84,11 +85,11 @@ func TestDatamartEngineAgainstLiveDatamart(t *testing.T) {
 		models.BookMetadata{BookID: 3, Title: "Unfinished Adventure", Author: "Jane Austen", Language: "en", PublicationYear: 1813},
 		"adventure adventure adventure adventure adventure adventure adventure adventure adventure")
 	markPending(t, client, 3)
-	engine := NewDatamartEngine(mongodb.NewDatamartReader(client))
+	index := mongodb.NewSearchIndex(mongodb.NewDatamartReader(client))
 	ctx := context.Background()
 
 	t.Run("single term is ranked by term frequency", func(t *testing.T) {
-		page, err := engine.Search(ctx, api.SearchQuery{Term: "adventure", Terms: []string{"adventure"}, Limit: api.DefaultLimit})
+		page, err := index.Search(ctx, search.Query{Text: "adventure", Terms: []string{"adventure"}, Limit: search.DefaultLimit})
 		if err != nil {
 			t.Fatalf("Search: %v", err)
 		}
@@ -98,9 +99,9 @@ func TestDatamartEngineAgainstLiveDatamart(t *testing.T) {
 	})
 
 	t.Run("filters combine with AND", func(t *testing.T) {
-		page, err := engine.Search(ctx, api.SearchQuery{
-			Term: "adventure", Terms: []string{"adventure"},
-			Filters: api.SearchFilters{Author: "austen", Language: "en", Year: 1813}, Limit: api.DefaultLimit,
+		page, err := index.Search(ctx, search.Query{
+			Text: "adventure", Terms: []string{"adventure"},
+			Filters: search.Filters{Author: "austen", Language: "en", Year: 1813}, Limit: search.DefaultLimit,
 		})
 		if err != nil {
 			t.Fatalf("Search: %v", err)
@@ -111,7 +112,7 @@ func TestDatamartEngineAgainstLiveDatamart(t *testing.T) {
 	})
 
 	t.Run("total counts every page", func(t *testing.T) {
-		page, err := engine.Search(ctx, api.SearchQuery{Term: "adventure", Terms: []string{"adventure"}, Offset: 1, Limit: 1})
+		page, err := index.Search(ctx, search.Query{Text: "adventure", Terms: []string{"adventure"}, Offset: 1, Limit: 1})
 		if err != nil {
 			t.Fatalf("Search: %v", err)
 		}
@@ -121,7 +122,7 @@ func TestDatamartEngineAgainstLiveDatamart(t *testing.T) {
 	})
 
 	t.Run("GET /search serves the datamart through the production router", func(t *testing.T) {
-		router := newTestRouter(t, mongodb.NewDatamartReader(client))
+		router := newTestRouter(t, mongodb.NewSearchIndex(mongodb.NewDatamartReader(client)))
 		recorder := httptest.NewRecorder()
 		router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/search?q=adventure&language=FR", nil))
 
@@ -136,7 +137,7 @@ func TestDatamartEngineAgainstLiveDatamart(t *testing.T) {
 	})
 
 	t.Run("GET /search normalizes q and ANDs every word", func(t *testing.T) {
-		router := newTestRouter(t, mongodb.NewDatamartReader(client))
+		router := newTestRouter(t, mongodb.NewSearchIndex(mongodb.NewDatamartReader(client)))
 		cases := []struct {
 			rawQuery  string
 			wantTotal int

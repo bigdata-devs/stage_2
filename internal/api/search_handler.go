@@ -1,24 +1,16 @@
 package api
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"log/slog"
-	"math"
 	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
 
-	"boogle-engine/internal/indexer"
 	"boogle-engine/internal/models"
-)
-
-const (
-	DefaultLimit  = 20
-	MaxLimit      = 100
-	MaxQueryTerms = 10
+	"boogle-engine/internal/search"
 )
 
 const (
@@ -26,29 +18,19 @@ const (
 	invalidParameterCode = "invalid_parameter"
 )
 
-var ErrMissingEngine = errors.New("search handler needs a search engine")
+var ErrMissingSearcher = errors.New("search handler needs a searcher")
 
-type SearchEngine interface {
-	Search(ctx context.Context, query SearchQuery) (SearchPage, error)
-}
-
-type SearchQuery struct {
-	Term    string
-	Terms   []string
-	Filters SearchFilters
-	Offset  int
-	Limit   int
+var searchParameters = map[search.Field]string{
+	search.FieldText:   "q",
+	search.FieldYear:   "year",
+	search.FieldOffset: "offset",
+	search.FieldLimit:  "limit",
 }
 
 type SearchFilters struct {
 	Author   string `json:"author,omitempty" example:"Jane Austen"`
 	Language string `json:"language,omitempty" example:"en"`
 	Year     int    `json:"year,omitempty" example:"1813"`
-}
-
-type SearchPage struct {
-	Total int
-	Books []models.BookMetadata
 }
 
 type SearchResponse struct {
@@ -75,14 +57,14 @@ type BookResult struct {
 }
 
 type SearchHandler struct {
-	engine SearchEngine
+	searcher search.Searcher
 }
 
-func NewSearchHandler(engine SearchEngine) (SearchHandler, error) {
-	if engine == nil {
-		return SearchHandler{}, ErrMissingEngine
+func NewSearchHandler(searcher search.Searcher) (SearchHandler, error) {
+	if searcher == nil {
+		return SearchHandler{}, ErrMissingSearcher
 	}
-	return SearchHandler{engine: engine}, nil
+	return SearchHandler{searcher: searcher}, nil
 }
 
 // @Summary		Search books by keywords
@@ -119,131 +101,72 @@ func NewSearchHandler(engine SearchEngine) (SearchHandler, error) {
 // @x-completion	"synchronous"
 // @Router			/search [get]
 func (handler SearchHandler) Search(writer http.ResponseWriter, request *http.Request) {
-	query, err := parseSearchQuery(request.URL.Query())
+	searchRequest, err := parseSearchRequest(request.URL.Query())
 	if err != nil {
 		writeQueryError(writer, err)
 		return
 	}
-	if len(query.Terms) == 0 {
-		writeJSON(writer, http.StatusOK, newSearchResponse(query, SearchPage{}))
+	result, err := handler.searcher.Search(request.Context(), searchRequest)
+	if errors.Is(err, search.ErrInvalidQuery) {
+		writeQueryError(writer, err)
 		return
 	}
-	page, err := handler.engine.Search(request.Context(), query)
 	if err != nil {
-		writeEngineFailure(writer, query, err)
+		writeSearchFailure(writer, searchRequest, err)
 		return
 	}
-	writeJSON(writer, http.StatusOK, newSearchResponse(query, page))
+	writeJSON(writer, http.StatusOK, newSearchResponse(result))
 }
 
-type queryParameterError struct {
-	code    string
-	message string
-}
-
-func (err queryParameterError) Error() string {
-	return err.message
-}
-
-func missingParameter(name string) queryParameterError {
-	return queryParameterError{code: missingParameterCode, message: fmt.Sprintf("query parameter %q is required", name)}
-}
-
-func invalidParameter(name, rule string) queryParameterError {
-	return queryParameterError{code: invalidParameterCode, message: fmt.Sprintf("query parameter %q %s", name, rule)}
-}
-
-type integerParameter struct {
-	name     string
-	fallback int
-	minimum  int
-	maximum  int
-	rule     string
-}
-
-var (
-	yearParameter   = integerParameter{name: "year", minimum: 1, maximum: 9999, rule: "must be a year between 1 and 9999"}
-	offsetParameter = integerParameter{name: "offset", minimum: 0, maximum: math.MaxInt32, rule: "must be a non-negative integer"}
-	limitParameter  = integerParameter{
-		name: "limit", fallback: DefaultLimit, minimum: 1, maximum: MaxLimit,
-		rule: fmt.Sprintf("must be an integer between 1 and %d", MaxLimit),
-	}
-)
-
-func (parameter integerParameter) parse(values url.Values) (int, error) {
-	raw := strings.TrimSpace(values.Get(parameter.name))
-	if raw == "" {
-		return parameter.fallback, nil
-	}
-	value, err := strconv.Atoi(raw)
-	if err != nil || value < parameter.minimum || value > parameter.maximum {
-		return 0, invalidParameter(parameter.name, parameter.rule)
-	}
-	return value, nil
-}
-
-func parseSearchQuery(values url.Values) (SearchQuery, error) {
-	query := SearchQuery{Term: strings.TrimSpace(values.Get("q"))}
-	if query.Term == "" {
-		return SearchQuery{}, missingParameter("q")
-	}
-	var err error
-	if query.Terms, err = parseSearchTerms(query.Term); err != nil {
-		return SearchQuery{}, err
-	}
-	if query.Filters, err = parseFilters(values); err != nil {
-		return SearchQuery{}, err
-	}
-	if query.Offset, err = offsetParameter.parse(values); err != nil {
-		return SearchQuery{}, err
-	}
-	if query.Limit, err = limitParameter.parse(values); err != nil {
-		return SearchQuery{}, err
-	}
-	return query, nil
-}
-
-func parseSearchTerms(q string) ([]string, error) {
-	words := indexer.Tokenize(q)
-	if len(words) == 0 {
-		return nil, invalidParameter("q", "must contain at least one word made of the letters a-z")
-	}
-	terms := []string{}
-	seen := map[string]bool{}
-	for _, term := range indexer.Normalize(words) {
-		if seen[term] {
-			continue
-		}
-		if len(terms) == MaxQueryTerms {
-			return nil, invalidParameter("q", fmt.Sprintf("must contain at most %d distinct search words", MaxQueryTerms))
-		}
-		seen[term] = true
-		terms = append(terms, term)
-	}
-	return terms, nil
-}
-
-func parseFilters(values url.Values) (SearchFilters, error) {
-	year, err := yearParameter.parse(values)
+func parseSearchRequest(values url.Values) (search.Request, error) {
+	year, err := optionalInteger(values, search.FieldYear)
 	if err != nil {
-		return SearchFilters{}, err
+		return search.Request{}, err
 	}
-	return SearchFilters{
-		Author:   strings.TrimSpace(values.Get("author")),
-		Language: strings.ToLower(strings.TrimSpace(values.Get("language"))),
+	offset, err := optionalInteger(values, search.FieldOffset)
+	if err != nil {
+		return search.Request{}, err
+	}
+	limit, err := optionalInteger(values, search.FieldLimit)
+	if err != nil {
+		return search.Request{}, err
+	}
+	return search.Request{
+		Text:     values.Get(searchParameters[search.FieldText]),
+		Author:   values.Get("author"),
+		Language: values.Get("language"),
 		Year:     year,
+		Offset:   offset,
+		Limit:    limit,
 	}, nil
 }
 
-func newSearchResponse(query SearchQuery, page SearchPage) SearchResponse {
-	results := make([]BookResult, 0, len(page.Books))
-	for _, book := range page.Books {
+func optionalInteger(values url.Values, field search.Field) (*int, error) {
+	raw := strings.TrimSpace(values.Get(searchParameters[field]))
+	if raw == "" {
+		return nil, nil
+	}
+	value, err := strconv.Atoi(raw)
+	if err != nil {
+		return nil, search.InvalidNumber(field)
+	}
+	return &value, nil
+}
+
+func newSearchResponse(result search.Result) SearchResponse {
+	results := make([]BookResult, 0, len(result.Page.Books))
+	for _, book := range result.Page.Books {
 		results = append(results, newBookResult(book))
 	}
+	query := result.Query
 	return SearchResponse{
-		Query:   query.Term,
-		Filters: query.Filters,
-		Total:   page.Total,
+		Query: query.Text,
+		Filters: SearchFilters{
+			Author:   query.Filters.Author,
+			Language: query.Filters.Language,
+			Year:     query.Filters.Year,
+		},
+		Total:   result.Page.Total,
 		Offset:  query.Offset,
 		Limit:   query.Limit,
 		Results: results,
@@ -262,15 +185,19 @@ func newBookResult(book models.BookMetadata) BookResult {
 
 func writeQueryError(writer http.ResponseWriter, err error) {
 	response := ErrorResponse{Error: invalidParameterCode, Message: err.Error()}
-	var parameterErr queryParameterError
-	if errors.As(err, &parameterErr) {
-		response.Error = parameterErr.code
+	var invalid search.InvalidQueryError
+	if errors.As(err, &invalid) {
+		name := searchParameters[invalid.Field]
+		response.Message = fmt.Sprintf("query parameter %q %s", name, invalid.Rule)
+		if invalid.Missing {
+			response = ErrorResponse{Error: missingParameterCode, Message: fmt.Sprintf("query parameter %q is required", name)}
+		}
 	}
 	writeJSON(writer, http.StatusBadRequest, response)
 }
 
-func writeEngineFailure(writer http.ResponseWriter, query SearchQuery, err error) {
-	slog.Error("search engine failed", "term", query.Term, "filters", query.Filters, "error", err)
+func writeSearchFailure(writer http.ResponseWriter, request search.Request, err error) {
+	slog.Error("search failed", "q", request.Text, "author", request.Author, "language", request.Language, "error", err)
 	writeJSON(writer, http.StatusInternalServerError, ErrorResponse{
 		Error:   internalErrorCode,
 		Message: "the search could not be completed, please try again later",

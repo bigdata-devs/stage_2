@@ -20,6 +20,7 @@ import (
 	_ "boogle-engine/api/search"
 	"boogle-engine/internal/api"
 	"boogle-engine/internal/mongodb"
+	"boogle-engine/internal/search"
 )
 
 const (
@@ -68,7 +69,7 @@ func run(arguments []string) error {
 	}
 	defer closeDatamart(client)
 	reader := mongodb.NewDatamartReader(client)
-	searchHandler, err := api.NewSearchHandler(NewDatamartEngine(reader))
+	searchHandler, err := buildSearchHandler(mongodb.NewSearchIndex(reader))
 	if err != nil {
 		return err
 	}
@@ -79,6 +80,14 @@ func run(arguments []string) error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	return serve(ctx, newServer(address, cors.Wrap(newRouter(searchHandler, catalogHandler))))
+}
+
+func buildSearchHandler(index search.Index) (api.SearchHandler, error) {
+	service, err := search.NewService(index)
+	if err != nil {
+		return api.SearchHandler{}, err
+	}
+	return api.NewSearchHandler(service)
 }
 
 func connectDatamart() (mongodb.Client, error) {

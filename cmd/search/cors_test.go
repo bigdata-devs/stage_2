@@ -11,7 +11,7 @@ import (
 
 	"boogle-engine/internal/api"
 	"boogle-engine/internal/models"
-	"boogle-engine/internal/mongodb"
+	"boogle-engine/internal/search"
 )
 
 func TestCORSPolicyFromEnvironment(t *testing.T) {
@@ -58,8 +58,8 @@ func TestSearchRoutesAnswerCrossOriginBrowsers(t *testing.T) {
 	if err != nil {
 		t.Fatalf("corsPolicyFromEnvironment: %v", err)
 	}
-	searcher := &fakeSearcher{result: mongodb.SearchResult{Total: 1, Books: []models.BookMetadata{{BookID: 2701, Title: "Moby Dick"}}}}
-	router := cors.Wrap(newTestRouter(t, searcher))
+	index := &fakeIndex{page: search.Page{Total: 1, Books: []models.BookMetadata{{BookID: 2701, Title: "Moby Dick"}}}}
+	router := cors.Wrap(newTestRouter(t, index))
 	cases := []struct {
 		name       string
 		method     string
