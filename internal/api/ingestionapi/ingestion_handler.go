@@ -1,4 +1,4 @@
-package api
+package ingestionapi
 
 import (
 	"errors"
@@ -7,15 +7,12 @@ import (
 	"net/http"
 	"path/filepath"
 
+	"boogle-engine/internal/api"
 	"boogle-engine/internal/ingestion"
 	"boogle-engine/internal/models"
 )
 
-const bookIDPathParameter = "book_id"
-
 const (
-	invalidBookIDCode   = "invalid_book_id"
-	bookNotFoundCode    = "book_not_found"
 	bookUnavailableCode = "book_unavailable"
 	downloadFailedCode  = "download_failed"
 )
@@ -89,10 +86,10 @@ func (handler IngestionHandler) RegisterRoutes(router *http.ServeMux) {
 // @Produce		json
 // @Param			book_id	path		int					true	"Project Gutenberg book ID (positive integer)"	minimum(1)	example(1342)
 // @Success		200		{object}	IngestionResponse	"The book is complete in the datalake"
-// @Failure		400		{object}	ErrorResponse		"invalid_book_id: book_id is not a positive integer"
-// @Failure		404		{object}	ErrorResponse		"book_unavailable: Gutenberg has no such book or its text lacks the START/END markers"
-// @Failure		500		{object}	ErrorResponse		"internal_error: the datalake could not be written"
-// @Failure		503		{object}	ErrorResponse		"download_failed: Gutenberg failed transiently or the ingestion budget ran out"
+// @Failure		400		{object}	api.ErrorResponse	"invalid_book_id: book_id is not a positive integer"
+// @Failure		404		{object}	api.ErrorResponse	"book_unavailable: Gutenberg has no such book or its text lacks the START/END markers"
+// @Failure		500		{object}	api.ErrorResponse	"internal_error: the datalake could not be written"
+// @Failure		503		{object}	api.ErrorResponse	"download_failed: Gutenberg failed transiently or the ingestion budget ran out"
 // @x-provider		"Ingestion Service"
 // @x-consumers	["Control Module"]
 // @x-audience		"internal"
@@ -100,9 +97,9 @@ func (handler IngestionHandler) RegisterRoutes(router *http.ServeMux) {
 // @x-completion	"synchronous"
 // @Router			/ingest/{book_id} [post]
 func (handler IngestionHandler) Ingest(writer http.ResponseWriter, request *http.Request) {
-	bookID, err := parseBookIDPath(request)
+	bookID, err := api.ParseBookIDPath(request)
 	if err != nil {
-		writeInvalidBookID(writer, err)
+		api.WriteInvalidBookID(writer, err)
 		return
 	}
 	result, err := handler.ingester.Ingest(request.Context(), bookID)
@@ -127,8 +124,8 @@ func (handler IngestionHandler) Ingest(writer http.ResponseWriter, request *http
 // @Produce		json
 // @Param			book_id	path		int					true	"Project Gutenberg book ID (positive integer)"	minimum(1)	example(1342)
 // @Success		200		{object}	BookStatusResponse	"Both files of the book are in the datalake"
-// @Failure		400		{object}	ErrorResponse		"invalid_book_id: book_id is not a positive integer"
-// @Failure		404		{object}	ErrorResponse		"book_not_found: the datalake holds no complete copy of the book"
+// @Failure		400		{object}	api.ErrorResponse	"invalid_book_id: book_id is not a positive integer"
+// @Failure		404		{object}	api.ErrorResponse	"book_not_found: the datalake holds no complete copy of the book"
 // @x-provider		"Ingestion Service"
 // @x-consumers	["Control Module"]
 // @x-audience		"internal"
@@ -136,17 +133,17 @@ func (handler IngestionHandler) Ingest(writer http.ResponseWriter, request *http
 // @x-completion	"synchronous"
 // @Router			/ingest/status/{book_id} [get]
 func (handler IngestionHandler) Status(writer http.ResponseWriter, request *http.Request) {
-	bookID, err := parseBookIDPath(request)
+	bookID, err := api.ParseBookIDPath(request)
 	if err != nil {
-		writeInvalidBookID(writer, err)
+		api.WriteInvalidBookID(writer, err)
 		return
 	}
 	if _, err := handler.lake.Locate(bookID); err == nil {
-		writeJSON(writer, http.StatusOK, BookStatusResponse{BookID: bookID, Status: models.StatusAvailable})
+		api.WriteJSON(writer, http.StatusOK, BookStatusResponse{BookID: bookID, Status: models.StatusAvailable})
 		return
 	}
 	message := fmt.Sprintf("book %d is not in the datalake", bookID)
-	writeJSON(writer, http.StatusNotFound, ErrorResponse{Error: bookNotFoundCode, Message: message})
+	api.WriteJSON(writer, http.StatusNotFound, api.ErrorResponse{Error: api.BookNotFoundCode, Message: message})
 }
 
 // @Summary		List the books in the datalake
@@ -163,7 +160,7 @@ func (handler IngestionHandler) Status(writer http.ResponseWriter, request *http
 // @Tags			ingestion
 // @Produce		json
 // @Success		200	{object}	BookListResponse	"Complete books in ascending order"
-// @Failure		500	{object}	ErrorResponse		"internal_error: the datalake folders could not be read"
+// @Failure		500	{object}	api.ErrorResponse	"internal_error: the datalake folders could not be read"
 // @x-provider		"Ingestion Service"
 // @x-consumers	["Control Module"]
 // @x-audience		"internal"
@@ -174,33 +171,20 @@ func (handler IngestionHandler) List(writer http.ResponseWriter, _ *http.Request
 	bookIDs, err := handler.lake.ListBookIDs()
 	if err != nil {
 		slog.Error("[INGESTION] datalake could not be listed", "error", err)
-		writeJSON(writer, http.StatusInternalServerError, ErrorResponse{Error: internalErrorCode, Message: "the datalake could not be listed"})
+		api.WriteJSON(writer, http.StatusInternalServerError, api.ErrorResponse{Error: api.InternalErrorCode, Message: "the datalake could not be listed"})
 		return
 	}
 	books := append([]models.BookID{}, bookIDs...)
-	writeJSON(writer, http.StatusOK, BookListResponse{Count: len(books), Books: books})
-}
-
-func parseBookIDPath(request *http.Request) (models.BookID, error) {
-	rawBookID := request.PathValue(bookIDPathParameter)
-	bookID, err := models.ParseBookID(rawBookID)
-	if err != nil {
-		return 0, fmt.Errorf("path parameter %q must be a positive integer, got %q", bookIDPathParameter, rawBookID)
-	}
-	return bookID, nil
-}
-
-func writeInvalidBookID(writer http.ResponseWriter, err error) {
-	writeJSON(writer, http.StatusBadRequest, ErrorResponse{Error: invalidBookIDCode, Message: err.Error()})
+	api.WriteJSON(writer, http.StatusOK, BookListResponse{Count: len(books), Books: books})
 }
 
 func writeIngestionResult(writer http.ResponseWriter, result models.IngestionResult) {
 	switch result.Status {
 	case models.StatusDownloaded, models.StatusAvailable:
-		writeJSON(writer, http.StatusOK, newIngestionResponse(result))
+		api.WriteJSON(writer, http.StatusOK, newIngestionResponse(result))
 	case models.StatusUnavailable:
 		slog.Warn("[INGESTION] book unavailable", "book_id", result.BookID, "error", result.Err)
-		writeJSON(writer, http.StatusNotFound, ErrorResponse{Error: bookUnavailableCode, Message: result.Err.Error()})
+		api.WriteJSON(writer, http.StatusNotFound, api.ErrorResponse{Error: bookUnavailableCode, Message: result.Err.Error()})
 	default:
 		writeIngestionFailure(writer, result)
 	}
@@ -213,10 +197,10 @@ func newIngestionResponse(result models.IngestionResult) IngestionResponse {
 func writeIngestionFailure(writer http.ResponseWriter, result models.IngestionResult) {
 	if errors.Is(result.Err, models.ErrTransient) {
 		slog.Warn("[INGESTION] download failed", "book_id", result.BookID, "error", result.Err)
-		writeJSON(writer, http.StatusServiceUnavailable, ErrorResponse{Error: downloadFailedCode, Message: result.Err.Error()})
+		api.WriteJSON(writer, http.StatusServiceUnavailable, api.ErrorResponse{Error: downloadFailedCode, Message: result.Err.Error()})
 		return
 	}
 	slog.Error("[INGESTION] book could not be stored", "book_id", result.BookID, "status", result.Status, "error", result.Err)
 	message := fmt.Sprintf("book %d could not be stored in the datalake", result.BookID)
-	writeJSON(writer, http.StatusInternalServerError, ErrorResponse{Error: internalErrorCode, Message: message})
+	api.WriteJSON(writer, http.StatusInternalServerError, api.ErrorResponse{Error: api.InternalErrorCode, Message: message})
 }

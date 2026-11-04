@@ -1,4 +1,4 @@
-package api
+package indexingapi
 
 import (
 	"context"
@@ -12,6 +12,8 @@ import (
 	"testing"
 	"time"
 
+	"boogle-engine/internal/api"
+	"boogle-engine/internal/api/apitest"
 	"boogle-engine/internal/datalake"
 	"boogle-engine/internal/indexing"
 	"boogle-engine/internal/models"
@@ -112,8 +114,8 @@ func (fixture indexingFixture) send(method, target string) *httptest.ResponseRec
 func (fixture indexingFixture) booksIndexed(t *testing.T) int {
 	t.Helper()
 	recorder := fixture.send(http.MethodGet, "/index/status")
-	assertStatus(t, recorder, http.StatusOK)
-	return decodeBody[IndexStatusResponse](t, recorder).BooksIndexed
+	apitest.AssertStatus(t, recorder, http.StatusOK)
+	return apitest.DecodeBody[IndexStatusResponse](t, recorder).BooksIndexed
 }
 
 func assertBooksIndexed(t *testing.T, fixture indexingFixture, want int) {
@@ -128,8 +130,8 @@ func TestIndexUpdateIndexesBookFromDatalake(t *testing.T) {
 
 	recorder := fixture.send(http.MethodPost, "/index/update/1342")
 
-	assertStatus(t, recorder, http.StatusOK)
-	assertBody(t, recorder, `{"book_id":1342,"index":"updated"}`)
+	apitest.AssertStatus(t, recorder, http.StatusOK)
+	apitest.AssertBody(t, recorder, `{"book_id":1342,"index":"updated"}`)
 	assertBooksIndexed(t, fixture, 1)
 }
 
@@ -138,8 +140,8 @@ func TestIndexUpdateRepeatedIsIdempotent(t *testing.T) {
 
 	for attempt := 1; attempt <= 3; attempt++ {
 		recorder := fixture.send(http.MethodPost, "/index/update/1342")
-		assertStatus(t, recorder, http.StatusOK)
-		assertBody(t, recorder, `{"book_id":1342,"index":"updated"}`)
+		apitest.AssertStatus(t, recorder, http.StatusOK)
+		apitest.AssertBody(t, recorder, `{"book_id":1342,"index":"updated"}`)
 	}
 
 	assertBooksIndexed(t, fixture, 1)
@@ -166,7 +168,7 @@ func TestConcurrentIndexUpdatesOfSameBookCreateNoDuplicates(t *testing.T) {
 func TestIndexUpdateOfBookMissingFromDatalakeReturnsNotFound(t *testing.T) {
 	fixture := newIndexingFixture(t)
 
-	assertErrorCode(t, fixture.send(http.MethodPost, "/index/update/1342"), http.StatusNotFound, bookNotFoundCode)
+	apitest.AssertErrorCode(t, fixture.send(http.MethodPost, "/index/update/1342"), http.StatusNotFound, api.BookNotFoundCode)
 	assertBooksIndexed(t, fixture, 0)
 }
 
@@ -174,7 +176,7 @@ func TestIndexUpdateRejectsInvalidBookID(t *testing.T) {
 	fixture := newIndexingFixture(t)
 	for _, target := range []string{"/index/update/abc", "/index/update/0", "/index/update/-1", "/index/update/1.5"} {
 		t.Run(target, func(t *testing.T) {
-			assertErrorCode(t, fixture.send(http.MethodPost, target), http.StatusBadRequest, invalidBookIDCode)
+			apitest.AssertErrorCode(t, fixture.send(http.MethodPost, target), http.StatusBadRequest, api.InvalidBookIDCode)
 		})
 	}
 }
@@ -184,8 +186,8 @@ func TestRebuildIndexesEveryBookInDatalake(t *testing.T) {
 
 	recorder := fixture.send(http.MethodPost, "/index/rebuild")
 
-	assertStatus(t, recorder, http.StatusOK)
-	response := decodeBody[RebuildResponse](t, recorder)
+	apitest.AssertStatus(t, recorder, http.StatusOK)
+	response := apitest.DecodeBody[RebuildResponse](t, recorder)
 	if _, err := time.ParseDuration(response.ElapsedTime); err != nil || response.BooksProcessed != 3 {
 		t.Errorf("response = %+v (parse error %v), want 3 books and a Go duration", response, err)
 	}
@@ -200,7 +202,7 @@ func TestRebuildStartsFromScratch(t *testing.T) {
 		t.Fatalf("remove book 84 from the datalake: %v", err)
 	}
 
-	assertStatus(t, fixture.send(http.MethodPost, "/index/rebuild"), http.StatusOK)
+	apitest.AssertStatus(t, fixture.send(http.MethodPost, "/index/rebuild"), http.StatusOK)
 
 	assertBooksIndexed(t, fixture, 1)
 }
@@ -237,12 +239,12 @@ func TestRebuildFailuresKeepTheContract(t *testing.T) {
 	}{
 		{"another rebuild running", indexing.ErrRebuildInProgress, http.StatusConflict, rebuildInProgressCode},
 		{"caller disconnected", fmt.Errorf("rebuild index: %w", context.Canceled), http.StatusServiceUnavailable, rebuildInterruptedCode},
-		{"unreadable datalake", errors.New("list datalake books: permission denied"), http.StatusInternalServerError, internalErrorCode},
+		{"unreadable datalake", errors.New("list datalake books: permission denied"), http.StatusInternalServerError, api.InternalErrorCode},
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
 			router := newIndexingRouter(t, scriptedIndex{rebuildErr: testCase.err}, time.Minute, testMaxConcurrentUpdates)
-			assertErrorCode(t, serveRequest(router, http.MethodPost, "/index/rebuild"), testCase.wantStatus, testCase.wantCode)
+			apitest.AssertErrorCode(t, serveRequest(router, http.MethodPost, "/index/rebuild"), testCase.wantStatus, testCase.wantCode)
 		})
 	}
 }
@@ -252,13 +254,13 @@ func TestRebuildIsStoppedByTheRebuildBudget(t *testing.T) {
 
 	recorder := serveRequest(router, http.MethodPost, "/index/rebuild")
 
-	assertErrorCode(t, recorder, http.StatusServiceUnavailable, rebuildInterruptedCode)
+	apitest.AssertErrorCode(t, recorder, http.StatusServiceUnavailable, rebuildInterruptedCode)
 }
 
 func TestIndexUpdateFailureReturnsInternalError(t *testing.T) {
 	router := newIndexingRouter(t, scriptedIndex{indexErr: errors.New("disk read failed")}, time.Minute, testMaxConcurrentUpdates)
 
-	assertErrorCode(t, serveRequest(router, http.MethodPost, "/index/update/1342"), http.StatusInternalServerError, internalErrorCode)
+	apitest.AssertErrorCode(t, serveRequest(router, http.MethodPost, "/index/update/1342"), http.StatusInternalServerError, api.InternalErrorCode)
 }
 
 func TestStatusMatchesTheContractExample(t *testing.T) {
@@ -272,8 +274,8 @@ func TestStatusMatchesTheContractExample(t *testing.T) {
 
 	recorder := serveRequest(router, http.MethodGet, "/index/status")
 
-	assertStatus(t, recorder, http.StatusOK)
-	assertBody(t, recorder, `{"books_indexed":1200,"last_update":"2025-10-08T14:05:00Z","index_size_MB":42.7}`)
+	apitest.AssertStatus(t, recorder, http.StatusOK)
+	apitest.AssertBody(t, recorder, `{"books_indexed":1200,"last_update":"2025-10-08T14:05:00Z","index_size_MB":42.7}`)
 }
 
 func TestNewIndexingHandlerValidatesItsArguments(t *testing.T) {
@@ -353,7 +355,7 @@ func TestIndexUpdateGivesUpWhileWaitingForAnUpdateSlot(t *testing.T) {
 	recorder := httptest.NewRecorder()
 	router.ServeHTTP(recorder, request)
 
-	assertErrorCode(t, recorder, http.StatusInternalServerError, internalErrorCode)
+	apitest.AssertErrorCode(t, recorder, http.StatusInternalServerError, api.InternalErrorCode)
 	select {
 	case <-index.entered:
 		t.Fatal("the caller that gave up still reached the index")

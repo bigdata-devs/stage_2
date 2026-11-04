@@ -1,4 +1,4 @@
-package api
+package indexingapi
 
 import (
 	"context"
@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"time"
 
+	"boogle-engine/internal/api"
 	"boogle-engine/internal/indexing"
 	"boogle-engine/internal/models"
 )
@@ -106,9 +107,9 @@ func (handler IndexingHandler) RegisterRoutes(router *http.ServeMux) {
 // @Produce		json
 // @Param			book_id	path		int					true	"Project Gutenberg book ID (positive integer)"	minimum(1)	example(1342)
 // @Success		200		{object}	IndexUpdateResponse	"The book is in the published index"
-// @Failure		400		{object}	ErrorResponse		"invalid_book_id: book_id is not a positive integer"
-// @Failure		404		{object}	ErrorResponse		"book_not_found: the datalake holds no complete copy of the book"
-// @Failure		500		{object}	ErrorResponse		"internal_error: the book could not be read or indexed"
+// @Failure		400		{object}	api.ErrorResponse	"invalid_book_id: book_id is not a positive integer"
+// @Failure		404		{object}	api.ErrorResponse	"book_not_found: the datalake holds no complete copy of the book"
+// @Failure		500		{object}	api.ErrorResponse	"internal_error: the book could not be read or indexed"
 // @x-provider		"Indexing Service"
 // @x-consumers	["Control Module"]
 // @x-audience		"internal"
@@ -116,15 +117,15 @@ func (handler IndexingHandler) RegisterRoutes(router *http.ServeMux) {
 // @x-completion	"synchronous"
 // @Router			/index/update/{book_id} [post]
 func (handler IndexingHandler) UpdateBook(writer http.ResponseWriter, request *http.Request) {
-	bookID, err := parseBookIDPath(request)
+	bookID, err := api.ParseBookIDPath(request)
 	if err != nil {
-		writeInvalidBookID(writer, err)
+		api.WriteInvalidBookID(writer, err)
 		return
 	}
 	if err := handler.acquireUpdateSlot(request.Context()); err != nil {
 		slog.Warn("[INDEXING] update gave up waiting for a slot", "book_id", bookID, "error", err)
 		message := fmt.Sprintf("book %d could not be indexed: the service was saturated and the caller stopped waiting", bookID)
-		writeJSON(writer, http.StatusInternalServerError, ErrorResponse{Error: internalErrorCode, Message: message})
+		api.WriteJSON(writer, http.StatusInternalServerError, api.ErrorResponse{Error: api.InternalErrorCode, Message: message})
 		return
 	}
 	defer handler.releaseUpdateSlot()
@@ -132,7 +133,7 @@ func (handler IndexingHandler) UpdateBook(writer http.ResponseWriter, request *h
 		writeIndexingFailure(writer, bookID, err)
 		return
 	}
-	writeJSON(writer, http.StatusOK, IndexUpdateResponse{BookID: bookID, Index: IndexUpdated})
+	api.WriteJSON(writer, http.StatusOK, IndexUpdateResponse{BookID: bookID, Index: IndexUpdated})
 }
 
 func (handler IndexingHandler) acquireUpdateSlot(ctx context.Context) error {
@@ -173,10 +174,10 @@ func (handler IndexingHandler) releaseUpdateSlot() {
 // @Description	- `503 rebuild_interrupted` and `500 internal_error`: the previous index is still published; retry later with backoff.
 // @Tags			indexing
 // @Produce		json
-// @Success		200	{object}	RebuildResponse	"The rebuilt index is published"
-// @Failure		409	{object}	ErrorResponse	"rebuild_in_progress: another rebuild is running"
-// @Failure		500	{object}	ErrorResponse	"internal_error: the datalake could not be listed or a book could not be indexed"
-// @Failure		503	{object}	ErrorResponse	"rebuild_interrupted: the rebuild budget ran out or the caller disconnected"
+// @Success		200	{object}	RebuildResponse		"The rebuilt index is published"
+// @Failure		409	{object}	api.ErrorResponse	"rebuild_in_progress: another rebuild is running"
+// @Failure		500	{object}	api.ErrorResponse	"internal_error: the datalake could not be listed or a book could not be indexed"
+// @Failure		503	{object}	api.ErrorResponse	"rebuild_interrupted: the rebuild budget ran out or the caller disconnected"
 // @x-provider		"Indexing Service"
 // @x-consumers	["Control Module"]
 // @x-audience		"internal"
@@ -192,7 +193,7 @@ func (handler IndexingHandler) Rebuild(writer http.ResponseWriter, request *http
 		return
 	}
 	slog.Info("[INDEXING] index rebuilt", "books", report.BooksProcessed, "elapsed", report.Elapsed)
-	writeJSON(writer, http.StatusOK, RebuildResponse{
+	api.WriteJSON(writer, http.StatusOK, RebuildResponse{
 		BooksProcessed: report.BooksProcessed,
 		ElapsedTime:    report.Elapsed.Round(time.Millisecond).String(),
 	})
@@ -222,7 +223,7 @@ func (handler IndexingHandler) Rebuild(writer http.ResponseWriter, request *http
 // @Router			/index/status [get]
 func (handler IndexingHandler) Status(writer http.ResponseWriter, _ *http.Request) {
 	stats := handler.index.Stats()
-	writeJSON(writer, http.StatusOK, IndexStatusResponse{
+	api.WriteJSON(writer, http.StatusOK, IndexStatusResponse{
 		BooksIndexed: stats.BooksIndexed,
 		LastUpdate:   stats.LastUpdate.UTC().Truncate(time.Second),
 		IndexSizeMB:  megabytesWithOneDecimal(stats.SizeBytes),
@@ -232,26 +233,26 @@ func (handler IndexingHandler) Status(writer http.ResponseWriter, _ *http.Reques
 func writeIndexingFailure(writer http.ResponseWriter, bookID models.BookID, err error) {
 	if errors.Is(err, models.ErrBookNotFound) {
 		message := fmt.Sprintf("book %d is not in the datalake; ingest it before indexing it", bookID)
-		writeJSON(writer, http.StatusNotFound, ErrorResponse{Error: bookNotFoundCode, Message: message})
+		api.WriteJSON(writer, http.StatusNotFound, api.ErrorResponse{Error: api.BookNotFoundCode, Message: message})
 		return
 	}
 	slog.Error("[INDEXING] book could not be indexed", "book_id", bookID, "error", err)
 	message := fmt.Sprintf("book %d could not be indexed", bookID)
-	writeJSON(writer, http.StatusInternalServerError, ErrorResponse{Error: internalErrorCode, Message: message})
+	api.WriteJSON(writer, http.StatusInternalServerError, api.ErrorResponse{Error: api.InternalErrorCode, Message: message})
 }
 
 func writeRebuildFailure(writer http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, indexing.ErrRebuildInProgress):
-		writeJSON(writer, http.StatusConflict, ErrorResponse{Error: rebuildInProgressCode, Message: err.Error()})
+		api.WriteJSON(writer, http.StatusConflict, api.ErrorResponse{Error: rebuildInProgressCode, Message: err.Error()})
 	case errors.Is(err, context.DeadlineExceeded), errors.Is(err, context.Canceled):
 		slog.Warn("[INDEXING] rebuild interrupted", "error", err)
 		message := "the rebuild was interrupted before it finished; the previous index is still published"
-		writeJSON(writer, http.StatusServiceUnavailable, ErrorResponse{Error: rebuildInterruptedCode, Message: message})
+		api.WriteJSON(writer, http.StatusServiceUnavailable, api.ErrorResponse{Error: rebuildInterruptedCode, Message: message})
 	default:
 		slog.Error("[INDEXING] rebuild failed", "error", err)
 		message := "the rebuild failed; the previous index is still published"
-		writeJSON(writer, http.StatusInternalServerError, ErrorResponse{Error: internalErrorCode, Message: message})
+		api.WriteJSON(writer, http.StatusInternalServerError, api.ErrorResponse{Error: api.InternalErrorCode, Message: message})
 	}
 }
 

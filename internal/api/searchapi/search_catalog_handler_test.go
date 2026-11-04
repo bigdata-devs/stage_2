@@ -1,4 +1,4 @@
-package api
+package searchapi
 
 import (
 	"context"
@@ -9,6 +9,8 @@ import (
 	"strings"
 	"testing"
 
+	"boogle-engine/internal/api"
+	"boogle-engine/internal/api/apitest"
 	"boogle-engine/internal/models"
 	"boogle-engine/internal/search"
 )
@@ -64,7 +66,7 @@ func publishedStubCatalog() *fakeCatalog {
 func TestBookReturnsPublishedBookMetadata(t *testing.T) {
 	recorder := sendCatalog(t, publishedStubCatalog(), http.MethodGet, "/books/1342")
 
-	assertStatus(t, recorder, http.StatusOK)
+	apitest.AssertStatus(t, recorder, http.StatusOK)
 	want := `{"book_id":1342,"title":"Pride and Prejudice","author":"Jane Austen","language":"en","year":1813}`
 	if body := strings.TrimSpace(recorder.Body.String()); body != want {
 		t.Errorf("body = %s, want %s", body, want)
@@ -84,9 +86,9 @@ func TestBookOfMissingOrUnpublishedBookReturnsNotFound(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			recorder := sendCatalog(t, testCase.catalog, http.MethodGet, testCase.target)
 
-			assertStatus(t, recorder, http.StatusNotFound)
-			if response := decodeBody[ErrorResponse](t, recorder); response.Error != bookNotFoundCode {
-				t.Errorf("error = %+v, want %s", response, bookNotFoundCode)
+			apitest.AssertStatus(t, recorder, http.StatusNotFound)
+			if response := apitest.DecodeBody[api.ErrorResponse](t, recorder); response.Error != api.BookNotFoundCode {
+				t.Errorf("error = %+v, want %s", response, api.BookNotFoundCode)
 			}
 		})
 	}
@@ -98,9 +100,9 @@ func TestBookWithMalformedIDReturnsBadRequest(t *testing.T) {
 			catalog := &fakeCatalog{}
 			recorder := sendCatalog(t, catalog, http.MethodGet, target)
 
-			assertStatus(t, recorder, http.StatusBadRequest)
-			if response := decodeBody[ErrorResponse](t, recorder); response.Error != invalidBookIDCode {
-				t.Errorf("error = %+v, want %s", response, invalidBookIDCode)
+			apitest.AssertStatus(t, recorder, http.StatusBadRequest)
+			if response := apitest.DecodeBody[api.ErrorResponse](t, recorder); response.Error != api.InvalidBookIDCode {
+				t.Errorf("error = %+v, want %s", response, api.InvalidBookIDCode)
 			}
 			if catalog.book.BookID != 0 {
 				t.Errorf("catalog was consulted with book ID %d for an invalid request", catalog.book.BookID)
@@ -113,10 +115,10 @@ func TestBookFailureReturnsInternalErrorWithoutDetails(t *testing.T) {
 	catalog := &fakeCatalog{bookErr: errors.New("mongo: connection refused")}
 	recorder := sendCatalog(t, catalog, http.MethodGet, "/books/1342")
 
-	assertStatus(t, recorder, http.StatusInternalServerError)
-	response := decodeBody[ErrorResponse](t, recorder)
-	if response.Error != internalErrorCode || len(response.Message) == 0 {
-		t.Errorf("error = %+v, want %s with a generic message", response, internalErrorCode)
+	apitest.AssertStatus(t, recorder, http.StatusInternalServerError)
+	response := apitest.DecodeBody[api.ErrorResponse](t, recorder)
+	if response.Error != api.InternalErrorCode || len(response.Message) == 0 {
+		t.Errorf("error = %+v, want %s with a generic message", response, api.InternalErrorCode)
 	}
 	if encoded, _ := json.Marshal(response); strings.Contains(string(encoded), "mongo") {
 		t.Errorf("response leaks internal details: %s", encoded)
@@ -130,7 +132,7 @@ func TestFiltersReturnsDistinctPublishedValues(t *testing.T) {
 	}}
 	recorder := sendCatalog(t, catalog, http.MethodGet, "/search/filters")
 
-	assertStatus(t, recorder, http.StatusOK)
+	apitest.AssertStatus(t, recorder, http.StatusOK)
 	want := `{"languages":["en","es","fr"],"years":[1719,1813,1851]}`
 	if body := strings.TrimSpace(recorder.Body.String()); body != want {
 		t.Errorf("body = %s, want %s", body, want)
@@ -140,11 +142,11 @@ func TestFiltersReturnsDistinctPublishedValues(t *testing.T) {
 func TestFiltersSerializesEmptyArraysWhenNoBooksArePublished(t *testing.T) {
 	recorder := sendCatalog(t, &fakeCatalog{}, http.MethodGet, "/search/filters")
 
-	assertStatus(t, recorder, http.StatusOK)
-	if languages := rawField(t, recorder, "languages"); languages != "[]" {
+	apitest.AssertStatus(t, recorder, http.StatusOK)
+	if languages := apitest.RawField(t, recorder, "languages"); languages != "[]" {
 		t.Errorf("languages = %s, want [] (never null)", languages)
 	}
-	if years := rawField(t, recorder, "years"); years != "[]" {
+	if years := apitest.RawField(t, recorder, "years"); years != "[]" {
 		t.Errorf("years = %s, want [] (never null)", years)
 	}
 }
@@ -153,9 +155,9 @@ func TestFiltersFailureReturnsInternalError(t *testing.T) {
 	catalog := &fakeCatalog{valuesErr: errors.New("mongo: socket closed")}
 	recorder := sendCatalog(t, catalog, http.MethodGet, "/search/filters")
 
-	assertStatus(t, recorder, http.StatusInternalServerError)
-	if response := decodeBody[ErrorResponse](t, recorder); response.Error != internalErrorCode {
-		t.Errorf("error = %+v, want %s", response, internalErrorCode)
+	apitest.AssertStatus(t, recorder, http.StatusInternalServerError)
+	if response := apitest.DecodeBody[api.ErrorResponse](t, recorder); response.Error != api.InternalErrorCode {
+		t.Errorf("error = %+v, want %s", response, api.InternalErrorCode)
 	}
 }
 

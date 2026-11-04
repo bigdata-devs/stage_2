@@ -1,4 +1,4 @@
-package api
+package searchapi
 
 import (
 	"errors"
@@ -7,6 +7,9 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"boogle-engine/internal/api"
+	"boogle-engine/internal/api/apitest"
 )
 
 func TestNewCORSPolicyNormalizesAllowedOrigins(t *testing.T) {
@@ -70,7 +73,7 @@ type countingHandler struct {
 
 func (handler *countingHandler) ServeHTTP(writer http.ResponseWriter, _ *http.Request) {
 	handler.calls++
-	writeJSON(writer, handler.status, map[string]string{"served": "by the router"})
+	api.WriteJSON(writer, handler.status, map[string]string{"served": "by the router"})
 }
 
 func serveThroughCORS(t *testing.T, setting string, request *http.Request) (*httptest.ResponseRecorder, *countingHandler) {
@@ -193,7 +196,7 @@ func TestCORSRejectsPreflightFromOriginOutsideTheList(t *testing.T) {
 			}
 			assertHeader(t, recorder, "Access-Control-Allow-Origin", "")
 			assertHeader(t, recorder, "Access-Control-Allow-Methods", "")
-			if response := decodeBody[ErrorResponse](t, recorder); response.Error != originNotAllowedCode {
+			if response := apitest.DecodeBody[api.ErrorResponse](t, recorder); response.Error != originNotAllowedCode {
 				t.Errorf("error = %+v, want %s", response, originNotAllowedCode)
 			}
 		})

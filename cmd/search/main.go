@@ -1,6 +1,6 @@
 package main
 
-//go:generate go run github.com/swaggo/swag/cmd/swag@v1.16.6 init -g main.go -d ./,../../internal/api -o ../../api/search -t search
+//go:generate go run github.com/swaggo/swag/cmd/swag@v1.16.6 init -g main.go -d ./,../../internal/api/searchapi,../../internal/api -o ../../api/search -t search
 
 import (
 	"context"
@@ -18,7 +18,7 @@ import (
 	httpSwagger "github.com/swaggo/http-swagger/v2"
 
 	_ "boogle-engine/api/search"
-	"boogle-engine/internal/api"
+	"boogle-engine/internal/api/searchapi"
 	"boogle-engine/internal/mongodb"
 	"boogle-engine/internal/search"
 )
@@ -82,12 +82,12 @@ func run(arguments []string) error {
 	return serve(ctx, newServer(address, cors.Wrap(newRouter(searchHandler, catalogHandler))))
 }
 
-func buildSearchHandler(index search.Index) (api.SearchHandler, error) {
+func buildSearchHandler(index search.Index) (searchapi.SearchHandler, error) {
 	service, err := search.NewService(index)
 	if err != nil {
-		return api.SearchHandler{}, err
+		return searchapi.SearchHandler{}, err
 	}
-	return api.NewSearchHandler(service)
+	return searchapi.NewSearchHandler(service)
 }
 
 func connectDatamart() (mongodb.Client, error) {
@@ -122,7 +122,7 @@ func parseAddress(arguments []string) (string, error) {
 	return *address, nil
 }
 
-func newRouter(searchHandler api.SearchHandler, catalogHandler api.CatalogHandler) *http.ServeMux {
+func newRouter(searchHandler searchapi.SearchHandler, catalogHandler searchapi.CatalogHandler) *http.ServeMux {
 	router := http.NewServeMux()
 	router.HandleFunc("GET /search", searchHandler.Search)
 	catalogHandler.RegisterRoutes(router)

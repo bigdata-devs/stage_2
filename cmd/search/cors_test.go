@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"boogle-engine/internal/api"
+	"boogle-engine/internal/api/searchapi"
 	"boogle-engine/internal/models"
 	"boogle-engine/internal/search"
 )
@@ -37,7 +37,7 @@ func TestCORSPolicyFromEnvironment(t *testing.T) {
 
 			policy, err := corsPolicyFromEnvironment()
 			if testCase.wantErr {
-				if !errors.Is(err, api.ErrInvalidAllowedOrigins) || !strings.Contains(err.Error(), corsEnvironmentVariable) {
+				if !errors.Is(err, searchapi.ErrInvalidAllowedOrigins) || !strings.Contains(err.Error(), corsEnvironmentVariable) {
 					t.Errorf("error = %v, want ErrInvalidAllowedOrigins naming %s", err, corsEnvironmentVariable)
 				}
 				return

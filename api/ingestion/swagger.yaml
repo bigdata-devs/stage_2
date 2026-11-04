@@ -1,6 +1,15 @@
 basePath: /
 definitions:
-  api.BookListResponse:
+  api.ErrorResponse:
+    properties:
+      error:
+        example: invalid_parameter
+        type: string
+      message:
+        example: query parameter "limit" must be an integer between 1 and 100
+        type: string
+    type: object
+  ingestionapi.BookListResponse:
     properties:
       books:
         description: IDs of the complete books in ascending order; never null
@@ -16,7 +25,7 @@ definitions:
         example: 3
         type: integer
     type: object
-  api.BookStatusResponse:
+  ingestionapi.BookStatusResponse:
     properties:
       book_id:
         example: 1342
@@ -27,16 +36,7 @@ definitions:
         example: available
         type: string
     type: object
-  api.ErrorResponse:
-    properties:
-      error:
-        example: invalid_parameter
-        type: string
-      message:
-        example: query parameter "limit" must be an integer between 1 and 100
-        type: string
-    type: object
-  api.IngestionResponse:
+  ingestionapi.IngestionResponse:
     properties:
       book_id:
         example: 1342
@@ -105,7 +105,7 @@ paths:
         "200":
           description: The book is complete in the datalake
           schema:
-            $ref: '#/definitions/api.IngestionResponse'
+            $ref: '#/definitions/ingestionapi.IngestionResponse'
         "400":
           description: 'invalid_book_id: book_id is not a positive integer'
           schema:
@@ -152,7 +152,7 @@ paths:
         "200":
           description: Complete books in ascending order
           schema:
-            $ref: '#/definitions/api.BookListResponse'
+            $ref: '#/definitions/ingestionapi.BookListResponse'
         "500":
           description: 'internal_error: the datalake folders could not be read'
           schema:
@@ -192,7 +192,7 @@ paths:
         "200":
           description: Both files of the book are in the datalake
           schema:
-            $ref: '#/definitions/api.BookStatusResponse'
+            $ref: '#/definitions/ingestionapi.BookStatusResponse'
         "400":
           description: 'invalid_book_id: book_id is not a positive integer'
           schema:

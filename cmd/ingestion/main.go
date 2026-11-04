@@ -1,6 +1,6 @@
 package main
 
-//go:generate go run github.com/swaggo/swag/cmd/swag@v1.16.6 init -g main.go -d ./,../../internal/api -o ../../api/ingestion -t ingestion
+//go:generate go run github.com/swaggo/swag/cmd/swag@v1.16.6 init -g main.go -d ./,../../internal/api/ingestionapi,../../internal/api -o ../../api/ingestion -t ingestion
 
 import (
 	"context"
@@ -16,7 +16,7 @@ import (
 	httpSwagger "github.com/swaggo/http-swagger/v2"
 
 	_ "boogle-engine/api/ingestion"
-	"boogle-engine/internal/api"
+	"boogle-engine/internal/api/ingestionapi"
 	"boogle-engine/internal/crawler"
 	"boogle-engine/internal/datalake"
 	"boogle-engine/internal/ingestion"
@@ -76,17 +76,17 @@ func run(arguments []string) error {
 	return serve(ctx, newServer(config, newRouter(ingestionHandler)))
 }
 
-func buildIngestionHandler(config serviceConfig) (api.IngestionHandler, error) {
+func buildIngestionHandler(config serviceConfig) (ingestionapi.IngestionHandler, error) {
 	lake, err := datalake.New(config.datalakeDir, config.batchSize)
 	if err != nil {
-		return api.IngestionHandler{}, err
+		return ingestionapi.IngestionHandler{}, err
 	}
 	client := crawler.NewGutenbergClient(config.baseURL, config.requestTimeout)
 	service, err := ingestion.NewService(ingestion.Ports{Fetcher: client, Store: lake}, config.retry, config.limits)
 	if err != nil {
-		return api.IngestionHandler{}, err
+		return ingestionapi.IngestionHandler{}, err
 	}
-	return api.NewIngestionHandler(service, service)
+	return ingestionapi.NewIngestionHandler(service, service)
 }
 
 func parseConfig(arguments []string) (serviceConfig, error) {
@@ -113,7 +113,7 @@ func registerFlags(flags *flag.FlagSet) *serviceConfig {
 	return config
 }
 
-func newRouter(ingestionHandler api.IngestionHandler) *http.ServeMux {
+func newRouter(ingestionHandler ingestionapi.IngestionHandler) *http.ServeMux {
 	router := http.NewServeMux()
 	ingestionHandler.RegisterRoutes(router)
 	router.Handle("GET /swagger/", httpSwagger.Handler(httpSwagger.URL("/swagger/doc.json")))

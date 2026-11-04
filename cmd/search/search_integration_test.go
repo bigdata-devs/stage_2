@@ -10,7 +10,7 @@ import (
 
 	"go.mongodb.org/mongo-driver/v2/bson"
 
-	"boogle-engine/internal/api"
+	"boogle-engine/internal/api/searchapi"
 	"boogle-engine/internal/indexer"
 	"boogle-engine/internal/models"
 	"boogle-engine/internal/mongodb"
@@ -154,7 +154,7 @@ func TestSearchAgainstLiveDatamart(t *testing.T) {
 			if recorder.Code != http.StatusOK {
 				t.Fatalf("%s: status = %d, want 200; body: %s", testCase.rawQuery, recorder.Code, recorder.Body.String())
 			}
-			var response api.SearchResponse
+			var response searchapi.SearchResponse
 			if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
 				t.Fatalf("%s: decode body: %v", testCase.rawQuery, err)
 			}

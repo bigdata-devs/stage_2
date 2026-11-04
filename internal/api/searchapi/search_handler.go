@@ -1,4 +1,4 @@
-package api
+package searchapi
 
 import (
 	"errors"
@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 
+	"boogle-engine/internal/api"
 	"boogle-engine/internal/models"
 	"boogle-engine/internal/search"
 )
@@ -91,9 +92,9 @@ func NewSearchHandler(searcher search.Searcher) (SearchHandler, error) {
 // @Param			year		query		int				false	"Exact original publication year"	minimum(1)	maximum(9999)	example(1813)
 // @Param			offset		query		int				false	"Number of matches to skip before the first result"	default(0)	minimum(0)
 // @Param			limit		query		int				false	"Maximum number of results in the page"	default(20)	minimum(1)	maximum(100)
-// @Success		200			{object}	SearchResponse	"One page of matching books"
-// @Failure		400			{object}	ErrorResponse	"q is missing (missing_parameter); q has no word or more than 10 distinct words, or another parameter is malformed (invalid_parameter)"
-// @Failure		500			{object}	ErrorResponse	"The search engine failed (internal_error)"
+// @Success		200			{object}	SearchResponse		"One page of matching books"
+// @Failure		400			{object}	api.ErrorResponse	"q is missing (missing_parameter); q has no word or more than 10 distinct words, or another parameter is malformed (invalid_parameter)"
+// @Failure		500			{object}	api.ErrorResponse	"The search engine failed (internal_error)"
 // @x-provider		"Search Service"
 // @x-consumers	["Front-end"]
 // @x-audience		"front-end"
@@ -115,7 +116,7 @@ func (handler SearchHandler) Search(writer http.ResponseWriter, request *http.Re
 		writeSearchFailure(writer, searchRequest, err)
 		return
 	}
-	writeJSON(writer, http.StatusOK, newSearchResponse(result))
+	api.WriteJSON(writer, http.StatusOK, newSearchResponse(result))
 }
 
 func parseSearchRequest(values url.Values) (search.Request, error) {
@@ -184,22 +185,22 @@ func newBookResult(book models.BookMetadata) BookResult {
 }
 
 func writeQueryError(writer http.ResponseWriter, err error) {
-	response := ErrorResponse{Error: invalidParameterCode, Message: err.Error()}
+	response := api.ErrorResponse{Error: invalidParameterCode, Message: err.Error()}
 	var invalid search.InvalidQueryError
 	if errors.As(err, &invalid) {
 		name := searchParameters[invalid.Field]
 		response.Message = fmt.Sprintf("query parameter %q %s", name, invalid.Rule)
 		if invalid.Missing {
-			response = ErrorResponse{Error: missingParameterCode, Message: fmt.Sprintf("query parameter %q is required", name)}
+			response = api.ErrorResponse{Error: missingParameterCode, Message: fmt.Sprintf("query parameter %q is required", name)}
 		}
 	}
-	writeJSON(writer, http.StatusBadRequest, response)
+	api.WriteJSON(writer, http.StatusBadRequest, response)
 }
 
 func writeSearchFailure(writer http.ResponseWriter, request search.Request, err error) {
 	slog.Error("search failed", "q", request.Text, "author", request.Author, "language", request.Language, "error", err)
-	writeJSON(writer, http.StatusInternalServerError, ErrorResponse{
-		Error:   internalErrorCode,
+	api.WriteJSON(writer, http.StatusInternalServerError, api.ErrorResponse{
+		Error:   api.InternalErrorCode,
 		Message: "the search could not be completed, please try again later",
 	})
 }

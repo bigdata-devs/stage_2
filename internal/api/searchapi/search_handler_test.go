@@ -1,8 +1,7 @@
-package api
+package searchapi
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -13,6 +12,8 @@ import (
 	"strings"
 	"testing"
 
+	"boogle-engine/internal/api"
+	"boogle-engine/internal/api/apitest"
 	"boogle-engine/internal/models"
 	"boogle-engine/internal/search"
 )
@@ -45,35 +46,6 @@ func performSearch(t *testing.T, index search.Index, rawQuery string) *httptest.
 	return recorder
 }
 
-func decodeBody[Body any](t *testing.T, recorder *httptest.ResponseRecorder) Body {
-	t.Helper()
-	var body Body
-	if err := json.Unmarshal(recorder.Body.Bytes(), &body); err != nil {
-		t.Fatalf("response is not valid JSON: %v\n%s", err, recorder.Body.String())
-	}
-	return body
-}
-
-func rawField(t *testing.T, recorder *httptest.ResponseRecorder, name string) string {
-	t.Helper()
-	fields := decodeBody[map[string]json.RawMessage](t, recorder)
-	field, found := fields[name]
-	if !found {
-		t.Fatalf("response has no %q field: %s", name, recorder.Body.String())
-	}
-	return string(field)
-}
-
-func assertStatus(t *testing.T, recorder *httptest.ResponseRecorder, want int) {
-	t.Helper()
-	if recorder.Code != want {
-		t.Fatalf("status = %d, want %d; body: %s", recorder.Code, want, recorder.Body.String())
-	}
-	if contentType := recorder.Header().Get("Content-Type"); !strings.HasPrefix(contentType, "application/json") {
-		t.Errorf("Content-Type = %q, want application/json", contentType)
-	}
-}
-
 func resultIDs(response SearchResponse) []models.BookID {
 	ids := make([]models.BookID, 0, len(response.Results))
 	for _, result := range response.Results {
@@ -85,15 +57,15 @@ func resultIDs(response SearchResponse) []models.BookID {
 func TestSearchReturnsMatchingBooksWithDefaultPagination(t *testing.T) {
 	recorder := performSearch(t, NewStubIndex(), "q=adventure")
 
-	assertStatus(t, recorder, http.StatusOK)
-	response := decodeBody[SearchResponse](t, recorder)
+	apitest.AssertStatus(t, recorder, http.StatusOK)
+	response := apitest.DecodeBody[SearchResponse](t, recorder)
 	if response.Query != "adventure" || response.Total != 5 || response.Offset != 0 || response.Limit != search.DefaultLimit {
 		t.Errorf("envelope = %+v, want query adventure, total 5, offset 0, limit %d", response, search.DefaultLimit)
 	}
 	if want := []models.BookID{11, 74, 76, 521, 1661}; !slices.Equal(resultIDs(response), want) {
 		t.Errorf("result IDs = %v, want %v", resultIDs(response), want)
 	}
-	if filters := rawField(t, recorder, "filters"); filters != "{}" {
+	if filters := apitest.RawField(t, recorder, "filters"); filters != "{}" {
 		t.Errorf("filters = %s, want {} when no filter is sent", filters)
 	}
 }
@@ -101,9 +73,9 @@ func TestSearchReturnsMatchingBooksWithDefaultPagination(t *testing.T) {
 func TestSearchMapsBookMetadataToResultSchema(t *testing.T) {
 	recorder := performSearch(t, NewStubIndex(), "q=pride")
 
-	assertStatus(t, recorder, http.StatusOK)
+	apitest.AssertStatus(t, recorder, http.StatusOK)
 	want := `[{"book_id":1342,"title":"Pride and Prejudice","author":"Jane Austen","language":"en","year":1813}]`
-	if results := rawField(t, recorder, "results"); results != want {
+	if results := apitest.RawField(t, recorder, "results"); results != want {
 		t.Errorf("results = %s, want %s", results, want)
 	}
 }
@@ -111,12 +83,12 @@ func TestSearchMapsBookMetadataToResultSchema(t *testing.T) {
 func TestSearchCombinesFilters(t *testing.T) {
 	recorder := performSearch(t, NewStubIndex(), "q=adventure&author=twain&language=EN&year=1884")
 
-	assertStatus(t, recorder, http.StatusOK)
-	response := decodeBody[SearchResponse](t, recorder)
+	apitest.AssertStatus(t, recorder, http.StatusOK)
+	response := apitest.DecodeBody[SearchResponse](t, recorder)
 	if want := []models.BookID{76}; response.Total != 1 || !slices.Equal(resultIDs(response), want) {
 		t.Errorf("total = %d, IDs = %v, want 1 match %v", response.Total, resultIDs(response), want)
 	}
-	if filters := rawField(t, recorder, "filters"); filters != `{"author":"twain","language":"en","year":1884}` {
+	if filters := apitest.RawField(t, recorder, "filters"); filters != `{"author":"twain","language":"en","year":1884}` {
 		t.Errorf("filters = %s, want every applied filter with the language lower-cased", filters)
 	}
 }
@@ -124,8 +96,8 @@ func TestSearchCombinesFilters(t *testing.T) {
 func TestSearchEchoesOnlyTheFiltersThatWereSent(t *testing.T) {
 	recorder := performSearch(t, NewStubIndex(), "q=the&language=fr&author=")
 
-	assertStatus(t, recorder, http.StatusOK)
-	if filters := rawField(t, recorder, "filters"); filters != `{"language":"fr"}` {
+	apitest.AssertStatus(t, recorder, http.StatusOK)
+	if filters := apitest.RawField(t, recorder, "filters"); filters != `{"language":"fr"}` {
 		t.Errorf("filters = %s, want only the language filter", filters)
 	}
 }
@@ -160,8 +132,8 @@ func TestSearchPaginatesMatches(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			recorder := performSearch(t, NewStubIndex(), testCase.rawQuery)
 
-			assertStatus(t, recorder, http.StatusOK)
-			response := decodeBody[SearchResponse](t, recorder)
+			apitest.AssertStatus(t, recorder, http.StatusOK)
+			response := apitest.DecodeBody[SearchResponse](t, recorder)
 			if response.Total != 5 || !slices.Equal(resultIDs(response), testCase.wantIDs) {
 				t.Errorf("total = %d, IDs = %v, want total 5 and %v", response.Total, resultIDs(response), testCase.wantIDs)
 			}
@@ -172,11 +144,11 @@ func TestSearchPaginatesMatches(t *testing.T) {
 func TestSearchWithoutMatchesReturnsEmptyResults(t *testing.T) {
 	recorder := performSearch(t, NewStubIndex(), "q=nonexistentword")
 
-	assertStatus(t, recorder, http.StatusOK)
-	if total := rawField(t, recorder, "total"); total != "0" {
+	apitest.AssertStatus(t, recorder, http.StatusOK)
+	if total := apitest.RawField(t, recorder, "total"); total != "0" {
 		t.Errorf("total = %s, want 0", total)
 	}
-	if results := rawField(t, recorder, "results"); results != "[]" {
+	if results := apitest.RawField(t, recorder, "results"); results != "[]" {
 		t.Errorf("results = %s, want [] (never null)", results)
 	}
 }
@@ -184,8 +156,8 @@ func TestSearchWithoutMatchesReturnsEmptyResults(t *testing.T) {
 func TestSearchSerializesEmptyResultsWhenIndexReturnsNoSlice(t *testing.T) {
 	recorder := performSearch(t, &recordingIndex{page: search.Page{}}, "q=anything")
 
-	assertStatus(t, recorder, http.StatusOK)
-	if results := rawField(t, recorder, "results"); results != "[]" {
+	apitest.AssertStatus(t, recorder, http.StatusOK)
+	if results := apitest.RawField(t, recorder, "results"); results != "[]" {
 		t.Errorf("results = %s, want [] (never null)", results)
 	}
 }
@@ -196,8 +168,8 @@ func TestSearchWithoutQueryReturnsBadRequest(t *testing.T) {
 			index := &recordingIndex{}
 			recorder := performSearch(t, index, rawQuery)
 
-			assertStatus(t, recorder, http.StatusBadRequest)
-			response := decodeBody[ErrorResponse](t, recorder)
+			apitest.AssertStatus(t, recorder, http.StatusBadRequest)
+			response := apitest.DecodeBody[api.ErrorResponse](t, recorder)
 			if response.Error != missingParameterCode || !strings.Contains(response.Message, `"q"`) {
 				t.Errorf("error = %+v, want %s naming q", response, missingParameterCode)
 			}
@@ -222,8 +194,8 @@ func TestSearchWithMalformedParameterReturnsBadRequest(t *testing.T) {
 		t.Run(rawQuery, func(t *testing.T) {
 			recorder := performSearch(t, &recordingIndex{}, rawQuery)
 
-			assertStatus(t, recorder, http.StatusBadRequest)
-			if response := decodeBody[ErrorResponse](t, recorder); response.Error != invalidParameterCode {
+			apitest.AssertStatus(t, recorder, http.StatusBadRequest)
+			if response := apitest.DecodeBody[api.ErrorResponse](t, recorder); response.Error != invalidParameterCode {
 				t.Errorf("error = %+v, want %s", response, invalidParameterCode)
 			}
 		})
@@ -234,10 +206,10 @@ func TestSearchIndexFailureReturnsInternalError(t *testing.T) {
 	index := &recordingIndex{err: errors.New("mongo: connection refused")}
 	recorder := performSearch(t, index, "q=whale")
 
-	assertStatus(t, recorder, http.StatusInternalServerError)
-	response := decodeBody[ErrorResponse](t, recorder)
-	if response.Error != internalErrorCode || strings.Contains(response.Message, "mongo") {
-		t.Errorf("error = %+v, want %s without internal details", response, internalErrorCode)
+	apitest.AssertStatus(t, recorder, http.StatusInternalServerError)
+	response := apitest.DecodeBody[api.ErrorResponse](t, recorder)
+	if response.Error != api.InternalErrorCode || strings.Contains(response.Message, "mongo") {
+		t.Errorf("error = %+v, want %s without internal details", response, api.InternalErrorCode)
 	}
 }
 
@@ -264,12 +236,12 @@ func TestSearchSplitsMultiWordQueryIntoDistinctTerms(t *testing.T) {
 			index := &recordingIndex{}
 			recorder := performSearch(t, index, "q="+url.QueryEscape(testCase.rawQ))
 
-			assertStatus(t, recorder, http.StatusOK)
+			apitest.AssertStatus(t, recorder, http.StatusOK)
 			if index.receivedQuery.Text != testCase.wantTerm || !slices.Equal(index.receivedQuery.Terms, testCase.wantTerms) {
 				t.Errorf("index got term %q terms %q, want %q and %q",
 					index.receivedQuery.Text, index.receivedQuery.Terms, testCase.wantTerm, testCase.wantTerms)
 			}
-			if response := decodeBody[SearchResponse](t, recorder); response.Query != testCase.wantTerm {
+			if response := apitest.DecodeBody[SearchResponse](t, recorder); response.Query != testCase.wantTerm {
 				t.Errorf("query echo = %q, want q as sent without surrounding spaces %q", response.Query, testCase.wantTerm)
 			}
 		})
@@ -290,8 +262,8 @@ func TestSearchRequiresEveryWordToMatch(t *testing.T) {
 		t.Run(testCase.rawQ, func(t *testing.T) {
 			recorder := performSearch(t, NewStubIndex(), "q="+url.QueryEscape(testCase.rawQ))
 
-			assertStatus(t, recorder, http.StatusOK)
-			response := decodeBody[SearchResponse](t, recorder)
+			apitest.AssertStatus(t, recorder, http.StatusOK)
+			response := apitest.DecodeBody[SearchResponse](t, recorder)
 			if response.Total != len(testCase.wantIDs) || !slices.Equal(resultIDs(response), testCase.wantIDs) {
 				t.Errorf("total = %d, IDs = %v, want %v", response.Total, resultIDs(response), testCase.wantIDs)
 			}
@@ -305,7 +277,7 @@ func TestSearchWithOnlyIgnoredWordsReturnsEmptyPageWithoutIndex(t *testing.T) {
 			index := &recordingIndex{err: errors.New("the index must not be called")}
 			recorder := performSearch(t, index, "q="+url.QueryEscape(rawQ)+"&language=fr&limit=5")
 
-			assertStatus(t, recorder, http.StatusOK)
+			apitest.AssertStatus(t, recorder, http.StatusOK)
 			want := fmt.Sprintf(`{"query":%q,"filters":{"language":"fr"},"total":0,"offset":0,"limit":5,"results":[]}`, rawQ)
 			if body := strings.TrimSpace(recorder.Body.String()); body != want {
 				t.Errorf("body = %s, want %s", body, want)
@@ -323,8 +295,8 @@ func TestSearchWithoutAnyWordReturnsBadRequest(t *testing.T) {
 			index := &recordingIndex{}
 			recorder := performSearch(t, index, "q="+url.QueryEscape(rawQ))
 
-			assertStatus(t, recorder, http.StatusBadRequest)
-			response := decodeBody[ErrorResponse](t, recorder)
+			apitest.AssertStatus(t, recorder, http.StatusBadRequest)
+			response := apitest.DecodeBody[api.ErrorResponse](t, recorder)
 			if response.Error != invalidParameterCode || !strings.Contains(response.Message, `"q"`) {
 				t.Errorf("error = %+v, want %s naming q", response, invalidParameterCode)
 			}
@@ -353,9 +325,9 @@ func TestSearchLimitsTheNumberOfDistinctTerms(t *testing.T) {
 			index := &recordingIndex{}
 			recorder := performSearch(t, index, "q="+url.QueryEscape(testCase.rawQ))
 
-			assertStatus(t, recorder, testCase.wantStatus)
+			apitest.AssertStatus(t, recorder, testCase.wantStatus)
 			if testCase.wantStatus == http.StatusBadRequest {
-				response := decodeBody[ErrorResponse](t, recorder)
+				response := apitest.DecodeBody[api.ErrorResponse](t, recorder)
 				if response.Error != invalidParameterCode || !strings.Contains(response.Message, fmt.Sprint(search.MaxQueryTerms)) {
 					t.Errorf("error = %+v, want %s stating the limit %d", response, invalidParameterCode, search.MaxQueryTerms)
 				}

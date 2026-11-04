@@ -5,19 +5,19 @@ import (
 	"os"
 	"strings"
 
-	"boogle-engine/internal/api"
+	"boogle-engine/internal/api/searchapi"
 )
 
 const corsEnvironmentVariable = "CORS_ALLOWED_ORIGIN"
 
-func corsPolicyFromEnvironment() (api.CORSPolicy, error) {
+func corsPolicyFromEnvironment() (searchapi.CORSPolicy, error) {
 	setting := strings.TrimSpace(os.Getenv(corsEnvironmentVariable))
 	if setting == "" {
-		setting = api.AnyOrigin
+		setting = searchapi.AnyOrigin
 	}
-	policy, err := api.NewCORSPolicy(setting)
+	policy, err := searchapi.NewCORSPolicy(setting)
 	if err != nil {
-		return api.CORSPolicy{}, fmt.Errorf("%s: %w", corsEnvironmentVariable, err)
+		return searchapi.CORSPolicy{}, fmt.Errorf("%s: %w", corsEnvironmentVariable, err)
 	}
 	return policy, nil
 }

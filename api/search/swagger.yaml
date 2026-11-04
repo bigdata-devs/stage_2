@@ -1,6 +1,15 @@
 basePath: /
 definitions:
-  api.BookResult:
+  api.ErrorResponse:
+    properties:
+      error:
+        example: invalid_parameter
+        type: string
+      message:
+        example: query parameter "limit" must be an integer between 1 and 100
+        type: string
+    type: object
+  searchapi.BookResult:
     properties:
       author:
         example: Jane Austen
@@ -21,16 +30,7 @@ definitions:
         example: 1813
         type: integer
     type: object
-  api.ErrorResponse:
-    properties:
-      error:
-        example: invalid_parameter
-        type: string
-      message:
-        example: query parameter "limit" must be an integer between 1 and 100
-        type: string
-    type: object
-  api.FilterValuesResponse:
+  searchapi.FilterValuesResponse:
     properties:
       languages:
         description: ISO 639 language codes of the published books, sorted ascending;
@@ -53,7 +53,7 @@ definitions:
           type: integer
         type: array
     type: object
-  api.SearchFilters:
+  searchapi.SearchFilters:
     properties:
       author:
         example: Jane Austen
@@ -65,11 +65,11 @@ definitions:
         example: 1813
         type: integer
     type: object
-  api.SearchResponse:
+  searchapi.SearchResponse:
     properties:
       filters:
         allOf:
-        - $ref: '#/definitions/api.SearchFilters'
+        - $ref: '#/definitions/searchapi.SearchFilters'
         description: Filters that were applied; absent filters are omitted
       limit:
         example: 20
@@ -84,7 +84,7 @@ definitions:
       results:
         description: Books of the requested page; never null
         items:
-          $ref: '#/definitions/api.BookResult'
+          $ref: '#/definitions/searchapi.BookResult'
         type: array
       total:
         description: Number of matches across all pages
@@ -135,7 +135,7 @@ paths:
         "200":
           description: The metadata of the published book
           schema:
-            $ref: '#/definitions/api.BookResult'
+            $ref: '#/definitions/searchapi.BookResult'
         "400":
           description: 'invalid_book_id: book_id is not a positive integer'
           schema:
@@ -221,7 +221,7 @@ paths:
         "200":
           description: One page of matching books
           schema:
-            $ref: '#/definitions/api.SearchResponse'
+            $ref: '#/definitions/searchapi.SearchResponse'
         "400":
           description: q is missing (missing_parameter); q has no word or more than
             10 distinct words, or another parameter is malformed (invalid_parameter)
@@ -262,7 +262,7 @@ paths:
         "200":
           description: Distinct filter values of the published books
           schema:
-            $ref: '#/definitions/api.FilterValuesResponse'
+            $ref: '#/definitions/searchapi.FilterValuesResponse'
         "500":
           description: 'internal_error: the datamart could not be read'
           schema:

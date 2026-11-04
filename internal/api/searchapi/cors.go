@@ -1,4 +1,4 @@
-package api
+package searchapi
 
 import (
 	"errors"
@@ -7,6 +7,8 @@ import (
 	"net/url"
 	"slices"
 	"strings"
+
+	"boogle-engine/internal/api"
 )
 
 const AnyOrigin = "*"
@@ -76,7 +78,7 @@ func (policy CORSPolicy) Wrap(next http.Handler) http.Handler {
 			return
 		}
 		if !allowed {
-			writeJSON(writer, http.StatusForbidden, ErrorResponse{
+			api.WriteJSON(writer, http.StatusForbidden, api.ErrorResponse{
 				Error:   originNotAllowedCode,
 				Message: fmt.Sprintf("origin %q may not call this API from a browser", origin),
 			})

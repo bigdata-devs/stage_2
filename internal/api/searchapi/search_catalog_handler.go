@@ -1,4 +1,4 @@
-package api
+package searchapi
 
 import (
 	"errors"
@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 
+	"boogle-engine/internal/api"
 	"boogle-engine/internal/search"
 )
 
@@ -52,10 +53,10 @@ func (handler CatalogHandler) RegisterRoutes(router *http.ServeMux) {
 // @Tags			search
 // @Produce		json
 // @Param			book_id	path		int			true	"Project Gutenberg book ID (positive integer)"	minimum(1)	example(1342)
-// @Success		200		{object}	BookResult	"The metadata of the published book"
-// @Failure		400		{object}	ErrorResponse	"invalid_book_id: book_id is not a positive integer"
-// @Failure		404		{object}	ErrorResponse	"book_not_found: no published book with that ID"
-// @Failure		500		{object}	ErrorResponse	"internal_error: the datamart could not be read"
+// @Success		200		{object}	BookResult			"The metadata of the published book"
+// @Failure		400		{object}	api.ErrorResponse	"invalid_book_id: book_id is not a positive integer"
+// @Failure		404		{object}	api.ErrorResponse	"book_not_found: no published book with that ID"
+// @Failure		500		{object}	api.ErrorResponse	"internal_error: the datamart could not be read"
 // @x-provider		"Search Service"
 // @x-consumers	["Front-end"]
 // @x-audience		"front-end"
@@ -63,9 +64,9 @@ func (handler CatalogHandler) RegisterRoutes(router *http.ServeMux) {
 // @x-completion	"synchronous"
 // @Router			/books/{book_id} [get]
 func (handler CatalogHandler) Book(writer http.ResponseWriter, request *http.Request) {
-	bookID, err := parseBookIDPath(request)
+	bookID, err := api.ParseBookIDPath(request)
 	if err != nil {
-		writeInvalidBookID(writer, err)
+		api.WriteInvalidBookID(writer, err)
 		return
 	}
 	book, found, err := handler.catalog.PublishedBook(request.Context(), bookID)
@@ -75,10 +76,10 @@ func (handler CatalogHandler) Book(writer http.ResponseWriter, request *http.Req
 	}
 	if !found {
 		message := fmt.Sprintf("no published book with ID %d", bookID)
-		writeJSON(writer, http.StatusNotFound, ErrorResponse{Error: bookNotFoundCode, Message: message})
+		api.WriteJSON(writer, http.StatusNotFound, api.ErrorResponse{Error: api.BookNotFoundCode, Message: message})
 		return
 	}
-	writeJSON(writer, http.StatusOK, newBookResult(book))
+	api.WriteJSON(writer, http.StatusOK, newBookResult(book))
 }
 
 // @Summary		List the available search filters
@@ -98,7 +99,7 @@ func (handler CatalogHandler) Book(writer http.ResponseWriter, request *http.Req
 // @Tags			search
 // @Produce		json
 // @Success		200				{object}	FilterValuesResponse	"Distinct filter values of the published books"
-// @Failure		500				{object}	ErrorResponse			"internal_error: the datamart could not be read"
+// @Failure		500				{object}	api.ErrorResponse		"internal_error: the datamart could not be read"
 // @x-provider		"Search Service"
 // @x-consumers	["Front-end"]
 // @x-audience		"front-end"
@@ -118,13 +119,13 @@ func (handler CatalogHandler) Filters(writer http.ResponseWriter, request *http.
 	if response.Years == nil {
 		response.Years = []int{}
 	}
-	writeJSON(writer, http.StatusOK, response)
+	api.WriteJSON(writer, http.StatusOK, response)
 }
 
 func writeCatalogFailure(writer http.ResponseWriter, action string, err error) {
 	slog.Error("catalog request failed", "action", action, "error", err)
-	writeJSON(writer, http.StatusInternalServerError, ErrorResponse{
-		Error:   internalErrorCode,
+	api.WriteJSON(writer, http.StatusInternalServerError, api.ErrorResponse{
+		Error:   api.InternalErrorCode,
 		Message: "the book catalog could not be read, please try again later",
 	})
 }

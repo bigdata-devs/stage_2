@@ -1,4 +1,4 @@
-package api
+package ingestionapi
 
 import (
 	"context"
@@ -14,6 +14,8 @@ import (
 	"testing"
 	"time"
 
+	"boogle-engine/internal/api"
+	"boogle-engine/internal/api/apitest"
 	"boogle-engine/internal/datalake"
 	"boogle-engine/internal/ingestion"
 	"boogle-engine/internal/models"
@@ -88,21 +90,6 @@ func (fixture ingestionFixture) storeBook(t *testing.T, bookID models.BookID) {
 	}
 }
 
-func assertBody(t *testing.T, recorder *httptest.ResponseRecorder, want string) {
-	t.Helper()
-	if body := strings.TrimSpace(recorder.Body.String()); body != want {
-		t.Errorf("body = %s, want %s", body, want)
-	}
-}
-
-func assertErrorCode(t *testing.T, recorder *httptest.ResponseRecorder, wantStatus int, wantCode string) {
-	t.Helper()
-	assertStatus(t, recorder, wantStatus)
-	if response := decodeBody[ErrorResponse](t, recorder); response.Error != wantCode {
-		t.Errorf("error = %+v, want code %s", response, wantCode)
-	}
-}
-
 func assertDownloads(t *testing.T, gutenberg *fakeGutenberg, want int32) {
 	t.Helper()
 	if got := gutenberg.downloads.Load(); got != want {
@@ -115,8 +102,8 @@ func TestIngestDownloadsBookIntoDatalake(t *testing.T) {
 
 	recorder := fixture.send(http.MethodPost, "/ingest/1342")
 
-	assertStatus(t, recorder, http.StatusOK)
-	response := decodeBody[IngestionResponse](t, recorder)
+	apitest.AssertStatus(t, recorder, http.StatusOK)
+	response := apitest.DecodeBody[IngestionResponse](t, recorder)
 	if response.BookID != 1342 || response.Status != models.StatusDownloaded {
 		t.Errorf("response = %+v, want book 1342 downloaded", response)
 	}
@@ -130,12 +117,12 @@ func TestIngestDownloadsBookIntoDatalake(t *testing.T) {
 
 func TestIngestTwiceReturnsAvailableWithoutDownloadingAgain(t *testing.T) {
 	fixture := newIngestionFixture(t, &fakeGutenberg{})
-	first := decodeBody[IngestionResponse](t, fixture.send(http.MethodPost, "/ingest/84"))
+	first := apitest.DecodeBody[IngestionResponse](t, fixture.send(http.MethodPost, "/ingest/84"))
 
 	recorder := fixture.send(http.MethodPost, "/ingest/84")
 
-	assertStatus(t, recorder, http.StatusOK)
-	second := decodeBody[IngestionResponse](t, recorder)
+	apitest.AssertStatus(t, recorder, http.StatusOK)
+	second := apitest.DecodeBody[IngestionResponse](t, recorder)
 	if second.Status != models.StatusAvailable || second.Path != first.Path {
 		t.Errorf("second response = %+v, want available at %q", second, first.Path)
 	}
@@ -169,8 +156,8 @@ func assertSamePath(t *testing.T, responses []*httptest.ResponseRecorder) {
 	t.Helper()
 	paths := map[string]bool{}
 	for _, recorder := range responses {
-		assertStatus(t, recorder, http.StatusOK)
-		paths[decodeBody[IngestionResponse](t, recorder).Path] = true
+		apitest.AssertStatus(t, recorder, http.StatusOK)
+		paths[apitest.DecodeBody[IngestionResponse](t, recorder).Path] = true
 	}
 	if len(paths) != 1 {
 		t.Errorf("callers received %d different paths, want 1: %v", len(paths), paths)
@@ -181,15 +168,15 @@ func TestIngestUnavailableBookReturnsNotFound(t *testing.T) {
 	failure := fmt.Errorf("%w: book 99999 (HTTP 404)", models.ErrBookUnavailable)
 	fixture := newIngestionFixture(t, &fakeGutenberg{failure: failure})
 
-	assertErrorCode(t, fixture.send(http.MethodPost, "/ingest/99999"), http.StatusNotFound, bookUnavailableCode)
-	assertErrorCode(t, fixture.send(http.MethodGet, "/ingest/status/99999"), http.StatusNotFound, bookNotFoundCode)
+	apitest.AssertErrorCode(t, fixture.send(http.MethodPost, "/ingest/99999"), http.StatusNotFound, bookUnavailableCode)
+	apitest.AssertErrorCode(t, fixture.send(http.MethodGet, "/ingest/status/99999"), http.StatusNotFound, api.BookNotFoundCode)
 }
 
 func TestIngestTransientFailureReturnsServiceUnavailable(t *testing.T) {
 	failure := fmt.Errorf("%w: book 1342 (HTTP 503)", models.ErrTransient)
 	fixture := newIngestionFixture(t, &fakeGutenberg{failure: failure})
 
-	assertErrorCode(t, fixture.send(http.MethodPost, "/ingest/1342"), http.StatusServiceUnavailable, downloadFailedCode)
+	apitest.AssertErrorCode(t, fixture.send(http.MethodPost, "/ingest/1342"), http.StatusServiceUnavailable, downloadFailedCode)
 }
 
 func TestIngestStorageFailureReturnsInternalError(t *testing.T) {
@@ -199,7 +186,7 @@ func TestIngestStorageFailureReturnsInternalError(t *testing.T) {
 	}
 	fixture := newIngestionFixtureAt(t, &fakeGutenberg{}, datalakeDir)
 
-	assertErrorCode(t, fixture.send(http.MethodPost, "/ingest/1342"), http.StatusInternalServerError, internalErrorCode)
+	apitest.AssertErrorCode(t, fixture.send(http.MethodPost, "/ingest/1342"), http.StatusInternalServerError, api.InternalErrorCode)
 }
 
 func TestEndpointsRejectInvalidBookID(t *testing.T) {
@@ -211,7 +198,7 @@ func TestEndpointsRejectInvalidBookID(t *testing.T) {
 	for _, target := range targets {
 		t.Run(target, func(t *testing.T) {
 			method, path, _ := strings.Cut(target, " ")
-			assertErrorCode(t, fixture.send(method, path), http.StatusBadRequest, invalidBookIDCode)
+			apitest.AssertErrorCode(t, fixture.send(method, path), http.StatusBadRequest, api.InvalidBookIDCode)
 		})
 	}
 	assertDownloads(t, fixture.gutenberg, 0)
@@ -223,21 +210,21 @@ func TestStatusReportsAvailableBook(t *testing.T) {
 
 	recorder := fixture.send(http.MethodGet, "/ingest/status/1342")
 
-	assertStatus(t, recorder, http.StatusOK)
-	assertBody(t, recorder, `{"book_id":1342,"status":"available"}`)
+	apitest.AssertStatus(t, recorder, http.StatusOK)
+	apitest.AssertBody(t, recorder, `{"book_id":1342,"status":"available"}`)
 }
 
 func TestListReturnsCompleteBooksInAscendingOrder(t *testing.T) {
 	fixture := newIngestionFixture(t, &fakeGutenberg{})
-	assertBody(t, fixture.send(http.MethodGet, "/ingest/list"), `{"count":0,"books":[]}`)
+	apitest.AssertBody(t, fixture.send(http.MethodGet, "/ingest/list"), `{"count":0,"books":[]}`)
 	for _, bookID := range []models.BookID{1342, 11, 84} {
 		fixture.storeBook(t, bookID)
 	}
 
 	recorder := fixture.send(http.MethodGet, "/ingest/list")
 
-	assertStatus(t, recorder, http.StatusOK)
-	assertBody(t, recorder, `{"count":3,"books":[11,84,1342]}`)
+	apitest.AssertStatus(t, recorder, http.StatusOK)
+	apitest.AssertBody(t, recorder, `{"count":3,"books":[11,84,1342]}`)
 }
 
 func TestRoutesRejectWrongMethods(t *testing.T) {

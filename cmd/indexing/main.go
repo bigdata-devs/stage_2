@@ -1,6 +1,6 @@
 package main
 
-//go:generate go run github.com/swaggo/swag/cmd/swag@v1.16.6 init -g main.go -d ./,../../internal/api -o ../../api/indexing -t indexing
+//go:generate go run github.com/swaggo/swag/cmd/swag@v1.16.6 init -g main.go -d ./,../../internal/api/indexingapi,../../internal/api -o ../../api/indexing -t indexing
 
 import (
 	"context"
@@ -19,7 +19,7 @@ import (
 	httpSwagger "github.com/swaggo/http-swagger/v2"
 
 	_ "boogle-engine/api/indexing"
-	"boogle-engine/internal/api"
+	"boogle-engine/internal/api/indexingapi"
 	"boogle-engine/internal/datalake"
 	"boogle-engine/internal/indexing"
 	"boogle-engine/internal/mongodb"
@@ -129,16 +129,16 @@ func closeDatamart(client mongodb.Client) {
 	}
 }
 
-func buildIndexingHandler(config serviceConfig, client mongodb.Client) (api.IndexingHandler, error) {
+func buildIndexingHandler(config serviceConfig, client mongodb.Client) (indexingapi.IndexingHandler, error) {
 	lake, err := datalake.New(config.datalakeDir, config.batchSize)
 	if err != nil {
-		return api.IndexingHandler{}, err
+		return indexingapi.IndexingHandler{}, err
 	}
 	service, err := newIndexingService(lake, client)
 	if err != nil {
-		return api.IndexingHandler{}, err
+		return indexingapi.IndexingHandler{}, err
 	}
-	return api.NewIndexingHandler(service, config.rebuildTimeout, config.maxConcurrentUpdates)
+	return indexingapi.NewIndexingHandler(service, config.rebuildTimeout, config.maxConcurrentUpdates)
 }
 
 func newIndexingService(lake datalake.Datalake, client mongodb.Client) (*indexing.Service, error) {
@@ -170,7 +170,7 @@ func registerFlags(flags *flag.FlagSet) *serviceConfig {
 	return config
 }
 
-func newRouter(indexingHandler api.IndexingHandler) *http.ServeMux {
+func newRouter(indexingHandler indexingapi.IndexingHandler) *http.ServeMux {
 	router := http.NewServeMux()
 	indexingHandler.RegisterRoutes(router)
 	router.Handle("GET /swagger/", httpSwagger.Handler(httpSwagger.URL("/swagger/doc.json")))

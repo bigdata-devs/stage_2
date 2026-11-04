@@ -40,7 +40,7 @@ const docTemplate = `{
                     "200": {
                         "description": "The metadata of the published book",
                         "schema": {
-                            "$ref": "#/definitions/api.BookResult"
+                            "$ref": "#/definitions/searchapi.BookResult"
                         }
                     },
                     "400": {
@@ -136,7 +136,7 @@ const docTemplate = `{
                     "200": {
                         "description": "One page of matching books",
                         "schema": {
-                            "$ref": "#/definitions/api.SearchResponse"
+                            "$ref": "#/definitions/searchapi.SearchResponse"
                         }
                     },
                     "400": {
@@ -175,7 +175,7 @@ const docTemplate = `{
                     "200": {
                         "description": "Distinct filter values of the published books",
                         "schema": {
-                            "$ref": "#/definitions/api.FilterValuesResponse"
+                            "$ref": "#/definitions/searchapi.FilterValuesResponse"
                         }
                     },
                     "500": {
@@ -196,7 +196,20 @@ const docTemplate = `{
         }
     },
     "definitions": {
-        "api.BookResult": {
+        "api.ErrorResponse": {
+            "type": "object",
+            "properties": {
+                "error": {
+                    "type": "string",
+                    "example": "invalid_parameter"
+                },
+                "message": {
+                    "type": "string",
+                    "example": "query parameter \"limit\" must be an integer between 1 and 100"
+                }
+            }
+        },
+        "searchapi.BookResult": {
             "type": "object",
             "properties": {
                 "author": {
@@ -223,20 +236,7 @@ const docTemplate = `{
                 }
             }
         },
-        "api.ErrorResponse": {
-            "type": "object",
-            "properties": {
-                "error": {
-                    "type": "string",
-                    "example": "invalid_parameter"
-                },
-                "message": {
-                    "type": "string",
-                    "example": "query parameter \"limit\" must be an integer between 1 and 100"
-                }
-            }
-        },
-        "api.FilterValuesResponse": {
+        "searchapi.FilterValuesResponse": {
             "type": "object",
             "properties": {
                 "languages": {
@@ -265,7 +265,7 @@ const docTemplate = `{
                 }
             }
         },
-        "api.SearchFilters": {
+        "searchapi.SearchFilters": {
             "type": "object",
             "properties": {
                 "author": {
@@ -282,14 +282,14 @@ const docTemplate = `{
                 }
             }
         },
-        "api.SearchResponse": {
+        "searchapi.SearchResponse": {
             "type": "object",
             "properties": {
                 "filters": {
                     "description": "Filters that were applied; absent filters are omitted",
                     "allOf": [
                         {
-                            "$ref": "#/definitions/api.SearchFilters"
+                            "$ref": "#/definitions/searchapi.SearchFilters"
                         }
                     ]
                 },
@@ -310,7 +310,7 @@ const docTemplate = `{
                     "description": "Books of the requested page; never null",
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/api.BookResult"
+                        "$ref": "#/definitions/searchapi.BookResult"
                     }
                 },
                 "total": {
