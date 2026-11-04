@@ -48,7 +48,7 @@ func fetchPostings(t *testing.T, client Client, term string) []models.Posting {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	var document struct {
-		Postings []models.Posting `bson:"postings"`
+		Postings []postingDocument `bson:"postings"`
 	}
 	err := client.Database().Collection(InvertedIndexCollection).
 		FindOne(ctx, bson.D{{Key: "_id", Value: term}}).Decode(&document)
@@ -58,7 +58,7 @@ func fetchPostings(t *testing.T, client Client, term string) []models.Posting {
 	if err != nil {
 		t.Fatalf("fetch postings for %q: %v", term, err)
 	}
-	return document.Postings
+	return postingsOf(document.Postings)
 }
 
 func fetchBookStatus(t *testing.T, client Client, bookID models.BookID) string {

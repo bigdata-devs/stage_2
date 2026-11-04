@@ -38,14 +38,14 @@ func (fake *fakeIngestion) callCount(bookID models.BookID) int {
 type fakeIndexing struct {
 	mutex   sync.Mutex
 	calls   map[models.BookID]int
-	respond func(context.Context, models.BookID) (models.IndexUpdateResult, error)
+	respond func(context.Context, models.BookID) error
 }
 
-func newFakeIndexing(respond func(context.Context, models.BookID) (models.IndexUpdateResult, error)) *fakeIndexing {
+func newFakeIndexing(respond func(context.Context, models.BookID) error) *fakeIndexing {
 	return &fakeIndexing{calls: map[models.BookID]int{}, respond: respond}
 }
 
-func (fake *fakeIndexing) Update(ctx context.Context, bookID models.BookID) (models.IndexUpdateResult, error) {
+func (fake *fakeIndexing) Update(ctx context.Context, bookID models.BookID) error {
 	fake.mutex.Lock()
 	fake.calls[bookID]++
 	fake.mutex.Unlock()
@@ -63,9 +63,9 @@ func downloadedAnswer(_ context.Context, bookID models.BookID) (models.Ingestion
 	return models.IngestionResult{BookID: bookID, Status: models.StatusDownloaded}, nil
 }
 
-func updatedAnswer(_ context.Context, bookID models.BookID) (models.IndexUpdateResult, error) {
+func updatedAnswer(context.Context, models.BookID) error {
 	time.Sleep(fakeServiceLatency)
-	return models.IndexUpdateResult{BookID: bookID, Index: "updated"}, nil
+	return nil
 }
 
 func alwaysFailIngest(_ context.Context, _ models.BookID) (models.IngestionResult, error) {

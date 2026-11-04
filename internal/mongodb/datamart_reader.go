@@ -37,10 +37,7 @@ func (reader DatamartReader) PostingsForTerms(ctx context.Context, terms []strin
 
 	postings := make([]models.TermPostings, 0, len(documents))
 	for _, document := range documents {
-		if document.Postings == nil {
-			document.Postings = []models.Posting{}
-		}
-		postings = append(postings, models.TermPostings{Term: document.Term, Postings: document.Postings})
+		postings = append(postings, models.TermPostings{Term: document.Term, Postings: postingsOf(document.Postings)})
 	}
 	return postings, nil
 }
@@ -50,25 +47,35 @@ func (reader DatamartReader) BooksByID(ctx context.Context, bookIDs []models.Boo
 		return []models.BookMetadata{}, nil
 	}
 
-	var books []models.BookMetadata
+	var documents []bookDocument
 	cursor, err := reader.books().Find(ctx,
 		bson.D{{Key: "_id", Value: bson.D{{Key: "$in", Value: bookIDs}}}},
 		options.Find().SetSort(bson.D{{Key: "_id", Value: 1}}))
 	if err != nil {
 		return nil, fmt.Errorf("find %d books: %w", len(bookIDs), err)
 	}
-	if err := cursor.All(ctx, &books); err != nil {
+	if err := cursor.All(ctx, &documents); err != nil {
 		return nil, fmt.Errorf("decode %d books: %w", len(bookIDs), err)
 	}
-	if books == nil {
-		books = []models.BookMetadata{}
-	}
-	return books, nil
+	return metadataOf(documents), nil
 }
 
 type termDocument struct {
-	Term     string           `bson:"_id"`
-	Postings []models.Posting `bson:"postings"`
+	Term     string            `bson:"_id"`
+	Postings []postingDocument `bson:"postings"`
+}
+
+type postingDocument struct {
+	BookID models.BookID `bson:"book_id"`
+	TF     int           `bson:"tf"`
+}
+
+func postingsOf(documents []postingDocument) []models.Posting {
+	postings := make([]models.Posting, 0, len(documents))
+	for _, document := range documents {
+		postings = append(postings, models.Posting{BookID: document.BookID, TF: document.TF})
+	}
+	return postings
 }
 
 func (reader DatamartReader) books() *mongo.Collection {

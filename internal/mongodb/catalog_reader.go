@@ -15,18 +15,18 @@ import (
 )
 
 func (reader DatamartReader) PublishedBook(ctx context.Context, bookID models.BookID) (models.BookMetadata, bool, error) {
-	var book models.BookMetadata
+	var document bookDocument
 	err := reader.books().FindOne(ctx, bson.D{
 		{Key: "_id", Value: bookID},
 		{Key: "status", Value: StatusPublished},
-	}).Decode(&book)
+	}).Decode(&document)
 	if errors.Is(err, mongo.ErrNoDocuments) {
 		return models.BookMetadata{}, false, nil
 	}
 	if err != nil {
 		return models.BookMetadata{}, false, fmt.Errorf("find published book %d: %w", bookID, err)
 	}
-	return book, true, nil
+	return document.metadata(), true, nil
 }
 
 func (reader DatamartReader) FilterOptions(ctx context.Context) (models.FilterValues, error) {

@@ -10,6 +10,21 @@ import (
 	"boogle-engine/internal/models"
 )
 
+type BookList struct {
+	Count int             `json:"count"`
+	Books []models.BookID `json:"books"`
+}
+
+type ingestionAnswer struct {
+	BookID models.BookID          `json:"book_id"`
+	Status models.IngestionStatus `json:"status"`
+	Path   string                 `json:"path"`
+}
+
+func (answer ingestionAnswer) result() models.IngestionResult {
+	return models.IngestionResult{BookID: answer.BookID, Status: answer.Status, Path: answer.Path}
+}
+
 type IngestionClient struct {
 	baseURL    string
 	httpClient *http.Client
@@ -23,25 +38,25 @@ func NewIngestionClient(baseURL string, requestTimeout time.Duration) IngestionC
 }
 
 func (client IngestionClient) Ingest(ctx context.Context, bookID models.BookID) (models.IngestionResult, error) {
-	var result models.IngestionResult
-	if err := doJSON(ctx, client.httpClient, http.MethodPost, client.bookURL(bookID), &result); err != nil {
+	var answer ingestionAnswer
+	if err := doJSON(ctx, client.httpClient, http.MethodPost, client.bookURL(bookID), &answer); err != nil {
 		return models.IngestionResult{}, err
 	}
-	return result, nil
+	return answer.result(), nil
 }
 
 func (client IngestionClient) Status(ctx context.Context, bookID models.BookID) (models.IngestionResult, error) {
-	var result models.IngestionResult
-	if err := doJSON(ctx, client.httpClient, http.MethodGet, client.statusURL(bookID), &result); err != nil {
+	var answer ingestionAnswer
+	if err := doJSON(ctx, client.httpClient, http.MethodGet, client.statusURL(bookID), &answer); err != nil {
 		return models.IngestionResult{}, err
 	}
-	return result, nil
+	return answer.result(), nil
 }
 
-func (client IngestionClient) List(ctx context.Context) (models.IngestionList, error) {
-	var list models.IngestionList
+func (client IngestionClient) List(ctx context.Context) (BookList, error) {
+	var list BookList
 	if err := doJSON(ctx, client.httpClient, http.MethodGet, client.baseURL+"/ingest/list", &list); err != nil {
-		return models.IngestionList{}, err
+		return BookList{}, err
 	}
 	return list, nil
 }

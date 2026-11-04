@@ -169,9 +169,7 @@ func searchResultFrom(facets []searchFacet) SearchResult {
 	if len(facets[0].Total) > 0 {
 		result.Total = int(facets[0].Total[0].Count)
 	}
-	if facets[0].Page != nil {
-		result.Books = facets[0].Page
-	}
+	result.Books = metadataOf(facets[0].Page)
 	return result
 }
 
@@ -180,6 +178,6 @@ type facetCount struct {
 }
 
 type searchFacet struct {
-	Total []facetCount          `bson:"total"`
-	Page  []models.BookMetadata `bson:"page"`
+	Total []facetCount   `bson:"total"`
+	Page  []bookDocument `bson:"page"`
 }

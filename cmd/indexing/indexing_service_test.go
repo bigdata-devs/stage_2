@@ -158,7 +158,7 @@ func TestIndexingServiceIsIdempotent(t *testing.T) {
 	ctx := context.Background()
 	var document struct {
 		Term     string           `bson:"_id"`
-		Postings []models.Posting `bson:"postings"`
+		Postings []map[string]any `bson:"postings"`
 	}
 	if err := client.Database().Collection(mongodb.InvertedIndexCollection).
 		FindOne(ctx, map[string]any{"_id": "curiosity"}).Decode(&document); err != nil {

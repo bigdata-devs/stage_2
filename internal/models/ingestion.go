@@ -10,13 +10,8 @@ const (
 )
 
 type IngestionResult struct {
-	BookID BookID          `json:"book_id"`
-	Status IngestionStatus `json:"status"`
-	Path   string          `json:"path,omitempty"`
-	Err    error           `json:"-"`
-}
-
-type IngestionList struct {
-	Count int      `json:"count"`
-	Books []BookID `json:"books"`
+	BookID BookID
+	Status IngestionStatus
+	Path   string
+	Err    error
 }

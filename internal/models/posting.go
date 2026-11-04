@@ -1,8 +1,8 @@
 package models
 
 type Posting struct {
-	BookID BookID `json:"book_id" bson:"book_id"`
-	TF     int    `json:"tf" bson:"tf"`
+	BookID BookID
+	TF     int
 }
 
 type TermPostings struct {

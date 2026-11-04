@@ -16,7 +16,7 @@ type IngestionService interface {
 }
 
 type IndexingService interface {
-	Update(ctx context.Context, bookID models.BookID) (models.IndexUpdateResult, error)
+	Update(ctx context.Context, bookID models.BookID) error
 }
 
 type RetryPolicy struct {
@@ -184,8 +184,7 @@ func (orchestrator Orchestrator) ensureIndexed(ctx context.Context, bookID model
 		return nil
 	}
 	err := orchestrator.withRetries(ctx, "index book", func(ctx context.Context) error {
-		_, updateErr := orchestrator.indexing.Update(ctx, bookID)
-		return updateErr
+		return orchestrator.indexing.Update(ctx, bookID)
 	})
 	if err != nil {
 		return err
