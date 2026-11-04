@@ -11,7 +11,7 @@ import (
 	"boogle-engine/internal/models"
 )
 
-var ErrMissingDependency = errors.New("orchestrator needs an ingestion service, an indexing service and a progress store")
+var ErrMissingDependency = errors.New("control use case is missing one of its dependencies")
 
 type RetryPolicy struct {
 	MaxAttempts    int

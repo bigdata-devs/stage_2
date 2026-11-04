@@ -66,29 +66,16 @@ func run(arguments []string) error {
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	state, err := localstate.Load(config.stateDir)
+	if err != nil {
+		return fmt.Errorf("load control state: %w", err)
+	}
 	if config.verify {
-		if config.searchURL == "" {
-			return fmt.Errorf("verify mode requires -search-url or SEARCH_URL")
-		}
-		state, err := localstate.Load(config.stateDir)
-		if err != nil {
-			return fmt.Errorf("load control state for verify: %w", err)
-		}
-		return verifyIndexed(ctx, config.searchURL, config.requestTimeout, state)
+		return verifyIndexed(ctx, config, state)
 	}
 	if config.retryFailed {
-		state, err := localstate.Load(config.stateDir)
-		if err != nil {
-			return fmt.Errorf("load control state for retry-failed: %w", err)
-		}
-		retriedIDs, err := state.WipeFailures()
-		if err != nil {
-			return fmt.Errorf("wipe failures: %w", err)
-		}
-		if len(retriedIDs) > 0 {
-			config.bookIDs = append(config.bookIDs, retriedIDs...)
-			slog.Info("[CONTROL] retry-failed: re-enqueuing previously failed books",
-				"count", len(retriedIDs))
+		if config.bookIDs, err = requeueFailures(config.bookIDs, state); err != nil {
+			return err
 		}
 	}
 	ingestion := httpclient.NewIngestionClient(config.ingestionURL, config.ingestTimeout)
@@ -100,7 +87,7 @@ func run(arguments []string) error {
 	if err != nil {
 		return err
 	}
-	orchestrator, err := buildOrchestrator(config, ingestion, indexing)
+	orchestrator, err := buildOrchestrator(config, ingestion, indexing, state)
 	if err != nil {
 		return err
 	}
@@ -115,6 +102,23 @@ func run(arguments []string) error {
 	return nil
 }
 
+func verifyIndexed(ctx context.Context, config serviceConfig, state *localstate.Store) error {
+	verifier, err := control.NewVerifier(state, httpclient.NewSearchClient(config.searchURL, config.requestTimeout))
+	if err != nil {
+		return err
+	}
+	_, err = verifier.Verify(ctx)
+	return err
+}
+
+func requeueFailures(candidates []models.BookID, state *localstate.Store) ([]models.BookID, error) {
+	requeuer, err := control.NewFailureRequeuer(state)
+	if err != nil {
+		return nil, err
+	}
+	return requeuer.Requeue(candidates)
+}
+
 func parseConfig(arguments []string) (serviceConfig, error) {
 	flags := flag.NewFlagSet("control", flag.ContinueOnError)
 	config := registerServiceFlags(flags)
@@ -127,6 +131,13 @@ func parseConfig(arguments []string) (serviceConfig, error) {
 	}
 	if config.ingestTimeout <= 0 {
 		return serviceConfig{}, fmt.Errorf("ingest timeout must be positive, got %s", config.ingestTimeout)
+	}
+	if config.verify {
+		if config.searchURL == "" {
+			return serviceConfig{}, errors.New("verify mode requires -search-url or SEARCH_URL")
+		}
+		config.bookIDs = []models.BookID{}
+		return *config, nil
 	}
 	bookIDs, err := selection.bookIDs()
 	if err != nil {
@@ -247,11 +258,7 @@ func resolveCandidates(ctx context.Context, config serviceConfig, ingestion http
 	return append(config.bookIDs, list.Books...), nil
 }
 
-func buildOrchestrator(config serviceConfig, ingestion httpclient.IngestionClient, indexing httpclient.IndexingClient) (control.Orchestrator, error) {
-	state, err := localstate.Load(config.stateDir)
-	if err != nil {
-		return control.Orchestrator{}, err
-	}
+func buildOrchestrator(config serviceConfig, ingestion httpclient.IngestionClient, indexing httpclient.IndexingClient, state *localstate.Store) (control.Orchestrator, error) {
 	slog.Info("[CONTROL] control state loaded",
 		"state_dir", config.stateDir,
 		"downloaded", state.DownloadedCount(),

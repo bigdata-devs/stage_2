@@ -22,3 +22,15 @@ type ProgressStore interface {
 	RecordIndexed(bookID models.BookID) error
 	RecordFailed(bookID models.BookID, reason string) error
 }
+
+type SearchService interface {
+	IsPublished(ctx context.Context, bookID models.BookID) (bool, error)
+}
+
+type IndexedBookLister interface {
+	IndexedIDs() []models.BookID
+}
+
+type FailureResetter interface {
+	WipeFailures() ([]models.BookID, error)
+}
