@@ -16,7 +16,7 @@
 %  "COVER-PAGE DATA" below (full names and student IDs). Placeholders are
 %  printed in dark red so that none can slip through unnoticed.
 % =============================================================================
-\documentclass[11pt,a4paper]{article}
+\documentclass[10pt,a4paper]{article}
 
 % ---------------------------------------------------------------------------
 % Encoding, fonts and language
@@ -36,7 +36,7 @@
 \usepackage{fancyhdr}
 \setlength{\parskip}{0.35em}
 \setlength{\parindent}{0pt}
-\setlength{\emergencystretch}{3em}
+\setlength{\emergencystretch}{6em}
 % Float placement: allow more floats per page and stack float pages from the top.
 \renewcommand{\topfraction}{0.9}
 \renewcommand{\bottomfraction}{0.8}
@@ -1315,8 +1315,8 @@ service. The full package-to-role table lives in
     \code{internal/indexing}, \code{internal/search} and
     \code{internal/control}.
   \item \emph{Driving adapters} (inbound HTTP): \code{internal/api} (shared
-    kit) and \code{internal/api/\{ingestion,indexing,search\}api} (handlers,
-    DTOs, CORS).
+    kit) and the three service packages under it (\code{ingestionapi},
+    \code{indexingapi}, \code{searchapi}) with their handlers, DTOs and CORS.
   \item \emph{Driven adapters} (outbound): \code{internal/crawler},
     \code{internal/datalake}, \code{internal/mongodb},
     \code{internal/control/httpclient} and \code{internal/localstate} (the
@@ -1366,7 +1366,7 @@ leaves at most a stray temporary file, never a truncated book.
 
 \paragraph{One update.}
 \route{POST /index/update/\allowbreak\{book\_id\}} first acquires one of eight update slots
-(\code{-max-concurrent-updates}); a request that finds them all busy waits
+(\code{-max-concurrent\-updates}); a request that finds them all busy waits
 until a slot frees or its caller disconnects, so a burst of updates cannot
 exhaust the datamart connection pool. The \textbf{indexing core}
 (\code{indexing.Service}) then reads the book from the datalake through its
