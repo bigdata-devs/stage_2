@@ -297,27 +297,14 @@ each was met, are the following:
 
 \begin{keyresults}[Key results]
 \begin{itemize}[leftmargin=1.2em]
-  \item \textbf{Contracts hold.} The running stack passes \fixed{19} of
-  \fixed{19} checks of the API validation script, \fixed{365} automated Go
-  tests pass against a live MongoDB server with none skipped, and both
-  end-to-end scripts pass.
-  \item \textbf{Search saturates at about 250~req/s.} From \fixed{10}
-  concurrent clients onwards throughput stays at 246--250~req/s, and mean
-  latency grows linearly with concurrency as Little's law predicts (within
-  2\%); the 95th percentile reaches 674~ms at \fixed{100} clients, above the
-  500~ms objective.
-  \item \textbf{MongoDB is the first bottleneck.} \code{mongod} consumes 9.2 to
-  11.0 of the host's 12 logical CPUs, about 44~ms of CPU per query, while each
-  Search process needs about 1~ms of CPU per query and less than 23~MiB of
-  memory.
-  \item \textbf{A second Search replica does not raise the ceiling.} With two
-  replicas behind nginx, throughput changes by $-1.8\%$ to $+4.0\%$ and the
-  95th percentile by $-4.6\%$ to $+3.1\%$ with no consistent sign: the
-  replicas share the saturated datamart and the same CPU.
-  \item \textbf{Indexing scales sub-linearly.} One to ten concurrent updates
-  raise throughput from 1.10 to 5.33~books/s (48\% parallel efficiency) while
-  the MongoDB CPU cost per book grows from 0.87 to 1.37 core-seconds,
-  evidence of write contention inside the datamart.
+  \item \textbf{Contracts hold:} \fixed{19}/\fixed{19} API checks, \fixed{365}
+  Go tests and both end-to-end scripts pass.
+  \item \textbf{MongoDB saturates first:} it uses 94--97\% of query CPU, and
+  search plateaus at about 250~req/s.
+  \item \textbf{Replication does not help on one host:} two Search replicas
+  change throughput by under 5\%.
+  \item \textbf{Indexing is contention-bound:} 48\% parallel efficiency at ten
+  concurrent updates.
 \end{itemize}
 \end{keyresults}
 
@@ -329,8 +316,6 @@ search, a corpus of \fixed{20} books for indexing) and to one run per
 configuration. The numbers characterise this implementation on this machine.
 Following the assignment, a single-machine experiment is \emph{not} presented
 as evidence of cluster scalability; that question belongs to Stage~3.
-Section numbers follow the report structure of the assignment, in which item~1
-is the cover page.
 
 % =============================================================================
 % 3. SYSTEM ARCHITECTURE
@@ -344,8 +329,9 @@ is the cover page.
 The system is composed of the three core services required by the assignment,
 a Control Module that coordinates them, an nginx reverse proxy that publishes
 the Search API, and a MongoDB server that holds the datamart.
-\Cref{tab:processes} lists every process of the deployment, and
-\cref{fig:architecture} shows how they interact.
+\Cref{tab:processes} lists every process of the deployment and
+\cref{fig:architecture} shows how they interact; the internal structure of
+each service is described in \cref{sec:implementation}.
 
 \begin{table}[htbp]
   \centering
@@ -508,29 +494,6 @@ the Search API, and a MongoDB server that holds the datamart.
   \label{fig:architecture}
 \end{figure}
 
-\paragraph{Ingestion Service.}
-Provider of the \route{/ingest} API. For a book ID it downloads the plain-text
-edition from Project Gutenberg, splits it at the official
-\code{*** START/END OF THE PROJECT GUTENBERG EBOOK} markers and stores the
-licence header and the body as two files in the batch-based datalake chosen in
-Stage~1. A book is reported as stored only when both files are complete.
-
-\paragraph{Indexing Service.}
-Provider of the \route{/index} API. It reads a complete book from the
-datalake, extracts its metadata (title, author, ISO~639 language codes,
-publication and release years) and its normalised body terms, and writes both
-into the MongoDB datamart: one metadata record per book and one posting list
-per term. It also rebuilds the whole datamart from the datalake and reports
-indexing statistics.
-
-\paragraph{Search Service.}
-Provider of the front-end API. It validates keyword queries, normalises them
-with the same tokenizer the Indexing Service applies to book bodies, and
-answers each query with a single server-side aggregation over the datamart
-that intersects the posting lists, joins published metadata, applies the
-optional filters, counts every match and returns one ranked page. It is
-stateless, which is what allows it to run as several replicas behind nginx.
-
 \subsection{Coordination mechanism}
 \label{sec:coordination}
 
@@ -539,38 +502,33 @@ of the assignment), reinforced by three shared-state mechanisms that make the
 workflow safe across process restarts and replicas:
 
 \begin{enumerate}
-  \item \textbf{Orchestration.} The Control Module decides \emph{which} work
-  is ready and \emph{who} performs it. Each candidate book is handed to
-  exactly one worker of the run, which calls the Ingestion Service and, only
-  after a successful answer, the Indexing Service. Both calls are synchronous:
-  a \code{2xx} answer means the step has \emph{completed}.
-  \item \textbf{Persistent completion markers.} Completion is recorded where
-  it happens. In the datalake, a book exists only when both of its files
-  exist, and the header is written last. In the control state, the Control
-  Module appends each book ID to \code{downloaded\_books.txt} or
-  \code{indexed\_books.txt} after the corresponding step succeeds, and to
-  \code{failed\_books.txt} with a reason when it gives up.
-  \item \textbf{Publication state in the datamart.} Each metadata record
-  carries a \code{status} that is \code{pending} while its postings are being
-  written and \code{published} once they are complete. The Search Service
-  only ever returns published books, so a half-indexed book is invisible.
-  \item \textbf{Cross-replica lease.} A full rebuild must not run twice at
-  the same time. A lease document in MongoDB serialises rebuilds across every
-  Indexing replica that shares the datamart.
+  \item \textbf{Orchestration.} The Control Module hands each book to one
+  worker, which calls the Ingestion Service and, only after a \code{2xx}
+  answer, the Indexing Service; both calls are synchronous, so \code{2xx}
+  means the step has \emph{completed}.
+  \item \textbf{Persistent completion markers.} A book exists in the datalake
+  only when both of its files do, and the Control Module records every
+  completed or abandoned step in append-only control-state files.
+  \item \textbf{Publication state in the datamart.} A book's metadata record
+  stays \code{pending} until its postings are written and then becomes
+  \code{published}; search returns published books only.
+  \item \textbf{Cross-replica lease.} A lease document in MongoDB allows one
+  full rebuild at a time across every Indexing replica.
 \end{enumerate}
 
-\Cref{fig:lifecycle} traces one book through this workflow. The dependency
-required by the assignment (a book becomes eligible for indexing only after
-its ingestion has completed) is enforced twice: by the orchestrator, which
-only calls \route{POST /index/update/\{id\}} after ingestion returned
-\code{2xx}, and by the Indexing Service itself, which answers
-\code{404 book\_not\_found} for a book whose two datalake files are not both
-present. Search reads a consistent published state because publication is the
-last write of every update, and because a rebuild builds new collections aside
-and swaps them in with an atomic rename. If a process stops between completing
-an operation and recording it, the book is simply not recorded; the next run
-replays the call, and because every service operation is idempotent the replay
-converges to the same state without duplicates (\cref{sec:readiness}).
+The rules these mechanisms impose on shared storage are specified as
+non-HTTP contracts in \cref{tab:shared-state}. \Cref{fig:lifecycle} traces one
+book through the workflow. The dependency required by the assignment (a book
+becomes eligible for indexing only after its ingestion has completed) is
+enforced twice: by the orchestrator, which calls
+\route{POST /index/update/\{id\}} only after ingestion answered \code{2xx},
+and by the Indexing Service, which refuses a book that is not complete in the
+datalake. Search reads a consistent published state because publication is the
+last write of every update and a rebuild is swapped in atomically
+(\cref{sec:impl-indexing}). If a process stops between completing a step and
+recording it, the book stays unrecorded and the next run replays the call;
+because every operation is idempotent, the replay converges without
+duplicates (\cref{sec:readiness}).
 
 \begin{figure}[htbp]
   \centering
@@ -631,27 +589,14 @@ converges to the same state without duplicates (\cref{sec:readiness}).
     \draw[msg] (\xS,-9.7) -- node[mlabel] {one aggregation} (\xM,-9.7);
     \draw[ret] (\xM,-10.3) -- node[mlabel] {ranked page + total} (\xS,-10.3);
   \end{tikzpicture}
-  \caption{Lifecycle of one book under the orchestration workflow. Solid arrows
-  are requests or writes and dashed arrows are responses; the green notes are
-  the readiness probe and the persistent completion markers of the control
-  state. Ingestion answers \code{downloaded}, or \code{available} when the book
-  was already complete, and writes each file through a temporary file,
-  \code{fsync} and rename. Steps 1--4 are the ordered datamart writes of one index
-  update: the book becomes visible to search only at step~4, because search
-  reads published books only, and a crash at any earlier step leaves it invisible
-  rather than half-indexed.}
+  \caption{Lifecycle of one book under the orchestration workflow: solid arrows
+  are requests or writes, dashed arrows responses, and green notes the readiness
+  probe and the completion markers of the control state. Steps 1--4 are the
+  ordered datamart writes of one index update (\cref{sec:impl-indexing}); the
+  book becomes visible to search only at step~4, so a crash at any earlier step
+  leaves it invisible rather than half-indexed.}
   \label{fig:lifecycle}
 \end{figure}
-
-\paragraph{Failure semantics.}
-The orchestrator classifies every failed step. Network errors, timeouts,
-HTTP \code{408}, \code{429} and \code{5xx}, and \code{failed} status answers
-are \emph{transient}: the step is retried up to three times with a backoff that
-starts at 1~s and doubles. Any other \code{4xx} answer and an \code{unavailable}
-status are \emph{permanent}: the book is recorded in \code{failed\_books.txt}
-and skipped by later runs unless the operator re-enqueues it with
-\code{-retry-failed}. A book interrupted by \code{SIGINT} or \code{SIGTERM} is
-left pending and claimed again by the next run.
 
 \subsection{Processes, replicas and threads}
 \label{sec:replicas-threads}
@@ -723,49 +668,36 @@ two request paths of the system.
 \end{figure}
 
 \paragraph{Distribution of requests among replicas.}
-nginx resolves the compose service name \code{search} through Docker's
-embedded DNS every 5~s and balances requests with \code{least\_conn}, so each
-request goes to the replica with the fewest requests in flight. This policy
-suits a workload whose cost varies with the posting-list length of the query,
-where strict rotation could queue a cheap query behind an expensive one.
-Scaling to $R$ replicas needs no proxy restart.
+nginx re-resolves the compose service name \code{search} every 5~s and sends
+each request to the replica with the fewest requests in flight
+(\code{least\_conn}), so replicas can be added without restarting the proxy;
+\cref{sec:decision-replicas} justifies these settings.
 
 \paragraph{Threads inside a process.}
-Every service is a Go process whose HTTP server starts one goroutine per
-connection. Goroutines blocked on network input or output (a MongoDB round
-trip, a Gutenberg download) are parked by the runtime's network poller and do
-not hold an operating-system thread: during the benchmark each Search process
-served up to 100 concurrent requests with 13 to 24 operating-system threads
-(\code{PIDs} column of \code{docker stats}). Concurrency that would overload a
-shared resource is bounded explicitly with buffered channels used as
-semaphores: eight concurrent downloads in the Ingestion Service, eight
-concurrent index updates in the Indexing Service, and $W$ workers in the
-Control Module. Shared in-process state is protected by mutexes, as detailed
-in \cref{sec:decision-concurrency}.
+Every service is a Go process that serves each request on its own goroutine
+(\cref{fig:concurrency}). A goroutine blocked on network input or output (a
+MongoDB round trip, a Gutenberg download) is parked by the runtime and holds no
+operating-system thread. Concurrency that would overload a shared resource
+(downloads, index updates, Control workers) is bounded explicitly with buffered
+channels used as semaphores, and shared in-process state is protected by
+mutexes (\cref{sec:decision-concurrency}).
 
 \paragraph{Concurrent access to shared storage.}
-Separate processes never share memory; they share the datalake volume, the
-MongoDB server and the control-state volume, each with its own cross-process
-rule. Datalake files are replaced atomically (temporary file, \code{fsync},
-rename), so a reader sees either no file or a complete one. MongoDB applies each
-document update atomically, and the write path is idempotent, so concurrent
-updates of the same book converge. Control-state files are appended under an
-exclusive \code{flock} (\code{LockFileEx} on Windows), so concurrent writers
-never interleave partial lines.
+Separate processes never share memory: they share the datalake, the
+control-state volume and the MongoDB server, and the rules that make their
+concurrent access safe are the shared-state contracts of
+\cref{tab:shared-state}.
 
 \subsection{Shared storage}
 \label{sec:storage}
 
 \paragraph{Datalake.}
-The named volume \code{datalake} is mounted by the Ingestion Service (writer)
-and by the Indexing Service (reader). It keeps the batch-based layout selected
-in Stage~1: each book has a folder
-\code{batch\_<low>\_<high>/\allowbreak<book\_id>/} that holds
+The named volume \code{datalake}, shared by the Ingestion and Indexing
+services, keeps the batch-based layout selected in Stage~1: each book has a
+folder \code{batch\_<low>\_<high>/\allowbreak<book\_id>/} that holds
 \code{<book\_id>\_body.txt} and \code{<book\_id>\_header.txt}, with 1{,}000
-consecutive IDs per batch folder, so
-book 1342 lives in \code{batch\_1000\_1999/1342/}. The body is written before
-the header, so the presence of both files is the completion marker that every
-reader checks.
+consecutive IDs per batch folder, so book 1342 lives in
+\code{batch\_1000\_1999/1342/}.
 
 \paragraph{Datamart.}
 The MongoDB database (\code{boogle} by default; \code{boogle\_bench} for the
@@ -778,57 +710,51 @@ needs no manual set-up.
   \small
   \caption{Collections of the MongoDB datamart.}
   \label{tab:collections}
-  \begin{tabularx}{\textwidth}{@{}l>{\raggedright\arraybackslash}X>{\raggedright\arraybackslash}p{3.7cm}>{\raggedright\arraybackslash}p{3.6cm}@{}}
+  \begin{tabularx}{\textwidth}{@{}l>{\raggedright\arraybackslash}X>{\raggedright\arraybackslash}p{4.6cm}@{}}
     \toprule
-    Collection & Document & Secondary indexes & Writers / readers \\
+    Collection & Document & Secondary indexes \\
     \midrule
     \code{books} & \code{\{\_id: book\_id, title, author, language,
       publication\_year, release\_year, status\}}; \code{status} is
       \code{pending} or \code{published} & \code{\{author, language,
-      publication\_year\}}, \code{\{language\}}, \code{\{publication\_year\}} &
-      Indexing / Search \\
+      publication\_year\}}, \code{\{language\}}, \code{\{publication\_year\}} \\
     \code{inverted\_index} & \code{\{\_id: term, postings: [\{book\_id, tf\}]\}},
       one document per normalised term, postings sorted by \code{book\_id}
-      without duplicates & \code{\{postings.book\_id\}} (multikey) &
-      Indexing / Search \\
+      without duplicates & \code{\{postings.book\_id\}} (multikey) \\
     \code{locks} & \code{\{\_id: "rebuild", owner, expires\_at\}}: the rebuild
-      lease & --- & Indexing replicas \\
+      lease & --- \\
     \bottomrule
   \end{tabularx}
 \end{table}
 
 \paragraph{Control state.}
-The named volume \code{control-state} holds the three append-only files of the
-Control Module (\cref{sec:coordination}). The Control Module is their only
-writer.
+The named volume \code{control-state} holds the Control Module's three
+append-only files, \code{downloaded\_books.txt}, \code{indexed\_books.txt} and
+\code{failed\_books.txt}; their format and locking are specified in
+\cref{tab:shared-state}.
 
 \subsection{Single-host deployment}
 \label{sec:deployment}
 
-The whole system is described by one \code{docker-compose.yml} (project
-\code{boogle-engine}): \code{mongo} (\code{mongo:7}), \code{ingestion},
-\code{indexing}, \code{search} (with \code{replicas: \$\{SEARCH\_REPLICAS:-1\}}),
-\code{nginx} (\code{nginx:1.28-alpine}) and the Control Module under the
-\code{tools} profile, started on demand with
-\code{docker compose --profile tools run --rm control -discover}. A single
-multi-stage \code{Dockerfile} builds the four Go binaries statically
-(\code{golang:1.25-alpine} builder, \code{CGO\_ENABLED=0}) into
-\code{alpine:3.21} images that run as an unprivileged user. Containers carry
-code only: the datalake, the control state and the datamart live in named
-volumes, so recreating a container never loses pipeline state. Services reach
-one another by compose service name (\code{http://ingestion:7001},
-\code{mongodb://mongo:27017}); host ports come from \code{.env}
-(\code{INGESTION\_PORT}, \code{INDEXING\_PORT}, \code{SEARCH\_PORT},
-\code{MONGO\_PORT}). Health checks gate the start-up order: the Indexing and
-Search services wait for a healthy MongoDB, nginx for a healthy Search replica,
-and the Control Module for healthy Ingestion and Indexing services.
+The whole system is described by one \code{docker-compose.yml}: the services
+\code{mongo}, \code{ingestion}, \code{indexing}, \code{search} (replica count
+from \code{SEARCH\_REPLICAS}) and \code{nginx}, plus the Control Module, which
+is started on demand under the \code{tools} profile. One multi-stage
+\code{Dockerfile} builds the four statically linked Go binaries into images
+that run as an unprivileged user. Containers carry code only: the datalake,
+the control state and the datamart live in named volumes, so recreating a
+container never loses pipeline state. Services reach one another by compose
+service name, and every port, address and data path comes from configuration
+(\cref{sec:decision-deployment}). Health checks gate the start-up order: the
+Indexing and Search services wait for a healthy MongoDB, nginx for a healthy
+Search replica, and the Control Module for healthy Ingestion and Indexing
+services.
 
 Every process, including the MongoDB server, the reverse proxy and, during
 the benchmarks, the k6 load generator and the resource sampler, runs on the
 one host described in \cref{tab:host}. No container had CPU or memory limits in
-the official session (the limits in \code{docker-compose.yml} are commented
-out), so all processes competed for the same 12 logical CPUs and 9.7~GiB of
-memory.
+the official session, so all processes competed for the same 12 logical CPUs
+and 9.7~GiB of memory.
 % =============================================================================
 % 4. API DESIGN AND CONTRACTS
 % =============================================================================
@@ -838,30 +764,25 @@ memory.
 \subsection{Consumers and use cases}
 \label{sec:use-cases}
 
-The interfaces serve three kinds of consumer, and the contract of each is
-specified separately:
+The interfaces serve three kinds of consumer: the front-end; the Control
+Module, which consumes the internal APIs (use cases UC4--UC8); and operational
+components such as Docker health checks and the interactive documentation
+(UC9). \Cref{tab:inventory} lists the operations of each. The front-end, a
+browser application or an HTTP client such as k6 or \code{curl} exercising the
+same contract during Stage~2, has three use cases:
 
 \begin{itemize}
-  \item \textbf{The front-end} (a browser application, or an HTTP client such
-  as k6 or \code{curl} exercising the same contract during Stage~2). Its use
-  cases are \emph{UC1}, searching books by one or more keywords with optional
-  author, language and publication-year filters and paginated results;
-  \emph{UC2}, opening the detail page of one book; and \emph{UC3}, populating
-  the filter controls with the values that actually occur in the catalogue.
-  \item \textbf{The Control Module}, which consumes the internal APIs to ingest
-  a book (\emph{UC4}), check that a book is complete in the datalake
-  (\emph{UC5}), discover the books already stored (\emph{UC6}), index and
-  publish a book (\emph{UC7}) and, as an administrative operation, rebuild the
-  whole datamart (\emph{UC8}).
-  \item \textbf{Operational components}: Docker health checks, the readiness
-  probe of the Control Module, the corpus guard of the load benchmarks and the
-  developers who browse the interactive documentation (\emph{UC9}).
+  \item \emph{UC1}: search books by one or more keywords, with optional author,
+  language and publication-year filters and paginated results;
+  \item \emph{UC2}: open the detail page of one book;
+  \item \emph{UC3}: populate the filter controls with the values that actually
+  occur in the catalogue.
 \end{itemize}
 
 The front-end never reads files, never connects to MongoDB and does not need
 to know how the services are coordinated: its contract describes application
-data only. Ingestion commands, index rebuilds and datalake paths are internal
-concerns and do not appear in it.
+data only, and ingestion commands, index rebuilds and datalake paths do not
+appear in it.
 
 \subsection{Endpoint inventory}
 \label{sec:inventory}
@@ -879,41 +800,34 @@ specification through the vendor extensions \code{x-completion} and
   \footnotesize
   \caption{Endpoint inventory. Front-end routes are published by nginx on port
   7003; internal routes are served on ports 7001 (Ingestion) and 7002
-  (Indexing). Error responses use the body of \cref{sec:errors}.}
+  (Indexing). Error codes and their meaning are listed in \cref{tab:errors}.}
   \label{tab:inventory}
   \renewcommand{\arraystretch}{1.12}
-  \begin{tabularx}{\textwidth}{@{}>{\raggedright\arraybackslash}p{3.95cm}>{\raggedright\arraybackslash}p{2.3cm}>{\raggedright\arraybackslash}X>{\raggedright\arraybackslash}p{3.9cm}@{}}
+  \begin{tabularx}{\textwidth}{@{}>{\raggedright\arraybackslash}p{3.95cm}>{\raggedright\arraybackslash}p{2.3cm}>{\raggedright\arraybackslash}X>{\raggedright\arraybackslash}p{2.3cm}@{}}
     \toprule
-    Method and route & Provider $\rightarrow$ consumer & Purpose & Responses \\
+    Method and route & Provider $\rightarrow$ consumer & Purpose & Status codes \\
     \midrule
     \multicolumn{4}{@{}l}{\textbf{Front-end-facing} (public, through nginx :7003)} \\
     \route{GET /search} & Search $\rightarrow$ front-end & UC1: keyword search with
-      optional filters, ranking and pagination & 200; 400 \code{missing\_parameter},
-      \code{invalid\_parameter}; 500 \\
+      optional filters, ranking and pagination & 200, 400, 500 \\
     \route{GET /books/\allowbreak\{book\_id\}} & Search $\rightarrow$ front-end & UC2: metadata
-      of one published book & 200; 400 \code{invalid\_book\_id}; 404
-      \code{book\_not\_found}; 500 \\
+      of one published book & 200, 400, 404, 500 \\
     \route{GET /search/filters} & Search $\rightarrow$ front-end & UC3: distinct
-      languages and publication years of published books & 200; 500 \\
+      languages and publication years of published books & 200, 500 \\
     \route{OPTIONS} (any route) & Search $\rightarrow$ browser & CORS preflight of a
-      cross-origin page & 204; 403 \code{origin\_not\_allowed} \\
+      cross-origin page & 204, 403 \\
     \midrule
     \multicolumn{4}{@{}l}{\textbf{Internal} (consumer: Control Module)} \\
     \route{POST /ingest/\allowbreak\{book\_id\}} & Ingestion $\rightarrow$ Control & UC4:
-      download, split and store one book & 200 \code{downloaded} or
-      \code{available}; 400; 404 \code{book\_unavailable}; 500; 503
-      \code{download\_failed} \\
+      download, split and store one book & 200, 400, 404, 500, 503 \\
     \route{GET /ingest/status/\allowbreak\{book\_id\}} & Ingestion $\rightarrow$ Control &
-      UC5: is the book complete in the datalake? & 200 \code{available}; 400; 404
-      \code{book\_not\_found} \\
+      UC5: is the book complete in the datalake? & 200, 400, 404 \\
     \route{GET /ingest/list} & Ingestion $\rightarrow$ Control & UC6: complete
-      books, in ascending order (\code{-discover}) & 200; 500 \\
+      books, in ascending order (\code{-discover}) & 200, 500 \\
     \route{POST /index/update/\allowbreak\{book\_id\}} & Indexing $\rightarrow$ Control & UC7:
-      index one book and publish it & 200 \code{updated}; 400; 404
-      \code{book\_not\_found}; 500 \\
+      index one book and publish it & 200, 400, 404, 500 \\
     \route{POST /index/rebuild} & Indexing $\rightarrow$ Control (admin.) & UC8:
-      rebuild the datamart from the whole datalake & 200; 409
-      \code{rebuild\_in\_progress}; 500; 503 \code{rebuild\_interrupted} \\
+      rebuild the datamart from the whole datalake & 200, 409, 500, 503 \\
     \midrule
     \multicolumn{4}{@{}l}{\textbf{Operational}} \\
     \route{GET /index/status} & Indexing $\rightarrow$ Control, k6, Docker &
@@ -923,7 +837,7 @@ specification through the vendor extensions \code{x-completion} and
       \route{GET /index/status}, \route{GET /search/filters} (replicas and nginx),
       \code{mongosh} ping & 200 \\
     \route{GET /books/\allowbreak\{book\_id\}} & Search $\rightarrow$ Control & \code{-verify}
-      mode: reconcile \code{indexed\_books.txt} with the datamart & 200; 404 \\
+      mode: reconcile \code{indexed\_books.txt} with the datamart & 200, 404 \\
     \route{GET /swagger/index.html} & every service $\rightarrow$ developers &
       UC9: interactive OpenAPI documentation (\code{/swagger/doc.json}) & 200 \\
     \bottomrule
@@ -960,9 +874,8 @@ Several design rules complete the contract.
   whereas \code{results} holds at most \code{limit} books starting at
   \code{offset}. A valid query without matches, or an \code{offset} past the
   last match, returns 200 with \code{results: []} and the true \code{total}.
-  \item \textbf{Bounded work.} At most 10 distinct terms and 100 results per
-  page are accepted, which bounds the posting lists a single request may
-  intersect and the size of each response.
+  \item \textbf{Limits.} At most 10 distinct terms per query and 100 results
+  per page are accepted.
 \end{itemize}
 
 \begin{table}[htbp]
@@ -1000,11 +913,9 @@ GET /search?q=adventure&author=austen&language=en&limit=5          -> 200 OK
 \end{lstlisting}
 
 \paragraph{GET /books/\allowbreak\{book\_id\} and GET /search/filters.}
-These two routes support the detail page and the filter controls of the
-front-end. \route{GET /books/\allowbreak\{book\_id\}} returns the same record as one search
-result, \code{404 book\_not\_found} when no \emph{published} book has that ID
-(a book still being indexed is as invisible here as in search), and
-\code{400 invalid\_book\_id} when the ID is not a positive integer.
+These two routes serve UC2 and UC3. \route{GET /books/\allowbreak\{book\_id\}}
+returns the same record as one search result, and only for a \emph{published}
+book: a book still being indexed is as invisible here as in search.
 \route{GET /search/filters} returns \code{\{"languages": [...], "years":
 [...]\}}, computed from published books only.
 
@@ -1012,27 +923,24 @@ result, \code{404 book\_not\_found} when no \emph{published} book has that ID
 \label{sec:internal-contracts}
 
 \paragraph{Ingestion.}
-\route{POST /ingest/\allowbreak\{book\_id\}} answers \code{downloaded}, or
-\code{available} when the book was already complete, in which case nothing is
-downloaded. A book that Project Gutenberg does not serve, or whose text lacks
-the START/END markers, is \code{404 book\_unavailable}, a permanent outcome. A
-transient download failure, or an exhausted ingestion budget (2~minutes by
-default, queueing and retries included), is \code{503 download\_failed}, which
-the caller should retry. Concurrent requests for the same book join one shared
-download, so the endpoint is safe under duplicate submissions.
+\route{POST /ingest/\allowbreak\{book\_id\}} answers \code{downloaded} once both
+files are stored, or \code{available} without downloading when the book was
+already complete; a failure is either permanent (\code{404}) or transient
+(\code{503}), as listed in \cref{tab:errors}. Concurrent requests for the same
+book join one shared download, so the endpoint is safe under duplicate
+submissions.
 
 \paragraph{Indexing.}
 \route{POST /index/update/\allowbreak\{book\_id\}} answers \code{updated} once the
 book's metadata and postings are in the \emph{published} index, visible to every
-request that starts afterwards. Re-indexing replaces the book's metadata record
-and its postings, including the removal of terms the new version no longer
-contains, so the index ends up exactly as after the first call. If a rebuild is
-running, the update is not blocked: it is recorded and replayed on the rebuilt
-index right after the swap. \route{POST /index/rebuild} builds a new catalogue
-and index aside and publishes them in one step; it answers \code{409
-rebuild\_in\_progress} while another replica holds the rebuild lease and
-\code{503 rebuild\_interrupted} if its budget (10~minutes by default) runs out,
-in which case the previous index stays published. \route{GET /index/status}
+request that starts afterwards. Re-indexing replaces the book's metadata and
+postings, including terms the new version no longer contains, so repeating the
+call leaves the index exactly as after the first one; an update that arrives
+during a rebuild is not blocked but replayed on the rebuilt index.
+\route{POST /index/rebuild} builds a new catalogue and index aside and
+publishes them in one step, so search keeps reading the previous complete
+index until the swap, and also when the rebuild fails (\cref{tab:errors}).
+\route{GET /index/status}
 reports the published books, the time of the last change and the document
 bytes of the datamart (\code{dbStats.dataSize}). The literal request and
 response bodies of every internal operation are recorded in
@@ -1040,7 +948,8 @@ response bodies of every internal operation are recorded in
 
 \paragraph{Timeouts and retries expected of the caller.}
 The specification states, per operation, the timeout and failure behaviour
-expected of the caller, and the Control Module implements it. A call to
+expected of the caller, which the Control Module implements
+(\cref{sec:impl-control}). A call to
 \route{POST /ingest} may take up to 150~s, above the service's own 2-minute
 budget, so the service always answers before the caller gives up. Indexing,
 status and readiness calls are bounded at 30~s. Transient failures (transport
@@ -1057,11 +966,7 @@ callers that joined it.
 Every service answers errors with the same JSON body,
 \code{\{"error": "<code>", "message": "<human-readable explanation>"\}}, where
 \code{error} is a stable machine-readable code and \code{message} is meant for
-logs and developers. For example, \route{GET /search?q=adventure\&limit=0}
-returns \code{400} with \code{"error":"invalid\_parameter"} and the message
-\emph{query parameter "limit" must be an integer between 1 and 100}.
-\Cref{tab:errors} lists every code. Requests with a method a route does not
-support are answered with \code{405 Method Not Allowed} by the router.
+logs and developers; \cref{tab:errors} lists every code.
 
 \begin{table}[htbp]
   \centering
@@ -1135,22 +1040,15 @@ They agree with \cref{fig:architecture,fig:lifecycle}.
 \subsection{Exposure and cross-origin access}
 \label{sec:cors}
 
-The front-end reaches the Search API through a single entry point, nginx on
-port 7003, whatever the number of replicas. A browser front-end served from
-another origin (for example a development server on \code{localhost:5173})
-needs CORS, which the Search Service implements as middleware around every
-route. The allowed origins come from \code{CORS\_ALLOWED\_ORIGIN}: \code{*} by
-default, which is safe for a public, read-only API that uses no credentials,
-or an explicit comma-separated list, in which case every response also carries
-\code{Vary: Origin}. A preflight from an allowed origin is answered with
-\code{204} and \code{Access-Control-Allow-Methods: GET, HEAD, OPTIONS},
-\code{Access-Control-Allow-Headers: Content-Type} and
-\code{Access-Control-Max-Age: 600}; a preflight from any other origin receives
-\code{403 origin\_not\_allowed}. Credentials are never allowed, and a value that
-names no valid origin stops the service at start-up instead of silently
-blocking the front-end. In Stage~2 the internal ports 7001 and 7002 are also
-published on the host, for the Control Module and the Swagger pages; the
-front-end contract never uses them.
+The front-end reaches the Search API through one entry point, nginx on port
+7003, whatever the number of replicas. For a browser page served from another
+origin, the Search Service applies CORS to every route: the allowed origins
+come from \code{CORS\_ALLOWED\_ORIGIN} (\code{*} by default, safe for a
+read-only API without credentials, or an explicit list), and a preflight is
+answered with \code{204} or \code{403} (check X4 in \cref{tab:validation}).
+The internal ports 7001 and 7002 are also published on the host, for the
+Control Module and the Swagger pages, but the front-end contract never uses
+them.
 
 \subsection{Specification and validation evidence}
 \label{sec:validation}
@@ -1158,35 +1056,28 @@ front-end contract never uses them.
 \paragraph{Versioned specification.}
 Each service carries a versioned OpenAPI~2.0 (Swagger) document, version
 1.0.0, under \code{api/ingestion/}, \code{api/indexing/} and \code{api/search/}
-(\code{swagger.yaml} and \code{swagger.json}). The documents are generated with
-\code{swaggo/swag} v1.16.6 (\code{go generate}) from annotations written next
-to the handlers, so specification and implementation are versioned together in
-one commit. Each running service serves its own document as an interactive page
-at \route{/swagger/index.html}. Beyond schemas, parameters, defaults and status
-codes, every operation records its provider, consumers and audience
-(\code{x-provider}, \code{x-consumers}, \code{x-audience}), its idempotency and
-completion semantics (\code{x-idempotent}, \code{x-completion}), and, in its
-description, the timeouts and retries expected of the caller.
+(\code{swagger.yaml} and \code{swagger.json}), published with the code at
+\url{\repourl/tree/develop/api}. The documents are generated with
+\code{swaggo/swag} v1.16.6 from annotations next to the handlers
+(\cref{sec:decision-api}), and each running service serves its own document as
+an interactive page at \route{/swagger/index.html}. Beyond schemas,
+parameters, defaults and status codes, every operation records its provider,
+consumers and audience (\code{x-provider}, \code{x-consumers},
+\code{x-audience}), the completion and idempotency extensions of
+\cref{sec:inventory}, and the timeouts and retries expected of the caller.
 
 \paragraph{API validation script (19/19).}
 \code{scripts/api\_validation.sh} is the runnable check of the front-end
-contract required by the assignment. It first seeds four fixture books (82
-\emph{Ivanhoe}, 84 \emph{Frankenstein}, 1341 \emph{The Altruist in Politics},
-1342 \emph{Pride and Prejudice}) through the stack's own \route{POST /ingest}
-and \route{POST /index/update} routes, which exercises the internal contracts
-on the way. It then sends nineteen requests to the public endpoint (nginx,
-\code{http://localhost:7003}) and asserts status codes, error codes and
-response invariants. The assertions rely only on what the fixture books
-guarantee (an ID that must or must not appear, a filter every result must
-satisfy), never on corpus-dependent totals, so the script also runs against a
-larger datamart. It exits with status~1 if any check fails, so it doubles as a
-regression test, and \code{--record <file>} regenerates the evidence document
-\code{docs/evidence/\allowbreak api\_validation\_results.md}, which contains the literal
+contract. It seeds four fixture books (82, 84, 1341 and 1342) through the
+stack's own \route{POST /ingest} and \route{POST /index/update} routes, which
+exercises the internal contracts on the way, then sends nineteen requests to
+nginx on port 7003 and asserts status codes, error codes and response
+invariants that depend only on the fixtures, never on corpus-dependent totals.
+It exits with status~1 on any failure, so it doubles as a regression test, and
+\code{--record} regenerates
+\code{docs/evidence/\allowbreak api\_validation\_results.md} with the literal
 response body of every check. The recorded run of 31~October~2026 passed
-\textbf{19 of 19} checks (\cref{tab:validation}). It covers keyword search,
-each filter individually and combined, empty results, invalid parameters,
-pagination, both catalogue routes, multi-word AND queries and the CORS
-preflight.
+\textbf{19 of 19} checks (\cref{tab:validation}).
 
 \begin{table}[htbp]
   \centering
@@ -1221,17 +1112,10 @@ preflight.
   \end{tabularx}
 \end{table}
 
-Two details of the recorded run matter for its interpretation. First, the
-transcript was produced on branch \code{fix/search-qa} at \code{c2cb456}, with
-the services running as local processes configured like
-\code{docker-compose.yml} and a local MongoDB~8.3.7 server, whereas the
-benchmarks used the \code{mongo:7} container; the HTTP contract does not depend
-on the server version. Second, that commit predates the metadata change that
-makes \code{publication\_year} fall back to the Gutenberg release year when a
-header has no original-publication line. The fixture books had no known year,
-so check S4 verified the \emph{contract} of the year filter (applied, echoed,
-never violated) over an empty year domain; on \code{develop} the fallback
-gives every book a filterable year.
+The run used local processes and MongoDB~8.3.7 at commit \code{c2cb456},
+which predates the fallback of \code{publication\_year} to the release year, so
+check S4 verified the \emph{contract} of the year filter (applied, echoed,
+never violated) on fixtures without a known year (\cref{sec:validity}).
 
 \paragraph{Internal interactions and further evidence.}
 The internal HTTP contracts are exercised end to end by two scripts whose
@@ -1246,10 +1130,8 @@ datamart across container recreation, and teardown; all pass. The
 cross-replica rebuild lease was verified live
 (\code{docs/evidence/\allowbreak rebuild\_replica.md}, \cref{sec:bench-indexing}). Under
 load, the k6 checks \emph{page respects limit} and \emph{pagination is echoed}
-held for 100\% of the 65{,}950 successful queries of the two search runs.
-Finally, \code{go test -count=1 -v ./...} against a live \code{mongo:7} server
-reports \textbf{365 passing tests}, none skipped and none failing
-(\code{docs/evidence/\allowbreak tests.txt}).
+held for 100\% of the 65{,}950 successful queries of the two search runs. The
+unit and integration tests are summarised in \cref{sec:testing}.
 % =============================================================================
 % 5. MICROSERVICE IMPLEMENTATION
 % =============================================================================
@@ -1261,52 +1143,31 @@ reports \textbf{365 passing tests}, none skipped and none failing
 
 The assignment's reference template is a Java~17 service built with Javalin,
 Gson and Maven and benchmarked with JMH. The group implemented the services in
-\textbf{Go} instead, as selected and justified by the Stage~1 measurements
+\textbf{Go} instead, the language selected by the Stage~1 measurements
 (highest datalake write throughput of the four implementations compared, and
-fastest index builds from 500 books upward). Each element of the template has a direct
-counterpart:
-
-\begin{itemize}
-  \item \textbf{HTTP server and router} (Javalin): the standard library
-  \code{net/http} server with the method-aware \code{http.ServeMux} introduced
-  in Go~1.22. Routes are declared as patterns such as
-  \code{"POST /index/update/\allowbreak\{book\_id\}"}, path parameters are read with
-  \code{Request.PathValue}, and a request with another method on a declared
-  path is answered with \code{405} automatically. No third-party router or web
-  framework is used.
-  \item \textbf{JSON serialisation} (Gson): \code{encoding/json}, with response
-  types declared as Go structs whose tags fix the field names of the contract.
-  \item \textbf{Build} (Maven): one Go module (\code{boogle-engine}, Go~1.25)
-  with four entry points under \code{cmd/}; \code{go build} produces one static
-  binary per service, and the multi-stage \code{Dockerfile} packages them.
-  \item \textbf{Micro-benchmarks} (JMH): Go's \code{testing.B} framework, with
-  adaptive iteration counts, ten samples per benchmark and aggregation by
-  \code{benchstat} (medians with 95\% confidence intervals, bytes and
-  allocations per operation), kept in \code{\_test.go} files and therefore
-  excluded from the service binaries.
-  \item \textbf{Datamart access}: the official MongoDB Go driver
-  (\code{go.mongodb.org/\allowbreak mongo-driver/v2}, v2.9.2); \textbf{API
-  documentation}: \code{swaggo/swag} and \code{http-swagger}; \textbf{logging}:
-  the structured \code{log/slog} logger.
-\end{itemize}
+fastest index builds from 500 books upward), and every element of the template
+has a standard counterpart. The \code{net/http} server with the method-aware
+\code{http.ServeMux} of Go~1.22, which answers \code{405} to an undeclared
+method, replaces Javalin without any third-party framework;
+\code{encoding/json}, with struct tags that fix the field names of the
+contract, replaces Gson; one Go module (\code{boogle-engine}, Go~1.25) with
+four entry points under \code{cmd/} replaces Maven; and \code{testing.B} with
+\code{benchstat} replaces JMH, with the benchmarks kept in \code{\_test.go}
+files and therefore out of the service binaries. The datamart is accessed
+through the official MongoDB Go driver (v2.9.2), the API documentation is
+generated with \code{swaggo/swag}, and logging uses the structured
+\code{log/slog} logger.
 
 \paragraph{Repository layout.}
-The Go code follows a \textbf{hexagonal (ports and adapters) structure}. Each
-use case lives in a \emph{core} package (\code{internal/ingestion},
-\code{internal/indexing}, \code{internal/search}, \code{internal/control})
-that declares, as Go interfaces, both the operations it offers and the
-operations it needs from outside. \emph{Adapters} connect the cores to a
-technology: the HTTP handlers call a core through its \emph{driving} ports
-(\code{BookIngester}, \code{BookIndex}, \code{Searcher}), while MongoDB, the
-datalake, the Gutenberg client, the HTTP clients of the Control Module and the
-control-state files implement its \emph{driven} ports (for example
-\code{indexing.IndexWriter} or \code{search.Index}). Source dependencies point
-only into the core: no core package imports HTTP, MongoDB or filesystem code,
-and every adapter asserts at compile time the ports it implements. The use
-cases are therefore tested with in-memory fakes, and moving a store to
-Stage~3 infrastructure means writing a new adapter rather than changing a
-service. The full package-to-role table lives in
-\code{docs/architecture.md}; in summary:
+The Go code follows a \textbf{hexagonal (ports and adapters) structure}: each
+use case lives in a \emph{core} package that declares, as Go interfaces, the
+operations it offers (\emph{driving} ports such as \code{Searcher}) and the
+operations it needs (\emph{driven} ports such as \code{search.Index}). Source
+dependencies point only into the core, and every adapter asserts at compile
+time the ports it implements, so the use cases are tested with in-memory fakes
+and moving a store to Stage~3 infrastructure means writing a new adapter rather
+than changing a service. The packages are grouped as follows (the full table is
+in \code{docs/architecture.md}):
 
 \begin{itemize}
   \item \emph{Cores} (no HTTP, MongoDB or filesystem code): \code{internal/models}
@@ -1331,9 +1192,7 @@ flags and environment variables, builds the adapters and injects them into the
 core constructors (constructor injection), mounts the handlers on a
 \code{ServeMux}, starts an \code{http.Server} whose read, header, write and
 idle timeouts are bounded, and shuts down gracefully on \code{SIGINT} or
-\code{SIGTERM} (30~s grace for Ingestion and Indexing, 10~s for Search). Test
-fakes live in \code{\_test.go} files and are never compiled into a service
-binary.
+\code{SIGTERM} (30~s grace for Ingestion and Indexing, 10~s for Search).
 
 \subsection{Ingestion Service}
 \label{sec:impl-ingestion}
@@ -1343,38 +1202,32 @@ the \textbf{ingestion core} (\code{ingestion.Service}) and from there to two
 driven adapters. The core implements single-flight per book: concurrent
 requests for the same ID join one shared ingestion, tracked in an in-flight map
 guarded by a mutex. Each ingestion runs detached from the requests that wait
-for it, under its own 2-minute budget (\code{-ingest-timeout}), so a caller
-that disconnects cancels neither the shared work nor the other callers. The
-core first checks the datalake and answers \code{available} without
-downloading when the book is already complete. Otherwise it waits for one of
-eight download slots (\code{-workers}), a buffered channel, and the
-\textbf{Gutenberg client} downloads
+for it, under its own time budget, so a caller that disconnects cancels neither
+the shared work nor the other callers. If the datalake already holds the
+complete book, the core returns at once; otherwise it waits for a download slot
+(a buffered channel) and the \textbf{Gutenberg client} downloads
 \code{https://www.gutenberg.org/\allowbreak cache/epub/<id>/pg<id>.txt} through one shared
-\code{http.Client} with connection reuse (30~s per attempt); the core makes up
-to three attempts with a 1~s doubling backoff and retries only the errors the
-client classifies as transient. The
-\textbf{splitter} then separates header and body at the START/END markers;
-a missing marker makes the book \code{unavailable}. Finally the
-\textbf{datalake} stores the body and then the header, each through a
-temporary file in the same directory, \code{fsync} and rename. Readiness
-follows directly: \route{GET /ingest/status/\{id\}} and \route{GET /ingest/list}
-report a book only when both files are present, and a crash at any point
-leaves at most a stray temporary file, never a truncated book.
+\code{http.Client} with connection reuse, retrying only the errors it
+classifies as transient. The \textbf{splitter} then separates header and body
+at the START/END markers, and the \textbf{datalake} adapter stores both files
+with the atomic protocol of \cref{tab:shared-state}, so a crash at any point
+leaves at most a stray temporary file, never a truncated book. The budget, slot
+count and retry settings are listed in \cref{tab:replicas}.
 
 \subsection{Indexing Service}
 \label{sec:impl-indexing}
 
 \paragraph{One update.}
-\route{POST /index/update/\allowbreak\{book\_id\}} first acquires one of eight update slots
-(\code{-max-concurrent\-updates}); a request that finds them all busy waits
-until a slot frees or its caller disconnects, so a burst of updates cannot
-exhaust the datamart connection pool. The \textbf{indexing core}
-(\code{indexing.Service}) then reads the book from the datalake through its
-\code{BookSource} port (\code{404} if incomplete), extracts the metadata from the header
-(title, author, language mapped to ISO~639 codes, original publication year
-falling back to the Gutenberg release year), and turns the body into terms
-with the Stage~1 tokenizer: lower-casing, keeping the maximal runs of the
-letters a--z, and dropping stop words, single letters and Roman numerals. The MongoDB writer,
+\route{POST /index/update/\allowbreak\{book\_id\}} first acquires an update slot
+(\cref{tab:replicas}); a request that finds them all busy waits until a slot
+frees or its caller disconnects, so a burst of updates cannot exhaust the
+datamart connection pool. The \textbf{indexing core} (\code{indexing.Service})
+then reads the book from the datalake through its \code{BookSource} port,
+refusing an incomplete one, extracts the metadata from the header (title,
+author, language mapped to ISO~639 codes, original publication year falling
+back to the Gutenberg release year), and turns the body into terms with the
+Stage~1 tokenizer, whose rules are those of the search contract
+(\cref{sec:frontend-contract}). The MongoDB writer,
 which implements the core's \code{IndexWriter} port, stores the book in four
 ordered, idempotent steps (\cref{fig:lifecycle}):
 
@@ -1392,16 +1245,13 @@ ordered, idempotent steps (\cref{fig:lifecycle}):
 \end{enumerate}
 
 \paragraph{Rebuild and publication.}
-\route{POST /index/rebuild} first claims the cross-replica lease: a single
-document in the \code{locks} collection, claimed with \code{findOneAndUpdate},
-valid for 2~minutes and renewed every 30~s by a background goroutine. A
-request that finds the lease held receives \code{409}; an expired lease, left
-by a replica that crashed mid-rebuild, is taken over. The holder streams the
-datalake one book at a time into the temporary collections
-\code{books\_rebuild} and \code{inverted\_index\_rebuild}, so its memory does not
-grow with the datalake, creates their indexes, and publishes them with two
-\code{renameCollection} commands (index first, then books). Search therefore
-keeps reading the previous complete datamart until the swap. Updates that
+\route{POST /index/rebuild} first claims the cross-replica lease of
+\cref{tab:shared-state}, which a background goroutine renews while the rebuild
+runs. The holder streams the datalake one book at a time into the temporary
+collections \code{books\_rebuild} and \code{inverted\_index\_rebuild}, so its
+memory does not grow with the datalake, creates their indexes, and publishes
+them with two \code{renameCollection} commands (index first, then books);
+search keeps reading the previous complete datamart until the swap. Updates that
 arrive during a rebuild are not blocked: an atomic flag, read \emph{before}
 each datamart write, makes the indexing core record the book in a
 mutex-protected replay list, and the list is re-applied to the fresh datamart after the swap,
@@ -1461,7 +1311,9 @@ unless both services answer their readiness routes within 10~s. A pool of
 mutex-protected \textbf{book selector} hands each candidate to exactly one
 worker; the worker skips books already indexed or failed, ensures ingestion,
 records it, ensures indexing and records it, applying the retry policy of
-\cref{sec:coordination} to each step. Two further modes support operations:
+\cref{sec:internal-contracts} to each step. A book interrupted by
+\code{SIGINT} or \code{SIGTERM} is left pending and claimed again by the next
+run. Two further modes support operations:
 \code{-retry-failed} atomically empties \code{failed\_books.txt} and
 re-enqueues its books, and \code{-verify} reconciles \code{indexed\_books.txt}
 with the datamart through \route{GET /books/\{id\}}. Every finished step is
@@ -1485,9 +1337,9 @@ mechanism that implements it.
     \toprule
     Concern & Mechanism & Where \\
     \midrule
-    Book ready for indexing & Both datalake files present, header written last;
-      otherwise \code{404 book\_not\_found} & \code{internal/datalake},
-      indexing handler \\
+    Book ready for indexing & Datalake completeness contract
+      (\cref{tab:shared-state}); an incomplete book is refused &
+      \code{internal/datalake}, indexing handler \\
     Service readiness & Docker health checks gate start-up; Control readiness
       probe (10~s); Indexing and Search refuse to start without MongoDB &
       \code{docker-compose.yml}, \code{cmd/*} \\
@@ -1495,8 +1347,9 @@ mechanism that implements it.
       Control instance at a time; single-flight per book in Ingestion; rebuild
       lease across replicas & \code{internal/control},
       \code{internal/ingestion}, \code{rebuild\_lock.go} \\
-    Retries & Control: 3 attempts, 1~s doubling backoff, transient versus
-      permanent; Ingestion downloads: 3 attempts, 1~s doubling &
+    Retries & Control: 3 attempts with 1~s doubling backoff for transient
+      failures only (\cref{sec:internal-contracts}); Ingestion downloads: same
+      policy &
       \code{orchestrator.go}, \code{internal/ingestion} \\
     Idempotency & Ingestion answers \code{available} for complete books;
       index updates replace metadata and converge postings; control records
@@ -1515,8 +1368,9 @@ mechanism that implements it.
 
 The repository contains unit tests for every package and integration tests that
 run against a live MongoDB server. These tests skip quickly when no server is
-reachable, and a recorded run against the \code{mongo:7} container reported
-365 passing tests and none skipped. The suites cover the orchestration loop
+reachable, and a recorded run of \code{go test -count=1 -v ./...} against the
+\code{mongo:7} container reported 365 passing tests, none skipped and none
+failing (\code{docs/evidence/\allowbreak tests.txt}). The suites cover the orchestration loop
 against fake services (happy path, resumption, retries, permanent failures,
 shutdown, concurrent workers), the HTTP clients against \code{httptest}
 servers, every handler's contract including error codes and CORS, the write
@@ -1575,28 +1429,17 @@ datamart.
 
 \paragraph{Decision and rationale.}
 Classical orchestration makes the one hard dependency of the pipeline explicit
-in code rather than emergent from message timing, and its synchronous
-completion semantics give the clearest definition of ``done'': the Control
-Module records a book as indexed only after the Indexing Service has
-\emph{published} it. It adds no infrastructure, which matters on a single
-host whose CPU is already the scarce resource (\cref{sec:bench-resources}), and
-it concentrates retry and failure policy in one place, where it is logged with
-per-step durations. Choreography with a broker was judged premature: it would
-add a stateful process, with acknowledgement, redelivery and duplicate-handling
-rules to specify, while still requiring idempotent consumers, which our
-services already are. Shared memory was rejected because it is unsafe across
-containers and, as the assignment notes, must be redesigned for Stage~3 anyway.
-Time-based coordination would only add latency on top of the readiness markers
-we already need.
-
-\paragraph{Why orchestration alone is not enough.}
-An orchestrator coordinates the processes it drives, but other actors also
-touch shared data: an operator may call \route{POST /index/rebuild} while the
-Control Module indexes, and two Indexing replicas may both receive a rebuild.
-Correctness therefore does not rest on the orchestrator alone. The datalake
-exposes only complete books, the datamart hides books until they are
-published, the rebuild lease serialises rebuilds across processes, and every
-operation is idempotent so that any replay is harmless.
+in code rather than emergent from message timing, and its synchronous answers
+give the clearest definition of ``done'': a book is recorded as indexed only
+after it has been \emph{published}. The alternatives buy nothing on one host. A
+broker would add a stateful process on a host whose CPU is already the scarce
+resource (\cref{sec:bench-resources}), while still requiring the idempotent
+consumers our services already are; time-based runs would only add latency on
+top of the readiness markers needed anyway; and shared memory is unsafe across
+containers and must be replaced in Stage~3. Orchestration alone is not
+enough, because an operator or a second Indexing replica can also touch shared
+data, so correctness also rests on the shared-state mechanisms of
+\cref{sec:coordination} and on idempotent operations.
 
 \paragraph{Trade-offs accepted.}
 The Control Module is a single point of coordination: while it is down, no new
@@ -1614,50 +1457,22 @@ the pipeline.
 
 Stage~2 runs every process on one machine, and the deployment is designed so
 that the experiment can be reproduced and later moved without code changes.
-Docker Compose captures the whole topology, its start-up order and its health
-checks in one file; named volumes separate state from code; and every address,
-path, replica count and concurrency setting is configurable rather than
-hard-coded (\cref{tab:config}). No \code{localhost} address appears in
-service code: inside the compose network services use service names, and on
-the host they use the published ports.
-
-\begin{table}[htbp]
-  \centering
-  \footnotesize
-  \caption{Configuration surface of the deployment (flags of the binaries and
-  environment variables read by \code{docker-compose.yml}).}
-  \label{tab:config}
-  \begin{tabularx}{\textwidth}{@{}>{\raggedright\arraybackslash}p{2.4cm}>{\raggedright\arraybackslash}X@{}}
-    \toprule
-    Aspect & Settings (defaults) \\
-    \midrule
-    Ports & \code{INGESTION\_PORT} (7001), \code{INDEXING\_PORT} (7002),
-      \code{SEARCH\_PORT} (7003, published by nginx), \code{MONGO\_PORT} (27017);
-      \code{-addr} of every service \\
-    Endpoints & \code{INGESTION\_URL}, \code{INDEXING\_URL}, \code{SEARCH\_URL}
-      (Control Module); \code{MONGO\_URI}, \code{MONGO\_DATABASE} (\code{boogle}) \\
-    Data paths & \code{-datalake} (\code{/data/datalake}), \code{-batch-size}
-      (1000), \code{CONTROL\_STATE\_DIR} (\code{/data/control}) \\
-    Replicas & \code{SEARCH\_REPLICAS} (1), \code{docker compose up --scale
-      search=N}, \code{docker-compose.replicas.yml} (2 replicas) \\
-    Concurrency & Control \code{-workers} (4); Ingestion \code{-workers} (8);
-      Indexing \code{-max-concurrent-updates} (8); \code{GOMAXPROCS} (runtime
-      default: number of logical CPUs); nginx \code{worker\_processes auto} \\
-    Time budgets & Ingestion \code{-ingest-timeout} (2~min), \code{-timeout}
-      (30~s per download), \code{-attempts} (3), \code{-backoff} (1~s); Indexing
-      \code{-rebuild-timeout} (10~min); Control \code{-ingest-timeout} (150~s),
-      \code{-timeout} (30~s) \\
-    Access & \code{CORS\_ALLOWED\_ORIGIN} (\code{*}) \\
-    \bottomrule
-  \end{tabularx}
-\end{table}
-
-The consequence of a single host is that replicas, threads, the datamart
-server and the load generator share one CPU, one memory and one disk. Adding
-workers can therefore increase contention rather than throughput, which is
-exactly what \cref{sec:benchmarks} measures. For the same reason the
-measurements describe how the architecture uses \emph{one} machine; they are
-not extrapolated to a cluster.
+Docker Compose was chosen because a single file then reproduces the whole
+topology of \cref{sec:deployment}, start-up order and health checks included.
+Every address, path, replica count and concurrency setting is configurable
+rather than hard-coded, and no \code{localhost} address appears in service
+code. Ports come from \code{INGESTION\_PORT}, \code{INDEXING\_PORT},
+\code{SEARCH\_PORT} and \code{MONGO\_PORT} (or each service's \code{-addr});
+endpoints from \code{INGESTION\_URL}, \code{INDEXING\_URL}, \code{SEARCH\_URL},
+\code{MONGO\_URI} and \code{MONGO\_DATABASE}; data paths from
+\code{-datalake}, \code{-batch-size} and \code{CONTROL\_STATE\_DIR}; the
+Search replica count from \code{SEARCH\_REPLICAS} (or \code{--scale search=N},
+or \code{docker-compose.replicas.yml} for two replicas); and allowed origins
+from \code{CORS\_ALLOWED\_ORIGIN}. The concurrency and time settings of each
+process are in \cref{tab:replicas}. Because replicas, threads, the datamart
+server and the load generator share one CPU, memory and disk, adding workers
+can increase contention rather than throughput, which is what
+\cref{sec:benchmarks} measures.
 
 \subsection{API design}
 \label{sec:decision-api}
@@ -1671,18 +1486,14 @@ not extrapolated to a cluster.
   default instead of a hazard. The one long operation, a full rebuild, stays
   synchronous but is guarded by a lease and a budget, and it can be observed
   through \route{GET /index/status}.
-  \item \textbf{One search endpoint.} Filters are optional parameters of
-  \route{GET /search}, combined with AND, rather than separate routes, as the
-  assignment requires; book details and filter values are separate read-only
-  routes because the front-end use cases need them.
   \item \textbf{Bounded requests.} The limits of at most 100 results per page
   and 10 terms per query cap the cost of any single request, which is a
   precondition for predictable latency under concurrency.
   \item \textbf{Offset pagination with deterministic order.} Offset and limit
-  are stateless and simple for a front-end. Ties in the relevance score are
-  broken by book ID, so pages never overlap. Deep offsets cost the datamart
-  work proportional to the offset, a known limit of this scheme
-  (\cref{sec:improvements}).
+  are stateless and simple for a front-end, and the deterministic order of
+  \cref{sec:frontend-contract} keeps pages from overlapping. Deep offsets cost
+  the datamart work proportional to the offset, a known limit of this scheme
+  (row~5 of \cref{tab:evidence-stage3}).
   \item \textbf{One error schema, stable codes.} Machine-readable codes let
   callers distinguish permanent from transient failures without parsing
   messages, which is what the Control Module's retry policy relies on.
@@ -1696,41 +1507,36 @@ not extrapolated to a cluster.
 \label{sec:decision-storage}
 
 \paragraph{Datalake on a shared volume.}
-The batch-based layout comes from Stage~1, where it matched the book-based
-layout on lookup time with far fewer directories. On one host a named volume is
+The batch-based layout is kept because it matched the book-based layout on
+lookup time in Stage~1 with far fewer directories. On one host a named volume is
 the simplest shared store, and atomic replacement of files gives crash safety
 without a database. Its limitation is locality: the volume exists on one
 machine only (\cref{sec:stage3}).
 
 \paragraph{MongoDB as the datamart.}
-Stage~1 measured the file-based indexes as faster in a single process but
-selected MongoDB for Stage~2 on requirements that a single process could not
-exhibit. Stage~2 relies on each of those requirements. Separate processes,
-including several Search replicas, share one index over the network instead of
-each holding a copy. Per-document atomic updates and idempotent upserts let
-concurrent writers converge. A server-side aggregation answers a filtered,
-ranked and paginated query, together with its total count, in one round trip.
-Secondary indexes back the metadata filters. \code{renameCollection} provides
-atomic publication of a rebuild, and \code{findOneAndUpdate} provides a
-cross-process lease. The JSON file and folder index of Stage~1 offer none of
-these properties: they would require a single writer, file locking across
-processes, and an in-memory copy of the index inside every Search replica.
+Stage~2 relies on every requirement for which MongoDB was provisionally
+selected (\cref{sec:introduction}). Separate processes, including several
+Search replicas, share one index over the network instead of each holding a
+copy. Per-document atomic updates and idempotent upserts let concurrent
+writers converge, secondary indexes back the metadata filters,
+\code{renameCollection} publishes a rebuild atomically, and
+\code{findOneAndUpdate} provides a cross-process lease. The file-based indexes
+of Stage~1 offer none of these properties: they would require a single writer,
+file locking across processes, and an in-memory copy of the index inside every
+Search replica.
 
 \paragraph{Query evaluation stays inside the datamart.}
 In the hexagonal structure (\cref{sec:stack}) the search core decides what a
-query means (its terms, filters and page) but not how it is evaluated. Keeping
-the AND matching of the terms and the relevance ranking (summed term
-frequencies, ties broken by book ID) inside the MongoDB aggregation, behind the
-core's \code{Index} port, is a deliberate architectural performance choice
-rather than an omission. Evaluated on the server, a query costs one round trip
-and returns one page of metadata; evaluated in the Search Service, it would
-transfer every posting of every query term on each request, and the posting
-list of a common term can span most of the corpus. Intersecting the postings
-before the join also keeps the join proportional to the matches. The price is
-that these rules belong to the adapter: they are documented as the contract of
-the port and pinned by the datamart's integration tests, and any future
-\code{Index} adapter, for example one on the (term, book) layout of
-\cref{sec:improvements}, must reproduce them.
+query means but not how it is evaluated. Keeping AND matching and relevance
+ranking inside the MongoDB aggregation of \cref{sec:impl-search}, behind the
+core's \code{Index} port, is a deliberate performance choice rather than an
+omission. Evaluated on the server, a query costs one round trip and returns one
+page of metadata together with the total count; evaluated in the Search
+Service, it would transfer every posting of every query term on each request,
+and the posting list of a common term can span most of the corpus. The price
+is that these rules belong to the adapter: they are documented as the contract
+of the port and pinned by the datamart's integration tests, so any future
+\code{Index} adapter must reproduce them.
 
 \paragraph{Costs of the data model.}
 Storing one document per term with its whole posting list makes reads simple
@@ -1739,47 +1545,39 @@ amplification}: re-indexing book 1342 rewrites the posting arrays of its 6{,}576
 distinct terms twice, once to remove the old entry and once to upsert the new
 one. The second is a \emph{size ceiling}: a BSON document is limited to 16~MB, so
 the posting list of a very common term would hit the limit at a few hundred
-thousand books. The datamart's integration guide (\code{docs/mongodb.md})
-proposes the Stage~3 replacement, one document per (term, book) pair, which is
-discussed in \cref{sec:improvements}.
+thousand books. Both costs are accepted for Stage~2 and addressed in the
+Stage~3 plan (\cref{sec:stage3}).
 
 \subsection{Concurrency model and protection of shared state}
 \label{sec:decision-concurrency}
 
-Go's concurrency model maps naturally onto a request-serving service.
-\code{net/http} serves every connection on its own goroutine, and the runtime
-multiplexes goroutines onto \code{GOMAXPROCS} operating-system threads (12 on
-the benchmark host, the runtime default, which is not overridden). A goroutine
-costs a few kilobytes of stack, and one blocked on I/O does not hold a thread,
-so concurrency is cheap. The design decisions therefore concern \emph{where to
-bound} concurrency and \emph{how to protect} shared state.
-\Cref{tab:primitives} lists every synchronisation mechanism, distinguishing
-in-process primitives from cross-process ones. As the assignment stresses, an
-in-process lock protects the goroutines of its own process only and does not
-coordinate separate replicas; wherever replicas must agree (the rebuild), the
-agreement is held in MongoDB.
+A goroutine costs a few kilobytes of stack and one blocked on I/O holds no
+thread (\cref{sec:replicas-threads}), so request concurrency is cheap in Go,
+and the runtime default of one operating-system thread per logical CPU
+(\code{GOMAXPROCS} = 12) was kept. The design decisions therefore concern
+\emph{where to bound} concurrency and \emph{how to protect} shared in-process
+state; \cref{tab:primitives} lists the mechanisms. As the assignment stresses,
+an in-process lock protects the goroutines of its own process only: wherever
+separate processes or replicas must agree, the rule is one of the shared-state
+contracts of \cref{tab:shared-state}, held in the file system or in MongoDB.
 
 \begin{table}[htbp]
   \centering
   \footnotesize
-  \caption{Synchronisation mechanisms and their scope.}
+  \caption{In-process synchronisation mechanisms. Cross-process rules are the
+  shared-state contracts of \cref{tab:shared-state}.}
   \label{tab:primitives}
-  \begin{tabularx}{\textwidth}{@{}>{\raggedright\arraybackslash}p{3.7cm}>{\raggedright\arraybackslash}p{3.1cm}>{\raggedright\arraybackslash}X>{\raggedright\arraybackslash}p{1.9cm}@{}}
+  \begin{tabularx}{\textwidth}{@{}>{\raggedright\arraybackslash}p{3.7cm}>{\raggedright\arraybackslash}p{3.1cm}>{\raggedright\arraybackslash}X@{}}
     \toprule
-    Mechanism & Where & Protects or bounds & Scope \\
+    Mechanism & Where & Protects or bounds \\
     \midrule
-    Goroutine per request & every HTTP server & Request concurrency & process \\
-    Buffered channel (8 slots) & ingestion core & Concurrent Gutenberg downloads & process \\
-    In-flight map + \code{sync.Mutex} & ingestion core & One download per book at a time (single-flight) & process \\
-    Buffered channel (8 slots) & indexing handler & Concurrent index updates, hence load on MongoDB & process \\
-    \code{atomic.Bool} + \code{sync.Mutex} & indexing core & Rebuild-in-progress flag; replay list of concurrent updates & process \\
-    \code{sync.RWMutex} & control state & In-memory sets of downloaded, indexed and failed books (read-mostly: every step reads, transitions write) & process \\
-    \code{sync.Mutex} & book selector & Claim cursor, so that each book goes to one worker & process \\
-    \code{sync.WaitGroup}, \code{context} & orchestrator, all services & Worker lifecycle; cancellation and deadlines propagated to MongoDB & process \\
-    \code{flock} / \code{LockFileEx} & control-state files & Appends and reads by goroutines or processes & host \\
-    Atomic rename (+ \code{fsync}) & datalake, failed-file wipe & No reader sees a torn file & host \\
-    Document atomicity, idempotent upserts & MongoDB collections & Concurrent writers converge & network \\
-    Lease document & \code{locks} collection & One rebuild across all replicas & network \\
+    Buffered channel (8 slots) & ingestion core & Concurrent Gutenberg downloads \\
+    In-flight map + \code{sync.Mutex} & ingestion core & One download per book at a time (single-flight) \\
+    Buffered channel (8 slots) & indexing handler & Concurrent index updates, hence load on MongoDB \\
+    \code{atomic.Bool} + \code{sync.Mutex} & indexing core & Rebuild-in-progress flag; replay list of concurrent updates \\
+    \code{sync.RWMutex} & control state & In-memory sets of downloaded, indexed and failed books (read-mostly: every step reads, transitions write) \\
+    \code{sync.Mutex} & book selector & Claim cursor, so that each book goes to one worker \\
+    \code{sync.WaitGroup}, \code{context} & orchestrator, all services & Worker lifecycle; cancellation and deadlines propagated to MongoDB \\
     \bottomrule
   \end{tabularx}
 \end{table}
@@ -1802,10 +1600,11 @@ settings that came from framework or runtime defaults.
 \begin{table}[htbp]
   \centering
   \footnotesize
-  \caption{Replicas, concurrency settings, ports and time limits per process
-  (defaults; ``tested'' lists the replica counts measured in \cref{sec:benchmarks}).}
+  \caption{Replicas, ports, concurrency settings and time limits per process,
+  with the flag that sets each value (defaults; ``tested'' lists the replica
+  counts measured in \cref{sec:benchmarks}).}
   \label{tab:replicas}
-  \begin{tabularx}{\textwidth}{@{}l>{\raggedright\arraybackslash}p{2.0cm}>{\raggedright\arraybackslash}p{1.6cm}>{\raggedright\arraybackslash}X>{\raggedright\arraybackslash}p{3.6cm}@{}}
+  \begin{tabularx}{\textwidth}{@{}l>{\raggedright\arraybackslash}p{2.0cm}>{\raggedright\arraybackslash}p{1.6cm}>{\raggedright\arraybackslash}X>{\raggedright\arraybackslash}p{4.2cm}@{}}
     \toprule
     Process & Replicas (tested) & Port & Concurrency settings & Time limits \\
     \midrule
@@ -1813,14 +1612,16 @@ settings that came from framework or runtime defaults.
       \code{worker\_connections 4096}, upstream keep-alive 64, \code{least\_conn} &
       connect 2~s, read 20~s; retry on connection error only (2 tries) \\
     Search & 1 (1 and 2) & internal 7003 & goroutine per request;
-      \code{GOMAXPROCS} 12; driver pool $\le$100 & header 5~s, read 10~s, write
-      15~s, idle 60~s \\
-    Ingestion & 1 (1) & 7001 & 8 download slots, single-flight per book &
-      budget 2~min; 30~s per download; 3 attempts \\
-    Indexing & 1 (1; 2 in the lease test) & 7002 & 8 update slots; one rebuild
-      cluster-wide & rebuild 10~min; write deadline 10~min + 10~s \\
-    Control & 1, on demand & --- & 4 workers & ingest 150~s; others 30~s;
-      readiness 10~s \\
+      \code{GOMAXPROCS} 12 (runtime default); driver pool $\le$100 & header 5~s,
+      read 10~s, write 15~s, idle 60~s \\
+    Ingestion & 1 (1) & 7001 & \code{-workers} 8 download slots; single-flight
+      per book & \code{-ingest-timeout} 2~min; \code{-timeout} 30~s per
+      download; \code{-attempts} 3, \code{-backoff} 1~s \\
+    Indexing & 1 (1; 2 in the lease test) & 7002 &
+      \code{-max-concurrent-updates} 8; one rebuild cluster-wide &
+      \code{-rebuild-timeout} 10~min; write deadline 10~min + 10~s \\
+    Control & 1, on demand & --- & \code{-workers} 4 & \code{-ingest-timeout}
+      150~s; \code{-timeout} 30~s; readiness 10~s \\
     MongoDB & 1 & 27017 & one server thread per connection; WiredTiger defaults
       & --- \\
     \bottomrule
@@ -1877,33 +1678,21 @@ The decisions above lead to expectations that \cref{sec:benchmarks} tests:
 \label{sec:benchmarks}
 
 This section answers the six benchmarking questions of the assignment with
-measurements taken on one machine. Every figure is an external vector file
-generated by \code{scripts/\allowbreak generate\_charts.py} (pandas, matplotlib, seaborn)
-directly from the raw evidence in \code{docs/evidence/\allowbreak }. The script also
-writes \code{docs/figures/\allowbreak chart\_data.csv}, which lists every plotted value and
-every derived quantity quoted below, so each number in the text can be traced to
-a row of a raw file. Colour follows the component in every figure:
-\swatch{cMongo}~coral is MongoDB (\code{mongod}),
-\swatch{cSearch}~teal the Search Service,
-\swatch{cIndex}~indigo the Indexing Service,
-\swatch{cNginx}~blue nginx and
-\swatch{cIngest}~plum the Ingestion Service. Dashed lines are
-models or bounds, dotted lines objectives or hard capacities. The palette was
-checked for colour-vision deficiency, and every series also carries a marker
-shape, a direct label or a legend entry, so the figures remain readable when
-printed in greyscale.
+measurements taken on one machine; \cref{sec:provenance} maps every table and
+figure to its raw evidence. In every figure, colour follows the component
+(\swatch{cMongo}~coral MongoDB, \swatch{cSearch}~teal Search,
+\swatch{cIndex}~indigo Indexing, \swatch{cNginx}~blue nginx,
+\swatch{cIngest}~plum Ingestion), dashed lines are models or bounds, and dotted
+lines objectives or hard capacities.
 
 \subsection{Experimental setup}
 \label{sec:setup}
 
 \paragraph{Host.}
 All official measurements were taken in one session on 1~November~2026, at
-commit \code{ade7245}, on the machine described in \cref{tab:host}, following
-the runbook \code{docs/evidence/\allowbreak benchmark\_protocol.md}. The only code change
-between that commit and the \code{develop} head described in this report
-(\code{790f75d}) moves the eight-slot admission bound of index updates from the
-datamart adapter into the HTTP handler, with the same default and the same
-behaviour.
+commit \code{ade7245}, on the machine described in \cref{tab:host}; the only
+later code change moves the admission bound of index updates into the HTTP
+handler without changing its behaviour.
 
 \begin{table}[htbp]
   \centering
@@ -1992,13 +1781,9 @@ time of every successful request as measured by k6, summarised by mean,
 median and the 90th, 95th and 99th percentiles. \emph{CPU} is the
 \code{docker stats} value expressed in logical cores (100\% of one core =
 1.0), so the host provides 12.0; memory is the container's resident memory.
-Resource samples are aligned with the k6 phases through the scenario start
-recorded by each run (\code{setup\_data.startedAt}) plus the phase offsets, and
-each per-level value averages the 8 to 10 samples that fall inside the hold
-window after its first 2~s. Samples outside a run's windows are discarded:
-the sampler of the one-replica run kept recording into the first minutes of
-the two-replica run, and those rows are not attributed to either
-configuration. Every configuration was run once (\cref{sec:validity}).
+Each per-level resource value averages the 8 to 10 samples that fall inside the
+hold window, aligned with the k6 phases (\cref{sec:provenance}), and every
+configuration was run once (\cref{sec:validity}).
 
 \paragraph{Analytical lens: operational laws.}
 Because the load is a closed system in steady state, three laws of operational
@@ -2106,14 +1891,14 @@ core-second in three that the stack consumes at ten clients is overhead of
 concurrency: at the single-client cost, the same 8.15 cores would have indexed
 8.0~books/s instead of 5.33.
 
-The mechanism is the shape of the write. Each update rewrites one posting
-array per distinct term twice (the \code{\$pull} of the old entry and the upsert
-pipeline), several thousand documents per book, and the books of the corpus
-share most of their common terms, so concurrent updates write the same term
-documents. Serialised document writes and retried write conflicts inside the
-storage engine are consistent with a per-book cost that grows with
-concurrency. This attribution remains a hypothesis: the server's conflict and
-lock counters (\code{serverStatus}) were not recorded.
+The mechanism is the write amplification of the data model
+(\cref{sec:decision-storage}): each update rewrites thousands of posting
+arrays, and the books of the corpus share most of their common terms, so
+concurrent updates write the same term documents. Serialised document writes
+and retried write conflicts inside the storage engine are consistent with a
+per-book cost that grows with concurrency; the attribution remains a
+hypothesis, because \code{serverStatus} counters were not recorded
+(\cref{sec:validity}).
 
 \paragraph{The write path in isolation.}
 The micro-benchmark \code{IndexBookRealBook} re-indexes book 1342 through the
@@ -2200,9 +1985,7 @@ concurrency a client rarely waits, above it every additional client only
 lengthens the queue. The measured plateau reaches 93--94\% of $X_{\max}$, and the
 remaining CPU went to the load generator, the Docker daemon and WSL2, which
 were not sampled. The knee lies close to the six physical cores of the host,
-as expected when a query keeps one core busy for practically its whole lifetime
-(\cref{sec:bench-resources}): about six aggregations can progress at full speed
-at once, and a seventh has to share a core.
+for the reason explained in \cref{sec:bench-resources}.
 
 \paragraph{Latency past the knee is pure queueing.}
 Above $N^{*}$, the mean grows linearly with the number of clients, from 40~ms at
@@ -2384,8 +2167,7 @@ replica count was the only variable (\cref{fig:replication}).
   percentile latency: the thin dark line of the two-replica run lies inside the
   thick light line of the one-replica run at every level. (c)~Relative change
   with two replicas; the shaded $\pm 5\%$ band is a visual reference, not a
-  measured confidence interval (each configuration was run once). No change has
-  a consistent sign.}
+  measured confidence interval. No change has a consistent sign.}
   \label{fig:replication}
 \end{figure}
 
@@ -2416,11 +2198,8 @@ Even if the Search and nginx tiers cost nothing at all, the bound would rise
 from 265 to 274~req/s, $+3\%$: that is the most any amount of Search
 replication can buy on this host. Replication did change one property of the
 datamart: each replica brings its own connection pool, so \code{mongod} ran up to
-209 threads instead of 155, with no more CPU to run them. On one host,
-replicating the stateless tier buys availability (nginx routes around a replica
-that cannot be reached), not throughput. It raises throughput only when the
-replicated tier is the bottleneck, or when the replicas run on separate machines
-together with a datamart that scales out as well (\cref{sec:stage3}).
+209 threads instead of 155, with no more CPU to run them. The measurement
+thus confirms the expectation of \cref{sec:decision-scaling}.
 
 % -----------------------------------------------------------------------------
 \subsection{Effects of threading}
@@ -2472,9 +2251,8 @@ beyond four, as expected on six physical cores with simultaneous
 multithreading, the same effect that doubles the cost of a query in
 \cref{sec:bench-resources}. \code{ProcessText}, the tokeniser, scales least: it
 allocates about 15~MB per book, so memory bandwidth and garbage collection are
-plausible further limits. Threads are therefore \emph{not} what limits indexing:
-the CPU-bound share of an update (13.7~ms) already parallelises, and the write
-to MongoDB dominates (\cref{sec:bench-indexing}).
+plausible further limits. Text processing is in any case not what limits
+indexing (\cref{sec:bench-indexing}).
 
 \paragraph{Datamart-bound work does not scale with client threads.}
 The datamart micro-benchmarks were swept with \code{-cpu 1,2,4,8}; their
@@ -2489,10 +2267,9 @@ server scales with concurrent requests is what the k6 runs measure.
 Ingestion scales almost linearly up to four download workers ($3.51\times$) and
 reaches $5.42\times$ (21.3~books/s) at eight, with the Ingestion process using
 on average less than 2\% of the machine's CPU (\cref{tab:ingestion}). Its limit
-is the latency of the upstream Gutenberg server, not local resources. This
-experiment ran on a different machine and network from the official session,
-so its absolute rates are not comparable with the other results; the shape of
-the curve is the finding.
+is the latency of the upstream Gutenberg server, not local resources. Because
+the experiment ran on another machine, the shape of the curve is the finding,
+not its absolute rates.
 
 \begin{table}[htbp]
   \centering
@@ -2520,8 +2297,6 @@ two replicas only in the lease experiment). Every search run went through
 nginx, so the proxy's own latency was not isolated. The services'
 \code{GOMAXPROCS}, the driver's pool size and the eight-slot bounds were not
 varied, and no container ran with CPU or memory limits or pinned to cores.
-MongoDB never ran on a separate machine from the load generator. Each
-configuration was run once.
 
 % -----------------------------------------------------------------------------
 \subsection{Coordination overhead}
@@ -2539,7 +2314,7 @@ of indicative values rather than plotted next to the official curves.
 \begin{table}[htbp]
   \centering
   \footnotesize
-  \caption{End-to-end orchestration runs (pre-official, 29~October~2026). Step
+  \caption{End-to-end orchestration runs (29~October~2026). Step
   means are over the books that entered the pipeline; ``unattributed'' is the
   share of worker time not spent waiting on a service step.}
   \label{tab:coordination-runs}
@@ -2577,37 +2352,21 @@ not shorten it.
 The figures rank the limits of the deployment in the order in which they bind:
 
 \begin{enumerate}
-  \item \textbf{Search: datamart CPU, at about six concurrent clients.} One
-  query costs 21~ms of one core when alone and 44~core-ms of \code{mongod} CPU at
-  saturation; the bounds place the knee at $N^{*} \approx 5.6$ clients and the
-  ceiling at about 250~req/s, reached with only 10 clients
-  (\cref{fig:search,fig:cpu}). The Search replicas, nginx and the Go code are
-  far from their limits (about 1.4~ms of CPU per query together).
-  \item \textbf{Host CPU, counted in physical cores.} From 50 clients the
-  containers use 94\% of the 12 logical CPUs, but the doubling of the cost per
-  query shows that the six physical cores are the real capacity for
-  aggregation-heavy work.
-  \item \textbf{Indexing: write contention inside the datamart, not capacity.}
-  Throughput reaches 5.33~books/s at ten concurrent updates with 48\%
-  efficiency while the host is only 68\% busy; the per-book cost in
-  \code{mongod} grows by 58\% (\cref{fig:indexing}).
-  \item \textbf{Ingestion: the upstream network.} Downloads are latency-bound
-  and parallelise well; local CPU and memory are negligible (\cref{fig:threads}b).
-  \item \textbf{Memory: not yet a limit.} The whole stack used under 0.7~GiB of
-  the 9.7~GiB available (\cref{fig:cpu}b). The posting arrays and MongoDB's cache
-  grow with the corpus, which a 300-book datamart does not exercise.
-  \item \textbf{Coordination: not a throughput limit.} The orchestrator accounts
-  for at most 2.6\% of worker time; its cost is waiting on the datamart.
-  \item \textbf{Co-location.} Load generator, datamart and services share the
-  same CPU, so the measured ceiling is a property of the whole host, not of
-  any single service.
+  \item \textbf{Search: datamart CPU.} About 250~req/s from ten clients on,
+  with the knee at $N^{*} \approx 5.6$ clients (\cref{fig:search,fig:cpu}).
+  \item \textbf{Host CPU, counted in physical cores.} Six physical cores, not
+  twelve logical CPUs, are the real capacity (\cref{sec:bench-resources}).
+  \item \textbf{Indexing: write contention in the datamart, not capacity.} 48\%
+  efficiency at ten updates with the host 68\% busy (\cref{fig:indexing}).
+  \item \textbf{Ingestion: the upstream network.} Downloads parallelise well at
+  negligible local cost (\cref{fig:threads}b).
+  \item \textbf{Memory: not yet a limit.} Under 0.7 of the 9.7~GiB available
+  for a 300-book datamart (\cref{fig:cpu}b).
+  \item \textbf{Coordination: not a throughput limit.} At most 2.6\% of worker
+  time (\cref{tab:coordination-runs}).
+  \item \textbf{Co-location.} One CPU shared by load generator, datamart and
+  services, so the ceiling belongs to the whole host.
 \end{enumerate}
-
-If the datamart scaled out, the next limit on the read path would be the Search
-tier itself, at about 1~ms of CPU per query, or roughly 1{,}000 queries per
-second per core. That figure is an extrapolation from the measured cost, not a
-measurement; it is also the point at which Search replicas would start to pay
-off.
 
 \subsection{Threats to validity}
 \label{sec:validity}
@@ -2645,66 +2404,6 @@ off.
   numerically with the official ones.
 \end{itemize}
 
-\subsection{Reproducibility and provenance}
-\label{sec:provenance}
-
-Every number and figure in this section can be regenerated from the repository:
-the runbook \code{docs/evidence/\allowbreak benchmark\_protocol.md} holds the exact
-commands of the official session, and
-\code{docs/evidence/\allowbreak README.md} the per-result steps. In short, the
-session brings the stack up with \code{docker compose}, seeds the datamart,
-drives it with the k6 scripts of \cref{tab:workloads}, samples the containers
-and the host, and regenerates the micro-benchmarks with
-\code{go test -bench} --- all from the repository root.
-
-\Cref{tab:provenance} maps every table and figure to its raw evidence. The k6
-outputs in \code{test/load/results/} are byte-identical to the copies in
-\code{docs/evidence/\allowbreak }; the chart script reads the latter, where the runs are
-labelled by replica count and sit next to their resource samples. An earlier
-search run in \code{test/load/results/} (18~October, untracked) predates the
-datamart-backed search engine and is not used.
-
-\begin{table}[htbp]
-  \centering
-  \footnotesize
-  \caption{Provenance of the results (paths relative to the repository root).
-  Every figure is \code{docs/figures/\allowbreak <name>.pdf}, written by
-  \code{scripts/\allowbreak generate\_charts.py} together with \code{chart\_data.csv}.}
-  \label{tab:provenance}
-  \begin{tabularx}{\textwidth}{@{}>{\raggedright\arraybackslash}p{4.1cm}>{\raggedright\arraybackslash}X@{}}
-    \toprule
-    Result & Raw evidence \\
-    \midrule
-    \cref{tab:host} & \code{docs/evidence/\allowbreak README.md} (environment),
-      \code{benchmark\_protocol.md} (host record) \\
-    \cref{tab:indexing,tab:indexing-resources}, \cref{fig:indexing}
-      (\code{fig2\_\allowbreak indexing\_\allowbreak throughput}) &
-      \code{docs/evidence/\allowbreak indexing\_benchmark\_\allowbreak 2026-11-01T16-14-15-954Z.\{csv,json\}},
-      \code{indexing\_benchmark\_run.log}, \code{indexing\_resources.csv} \\
-    \cref{tab:search}, \cref{fig:search} (\code{fig1\_\allowbreak query\_\allowbreak latency}),
-      \cref{fig:replication} (\code{fig4\_replication}) &
-      \code{docs/evidence/\allowbreak search\_benchmark\_\allowbreak 2026-11-01T16-26-57-365Z\_\allowbreak 1replica.\{csv,json\}},
-      \code{search\_benchmark\_\allowbreak 2026-11-01T16-30-41-872Z\_\allowbreak 2replicas.\{csv,json\}},
-      \code{search\_benchmark\_run\_\{1replica,2replicas\}.log} \\
-    \cref{tab:resources}, \cref{fig:cpu} (\code{fig3\_\allowbreak resource\_\allowbreak utilisation}),
-      bound $X_{\max}$ of \cref{fig:search} &
-      \code{docs/evidence/\allowbreak search\_resources.csv},
-      \code{search\_resources\_2replicas.csv}, aligned with
-      \code{setup\_data.startedAt} of each k6 JSON \\
-    \cref{tab:datamart-micro,tab:micro}, \cref{fig:threads}
-      (\code{fig5\_threading}) &
-      \code{docs/evidence/\allowbreak benchstat\{,\_cpu,\_micro\}.csv}, \code{benchstat*.txt},
-      \code{benchmarks*.txt}, \code{microbenchmarks.txt} \\
-    \cref{tab:ingestion}, \cref{fig:threads}b &
-      \code{docs/evidence/\allowbreak ingestion\_throughput.md},
-      \code{ingestion\_throughput\_summary.csv}, \code{ingestion\_resources\_w*.csv} \\
-    \cref{tab:coordination-runs} & \code{cmd/control/results/coordination\_workers\_\{1,2,4,8\}.txt} \\
-    Rebuild figures & \code{docs/evidence/\allowbreak rebuild\_replica.md} \\
-    \cref{tab:validation} and tests & \code{docs/evidence/\allowbreak api\_validation\_results.md},
-      \code{e2e\_control\_*.txt}, \code{e2e\_compose\_*.txt}, \code{tests.txt} \\
-    \bottomrule
-  \end{tabularx}
-\end{table}
 % =============================================================================
 % 8. CONCLUSIONS AND FUTURE IMPROVEMENTS
 % =============================================================================
@@ -2713,103 +2412,131 @@ datamart-backed search engine and is not used.
 
 Stage~2 met its objectives: the Stage~1 data layer now runs as cooperating
 services with documented and validated contracts, an explicit coordination
-mechanism and a measured performance envelope. The measurements also answer
-the question Stage~1 left open. MongoDB does serve several independent
-processes correctly under concurrent access, and on a single host it is the
-first component to saturate: it consumes 94--97\% of the CPU of every query
-(\cref{fig:cpu}c) and all of the growth in the cost of indexing a book under
-concurrency (\cref{fig:indexing}b). The design of Stage~3 follows from that
-single fact.
+mechanism and a measured performance envelope. The measurements also close the
+question Stage~1 left open: MongoDB serves several independent processes
+correctly under concurrent access, and on a single host it is the first
+component to saturate on both the read and the write path
+(\cref{sec:bench-limits}), the fact from which the design of Stage~3 follows.
 
 \subsection{Strengths}
 \label{sec:strengths}
 
 \begin{itemize}
   \item \textbf{Contracts that are specified and verified.} The OpenAPI
-  documents are generated from the code. The running stack passes all 19 API
-  checks and 365 automated tests, both end-to-end scripts pass, and the
-  pagination contract held for all 65{,}950 queries of the load tests.
+  documents are generated from the code, and the running stack passes every API
+  check, automated test and end-to-end script (\cref{sec:validation,sec:testing}).
   \item \textbf{Coordination that tolerates failures.} Ingestion before
-  indexing is enforced twice, partially indexed books are invisible, rebuilds
-  are serialised across replicas (verified live: \code{409}, then a successful
-  retry), and every operation is idempotent, so a crash between a completed
-  call and its record costs a replay, never a duplicate.
-  \item \textbf{Graceful saturation.} Past the knee, throughput stays on its
-  plateau and latency grows exactly as queueing predicts (within 2\% of
-  Little's law, 6--7\% above the asymptotic bound): no request failed with 100
-  concurrent clients, and overload turns into waiting, not into errors or
-  collapse (\cref{fig:search}).
-  \item \textbf{A lean service tier.} A Search replica needs about 1~ms of CPU
-  and less than 23~MiB of memory per process, and nginx under 0.1 cores at
-  250~req/s (\cref{fig:cpu}). The Go services are not where the cost is.
+  indexing is enforced twice, half-indexed books are invisible, rebuilds are
+  serialised across replicas, and idempotency turns a crash between a call and
+  its record into a harmless replay (\cref{sec:coordination,sec:readiness}).
+  \item \textbf{Graceful saturation.} Past the knee, throughput holds its
+  plateau and latency grows exactly as queueing predicts, with no failed
+  request even at 100 clients (\cref{sec:bench-search}).
+  \item \textbf{A lean service tier.} The Go services and nginx account for only
+  a few percent of the CPU of a query; the cost lies in the datamart
+  (\cref{sec:bench-resources}).
   \item \textbf{Concurrency that is bounded and measured.} Semaphores,
-  timeouts and context propagation keep overload from turning into resource
-  exhaustion. CPU-bound text processing scales $3.4$--$4.6\times$ with eight
-  threads, and network-bound ingestion $5.4\times$ with eight download workers
-  (\cref{fig:threads}).
+  timeouts and context propagation keep overload from exhausting resources,
+  and CPU- and network-bound work scale with threads as expected
+  (\cref{sec:bench-threads}).
   \item \textbf{Reproducible evidence.} Every figure is regenerated by one
-  script from committed raw files, and every plotted value is exported as a
-  table (\cref{sec:provenance}).
+  script from committed raw files (\cref{sec:provenance}).
 \end{itemize}
 
 \subsection{Weaknesses}
 \label{sec:weaknesses}
 
 \begin{itemize}
-  \item \textbf{One datamart server bounds both paths.} Search saturates at
-  about six concurrent clients and 250~req/s and misses the 95th-percentile
-  objective at 100 clients. Indexing reaches 48\% parallel efficiency at ten
-  concurrent updates. Replicating the Search tier does not help on one host
-  (\cref{fig:replication}).
+  \item \textbf{One datamart server bounds both paths.} Search saturates early
+  and misses its 95th-percentile objective at 100 clients, indexing scales
+  sub-linearly, and Search replicas cannot help on one host
+  (\cref{sec:bench-limits}).
   \item \textbf{An expensive query plan.} The per-candidate \code{\$lookup} and
-  the \code{\$facet} make a search $43\times$ more expensive than fetching its
-  postings, and metadata filters make it slower rather than faster.
+  the \code{\$facet} dominate the cost of a search, and metadata filters make it
+  slower rather than faster (\cref{sec:bench-resources}).
   \item \textbf{Write amplification and contention.} The one-document-per-term
   layout rewrites thousands of posting arrays per book, concurrent updates
-  collide on the same term documents (the per-book cost grows by 58\%), and
-  the arrays of common terms approach the 16~MB document ceiling as the corpus
-  grows.
-  \item \textbf{Per-process coordination state.} The replay list of updates
-  received during a rebuild, the ingestion single-flight map and the Control
-  Module's claim cursor live in memory, so they hold only for one process.
+  collide on shared term documents, and common terms approach the document
+  size ceiling (\cref{sec:decision-storage,sec:bench-indexing}).
+  \item \textbf{Per-process coordination state.} The rebuild replay list, the
+  ingestion single-flight map and the Control Module's claim cursor live in
+  memory, so they hold for one process only (\cref{tab:local-assumptions}).
   \item \textbf{One coordinator.} New books stop entering the pipeline while
-  the Control Module is down, and synchronous calls tie a worker to a slow
-  index update.
-  \item \textbf{Limited evidence.} The results come from single runs with a
-  co-located load generator and without MongoDB's internal counters or CPU
-  frequency (\cref{sec:validity}).
+  the Control Module is down (\cref{sec:decision-coordination}).
+  \item \textbf{Limited evidence.} Single runs, a co-located load generator and
+  unrecorded server counters limit the precision of the results
+  (\cref{sec:validity}).
 \end{itemize}
 
 \subsection{From the measurements to the Stage 3 evolution}
 \label{sec:evidence-to-design}
 \label{sec:stage3}
 
-A single-machine experiment cannot show how the system will scale on a cluster,
-and this report does not claim that it does. What the figures can do is rule
-options out and set priorities. \Cref{tab:evidence-stage3} pairs each measured
-fact with the Stage~3 decision it supports and with the acceptance check that
-will confirm the decision, using the same benchmark, the same script and the
-same figure, so that Stage~3 is evaluated against Stage~2 like for like.
+The figures cannot show how the system will scale on a cluster
+(\cref{sec:introduction}), but they rule options out and set priorities.
+\Cref{tab:evidence-stage3} orders the Stage~3 work by expected impact and pairs
+each decision with the measured fact behind it and with the acceptance check
+that will confirm it, using the same benchmark and the same figure, so that
+Stage~3 is evaluated against Stage~2 like for like.
 
 \begin{table}[htbp]
   \centering
   \footnotesize
-  \caption{Measured facts, the Stage~3 decisions they justify, and how each
-  decision will be verified with the same benchmarks and figures.}
+  \caption{Prioritised improvements for Stage~3: the measured facts behind each
+  decision, and how each decision will be verified with the same benchmarks and
+  figures.}
   \label{tab:evidence-stage3}
-  \begin{tabularx}{\textwidth}{@{}>{\raggedright\arraybackslash}p{3.7cm}>{\raggedright\arraybackslash}p{3.4cm}>{\raggedright\arraybackslash}X>{\raggedright\arraybackslash}p{3.3cm}@{}}
+  \begin{tabularx}{\textwidth}{@{}r>{\raggedright\arraybackslash}p{3.4cm}>{\raggedright\arraybackslash}p{2.9cm}>{\raggedright\arraybackslash}X>{\raggedright\arraybackslash}p{3.1cm}@{}}
     \toprule
-    Measured fact & What it implies & Stage 3 decision & Acceptance check \\
+    \# & Measured fact & What it implies & Stage 3 decision & Acceptance check \\
     \midrule
-    \code{mongod}: 94--97\% of the CPU of a query; ceiling 250~req/s at
-      $N^{*} \approx 6$ clients (\cref{fig:search,fig:cpu}) &
-      The read ceiling is a property of the datamart, not of the services &
-      Make a query cheaper first; then scale reads with the datamart
-      (replica-set secondaries or shards) &
-      \cref{fig:search}a: plateau scales with data nodes; \cref{fig:cpu}c: lower
-      core-ms per query \\
+    1 & \code{mongod}: 94--97\% of the CPU of a query; ceiling 250~req/s at
+      $N^{*} \approx 6$ clients; full aggregation $43\times$ the cost of
+      fetching postings (\cref{fig:search,fig:cpu,tab:datamart-micro}) &
+      The read ceiling is a property of the datamart, and a cheaper query raises
+      it on every node &
+      Rank the intersected postings and join only the requested page; filter on
+      denormalised or index-backed attributes; cache hot queries in the Search
+      replicas, keyed by index version; then scale reads with replica-set
+      secondaries or shards &
+      \cref{fig:cpu}c: lower core-ms per query, checked with \code{explain()};
+      \cref{fig:search}a: plateau scales with data nodes \\
     \addlinespace
-    Two Search replicas: $|\Delta| \le 5\%$; at most $+3\%$ possible on one
+    2 & Indexing: 48\% efficiency with the host 68\% busy; per-book
+      \code{mongod} cost $+58\%$ (\cref{fig:indexing}) &
+      Contention on shared term documents, not lack of CPU: more cores on one
+      server would not help &
+      (term, book) posting documents (\code{docs/mongodb.md}), which also remove
+      the 16~MB ceiling; shard
+      key hashed on the term; batched, unordered writes; indexing tasks
+      partitioned by book &
+      \cref{fig:indexing}b: per-book cost flat ($\le 10\%$ growth) from 1 to 10
+      clients; efficiency $\ge 80\%$ at 10 \\
+    \addlinespace
+    3 & Query cost doubles past six clients on 6 physical / 12 logical cores;
+      single runs; server counters and CPU frequency not recorded
+      (\cref{fig:cpu}c, \cref{sec:validity}) &
+      Logical CPUs overstate capacity, and two attributions remain hypotheses &
+      Size data nodes by physical cores; pin or limit containers; run k6 on its
+      own node; record \code{serverStatus}, query plans and CPU frequency;
+      repeat every configuration at least three times &
+      Cost per query constant across load levels; every figure with confidence
+      intervals \\
+    \addlinespace
+    4 & Orchestrator overhead $\le 2.6\%$; index step $4.7\times$ longer with 8
+      workers (\cref{tab:coordination-runs}) &
+      Central coordination is an availability problem, not a throughput one &
+      A tasks collection with leases replacing the control files and the
+      in-memory claim, or a broker with consumer groups &
+      Throughput unchanged when one coordinator is killed mid-run \\
+    \addlinespace
+    5 & Deep offsets cost datamart work proportional to the offset
+      (\cref{sec:decision-api}) &
+      Offset pagination degrades as the corpus grows &
+      Keyset pagination, continuing after the last returned score and book ID &
+      Page latency independent of the offset \\
+    \addlinespace
+    6 & Two Search replicas: $|\Delta| \le 5\%$; at most $+3\%$ possible on one
       host (\cref{fig:replication}) &
       Stateless replicas add availability, not throughput, while the datamart is
       shared &
@@ -2818,29 +2545,7 @@ same figure, so that Stage~3 is evaluated against Stage~2 like for like.
       Repeat \cref{fig:replication} on the cluster: throughput should rise with
       replicas once data nodes scale \\
     \addlinespace
-    Indexing: 48\% efficiency with the host 68\% busy; per-book \code{mongod}
-      cost $+58\%$ (\cref{fig:indexing}) &
-      Contention on shared term documents, not lack of CPU: more cores on one
-      server would not help &
-      (term, book) posting documents; shard key hashed on the term; batched,
-      unordered writes; indexing tasks partitioned by book &
-      \cref{fig:indexing}b: per-book cost flat ($\le 10\%$ growth) from 1 to 10
-      clients; efficiency $\ge 80\%$ at 10 \\
-    \addlinespace
-    Query cost doubles past six clients on 6 physical / 12 logical cores
-      (\cref{fig:cpu}c) &
-      Logical CPUs overstate capacity for aggregation work &
-      Size data nodes by physical cores; pin or limit containers; record CPU
-      frequency &
-      Cost per query constant across load levels \\
-    \addlinespace
-    Orchestrator overhead $\le 2.6\%$; index step $4.7\times$ longer with 8
-      workers (\cref{tab:coordination-runs}) &
-      Central coordination is an availability problem, not a throughput one &
-      Durable tasks with leases, or a broker with consumer groups &
-      Throughput unchanged when one coordinator is killed mid-run \\
-    \addlinespace
-    Ingestion $5.4\times$ with 8 workers at $<2\%$ CPU (\cref{fig:threads}b) &
+    7 & Ingestion $5.4\times$ with 8 workers at $<2\%$ CPU (\cref{fig:threads}b) &
       Network-bound; scales with concurrency, not with machines &
       Keep one Ingestion replica per node with a worker pool; rate-limit towards
       Gutenberg &
@@ -2849,92 +2554,58 @@ same figure, so that Stage~3 is evaluated against Stage~2 like for like.
   \end{tabularx}
 \end{table}
 
-\paragraph{Read path: make a query cheaper before buying nodes.}
-On the current plan, one six-core data node sustains about 250~req/s. Because
-the bound is $X_{\max} = m / D_{\text{cpu}}$, the read capacity of a cluster can grow
-in two independent ways: more processors $m$ (data nodes that serve reads) or a
-smaller demand $D_{\text{cpu}}$ per query. The second is cheaper and multiplies the
-first. The micro-benchmarks show where the demand goes: fetching the postings of
-a common term costs 0.60~ms, the full aggregation 26.2~ms. A plan that ranks
-the intersected postings and joins the metadata of the requested page only, and
-that applies filters through indexed, denormalised attributes, attacks the 97\%
-share of \code{mongod} directly; every halving of the 21~ms per query doubles the
-ceiling of every data node. Only then is adding nodes efficient: as a rough
+\paragraph{Why a cheaper query comes first.}
+Because the read bound is $X_{\max} = m / D_{\text{cpu}}$, read capacity can grow
+through more processors $m$ (data nodes that serve reads) or a smaller demand
+$D_{\text{cpu}}$ per query, and the second multiplies the first: every halving of
+the 21~ms per query doubles the ceiling of every data node. As a rough
 illustration, sustaining 1{,}000~req/s on today's plan would need at least four
-such data nodes serving reads, which is an extrapolation of the bound, not a
-measurement, and assumes reads spread evenly over nodes that tolerate bounded
-staleness. Once the datamart scales, the Search tier, at about 1~ms of CPU per
-query, becomes the next limit, and that is the point at which Search replicas on
-separate nodes start to raise throughput.
+six-core data nodes serving reads, an extrapolation of the bound rather than a
+measurement. Once the datamart scales, the Search tier, at about 1~ms of CPU per
+query or roughly 1{,}000 queries per second per core, becomes the next limit,
+and only then do Search replicas on separate nodes raise throughput.
 
-\paragraph{Write path: remove the contention, then distribute it.}
-\Cref{fig:indexing} shows that indexing is not starved of CPU but loses it to
-concurrency: at ten clients a third of the CPU the stack consumes is overhead
-compared with the single-client cost. Adding cores to one server would feed the
-same collisions. The data layout has to change first: with one document per
-(term, book) pair, indexing a book inserts or replaces small, independent
-documents instead of rewriting shared arrays, so concurrent updates of different
-books stop colliding and the 16~MB ceiling disappears. Sharding that collection
-by a hashed term key spreads the writes over data nodes, and partitioning
-indexing tasks by book ID across Indexing replicas keeps each book's update on
-one writer. The acceptance criterion is the metric of \cref{fig:indexing}b: the
-CPU cost per book must stay flat as concurrent updates increase.
-
-\paragraph{Cross-machine communication.}
+\paragraph{Cross-machine communication and storage access.}
 The HTTP/JSON contracts carry over unchanged, because every address already
-comes from configuration. In Stage~3, compose DNS names are replaced by cluster
-service discovery (for example Kubernetes services or Consul). Each tier gets
-its own load balancer with active health checks, and timeouts and retry budgets
-are recalibrated for network delay: the 21~ms service time of a lone query
-leaves room for a few milliseconds of network per hop, but timeouts must be set
-from the measured percentiles, not from single-host defaults. Because the
-operations are idempotent, retrying over an unreliable network stays safe;
-adding jitter to the backoff prevents synchronised retry storms.
-
-\paragraph{Storage access.}
-The datalake moves from a local volume to object storage (for example MinIO or
-S3) or a distributed file system. ``Header written last'' becomes ``completion
-marker object written last'', and local renames become conditional writes. The
-control state moves from \code{flock}-protected files to the database. MongoDB
-becomes a replica set of at least three nodes for availability and read
-scaling, and the inverted index adopts the one-document-per-(term, book) layout
-proposed in \code{docs/mongodb.md}, sharded by a hashed key so that writes
-spread without hot-term skew (\cref{sec:evidence-to-design}).
+comes from configuration, and each local mechanism is replaced as listed in
+\cref{tab:local-assumptions}: for example Kubernetes services or Consul for
+discovery, and MinIO or S3 for the datalake, with a completion marker object
+written last. Timeouts and retry budgets must be recalibrated from the measured
+percentiles rather than single-host defaults; the 21~ms service time of a lone
+query leaves room for a few milliseconds of network per hop. Idempotency keeps
+retries over an unreliable network safe, and jitter in the backoff prevents
+synchronised retry storms. MongoDB becomes a replica set of at least three
+nodes for availability and read scaling, with the inverted index laid out and
+sharded as in row~2 of \cref{tab:evidence-stage3}.
 
 \paragraph{Distribution of tasks and requests.}
-Pipeline work becomes claimable tasks: either documents in a shared tasks
-collection, claimed atomically with \code{findOneAndUpdate} under a lease, or
-\code{BookDownloaded} and \code{BookIndexed} events in a broker, partitioned by
-book ID so that the updates of one book stay ordered. Several Control instances
-(or none, under choreography) can then share the work without duplicating it.
-Search requests are balanced over replicas on several nodes, and read-heavy
-traffic can be served by replica-set secondaries where bounded staleness is
-acceptable. That makes Search replication useful at last, because the datamart
-scales with it, which is precisely the condition \cref{fig:replication} shows
-to be missing on one host.
+Pipeline work becomes claimable tasks, either documents claimed atomically
+under a lease or \code{BookDownloaded} and \code{BookIndexed} events
+partitioned by book ID, so that the updates of one book stay ordered and
+several Control instances (or none, under choreography) can share the work
+without duplicating it. Search requests are balanced over replicas on several
+nodes, and read-heavy traffic can be served by replica-set secondaries where
+bounded staleness is acceptable; Search replication then pays off, because the
+datamart scales with it.
 
 \paragraph{Consistency.}
 The per-book publication protocol (pending, writes, published) remains the
-unit of visibility. On a replica set, the publication steps use
+unit of visibility. On a replica set the publication steps use
 \code{w: majority}, so that a published book cannot be rolled back after a
-failover, and search reads use \code{readConcern: majority}; the \code{-verify}
-mode uses causally consistent sessions to read its own writes. Rebuild
-publication switches from two \code{renameCollection} commands, which sharded
-collections do not support, to versioned collections behind a single pointer
-document that readers resolve once per request, which also closes the
-sub-millisecond mixed window of the current swap.
+failover, search reads use \code{readConcern: majority}, and the \code{-verify}
+mode uses causally consistent sessions to read its own writes. The version
+pointer that replaces \code{renameCollection} is resolved once per request,
+which also closes the sub-millisecond mixed window of the current swap.
 
 \paragraph{Recovery from unavailable nodes.}
-Health checks split into liveness and readiness, where readiness includes
-MongoDB connectivity, so that load balancers stop routing to a replica that
-cannot serve. nginx already ejects a replica after three failures for 10~s and
-retries connection errors on another. Driver-level retryable reads and writes
-absorb replica-set elections. Leases expire, so the work of a crashed holder is
-taken over; coordinators resume from durable task state; and idempotency makes
-redelivery harmless. To tolerate clock skew between nodes, lease expiry should
-use the server's clock rather than the client's, and writes made under a lease
-should carry a fencing token, so that a paused former holder cannot overwrite
-the work of its successor.
+Health checks split into liveness and readiness, readiness including MongoDB
+connectivity, so that load balancers stop routing to a replica that cannot
+serve, as nginx already does by ejecting a replica after three failures.
+Driver-level retryable reads and writes absorb replica-set elections, expired
+leases let another node take over the work of a crashed holder, coordinators
+resume from durable task state, and idempotency makes redelivery harmless.
+Fencing tokens on writes made under a lease stop a paused former holder from
+overwriting the work of its successor.
 
 \Cref{tab:local-assumptions} lists every Stage~2 assumption that holds only on
 one machine, including the in-process locks and the shared files used for
@@ -2979,43 +2650,64 @@ coordination, together with its Stage~3 replacement.
   \end{tabularx}
 \end{table}
 
-\subsection{Prioritised improvements}
-\label{sec:improvements}
 
-The bottleneck analysis orders the work by expected impact, and each item names
-the figure that will show whether it worked:
+% =============================================================================
+% APPENDIX: EVIDENCE PROVENANCE
+% =============================================================================
+\appendix
+\section{Evidence Provenance}
+\label{sec:provenance}
 
-\begin{enumerate}
-  \item \textbf{Make a query cheaper} (\cref{fig:search,fig:cpu}). Restructure
-  the aggregation so that the join runs only for the requested page: without
-  filters, sort the intersected postings by score and limit them before the
-  \code{\$lookup}; with filters, evaluate them on filterable attributes
-  denormalised into the postings (or in a first, index-backed query on
-  \code{books}). Then add a cache of hot queries in the Search replicas, keyed
-  by query, filters, page and index version, which is also what would let
-  replication raise throughput. Validate each change with \code{explain()}, the
-  micro-benchmarks and the k6 profile.
-  \item \textbf{Remove write amplification} (\cref{fig:indexing}). Adopt the
-  (term, book) layout, so that indexing a book inserts or replaces small
-  documents instead of rewriting arrays, and remeasure the per-book cost of
-  concurrent updates.
-  \item \textbf{Strengthen the evidence.} Record \code{serverStatus} (write
-  conflicts, tickets, cache), query plans and CPU frequency, run k6 from a
-  separate machine, pin or limit containers so that \code{mongod}'s share can
-  be controlled, and repeat every configuration at least three times so that
-  the figures can carry confidence intervals.
-  \item \textbf{Move coordination state into the datamart.} A tasks collection
-  with leases replaces the control files and the in-memory claim, a
-  prerequisite for several coordinators and for Stage~3.
-  \item \textbf{Keyset pagination} (continuing after the last returned score and
-  book ID) avoids the linear cost of deep offsets.
-\end{enumerate}
+Every number and figure of \cref{sec:benchmarks} can be regenerated from the
+repository root: \code{docs/evidence/\allowbreak benchmark\_protocol.md} holds the
+exact commands of the official session and
+\code{docs/evidence/\allowbreak README.md} the per-result steps. Every figure is
+drawn by \code{scripts/\allowbreak generate\_charts.py} (pandas, matplotlib, seaborn)
+directly from the raw files of \cref{tab:provenance}, and the script also writes
+\code{docs/figures/\allowbreak chart\_data.csv}, which lists every plotted value and
+every derived quantity quoted in the text. The k6 outputs in
+\code{test/load/results/} are byte-identical to the copies in
+\code{docs/evidence/} that the script reads.
 
-In summary, Stage~2 delivers a correct, observable and reproducible
-service-oriented search engine whose limits are known and explained: on one
-machine, the shared datamart sets the ceiling at about six concurrent clients,
-and adding service replicas cannot raise it. Stage~3 must therefore make each
-query cheaper, scale the data tier together with the services, and replace with
-cluster-wide mechanisms every local assumption that Stage~2 relied on.
+\begin{table}[htbp]
+  \centering
+  \footnotesize
+  \caption{Provenance of the results (paths relative to the repository root).
+  Every figure is \code{docs/figures/\allowbreak <name>.pdf}.}
+  \label{tab:provenance}
+  \begin{tabularx}{\textwidth}{@{}>{\raggedright\arraybackslash}p{4.1cm}>{\raggedright\arraybackslash}X@{}}
+    \toprule
+    Result & Raw evidence \\
+    \midrule
+    \cref{tab:host} & \code{docs/evidence/\allowbreak README.md} (environment),
+      \code{benchmark\_protocol.md} (host record) \\
+    \cref{tab:indexing,tab:indexing-resources}, \cref{fig:indexing}
+      (\code{fig2\_\allowbreak indexing\_\allowbreak throughput}) &
+      \code{docs/evidence/\allowbreak indexing\_benchmark\_\allowbreak 2026-11-01T16-14-15-954Z.\{csv,json\}},
+      \code{indexing\_benchmark\_run.log}, \code{indexing\_resources.csv} \\
+    \cref{tab:search}, \cref{fig:search} (\code{fig1\_\allowbreak query\_\allowbreak latency}),
+      \cref{fig:replication} (\code{fig4\_replication}) &
+      \code{docs/evidence/\allowbreak search\_benchmark\_\allowbreak 2026-11-01T16-26-57-365Z\_\allowbreak 1replica.\{csv,json\}},
+      \code{search\_benchmark\_\allowbreak 2026-11-01T16-30-41-872Z\_\allowbreak 2replicas.\{csv,json\}},
+      \code{search\_benchmark\_run\_\{1replica,2replicas\}.log} \\
+    \cref{tab:resources}, \cref{fig:cpu} (\code{fig3\_\allowbreak resource\_\allowbreak utilisation}),
+      bound $X_{\max}$ of \cref{fig:search} &
+      \code{docs/evidence/\allowbreak search\_resources.csv},
+      \code{search\_resources\_2replicas.csv}, aligned with
+      \code{setup\_data.startedAt} of each k6 JSON \\
+    \cref{tab:datamart-micro,tab:micro}, \cref{fig:threads}
+      (\code{fig5\_threading}) &
+      \code{docs/evidence/\allowbreak benchstat\{,\_cpu,\_micro\}.csv}, \code{benchstat*.txt},
+      \code{benchmarks*.txt}, \code{microbenchmarks.txt} \\
+    \cref{tab:ingestion}, \cref{fig:threads}b &
+      \code{docs/evidence/\allowbreak ingestion\_throughput.md},
+      \code{ingestion\_throughput\_summary.csv}, \code{ingestion\_resources\_w*.csv} \\
+    \cref{tab:coordination-runs} & \code{cmd/control/results/coordination\_workers\_\{1,2,4,8\}.txt} \\
+    Rebuild figures & \code{docs/evidence/\allowbreak rebuild\_replica.md} \\
+    \cref{tab:validation} and tests & \code{docs/evidence/\allowbreak api\_validation\_results.md},
+      \code{e2e\_control\_*.txt}, \code{e2e\_compose\_*.txt}, \code{tests.txt} \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
 
 \end{document}
