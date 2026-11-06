@@ -1,43 +1,20 @@
-% =============================================================================
-%  Boogle Engine -- Stage 2: Service-Oriented Architecture
-%  Final report (Big Data, Grado en Ciencia e Ingenieria de Datos, ULPGC)
-%
-%  Compile from the report/ folder with
-%      latexmk -pdf final_report.tex    (or: pdflatex final_report.tex, twice)
-%  Architecture diagrams are drawn with TikZ. The data figures of Section 7 are
-%  external vector PDFs in docs/figures/, generated from the raw evidence in
-%  docs/evidence/ by
-%      python3 scripts/generate_charts.py
-%  (run it from the repository root before compiling if the evidence changes).
-%  The figures are drawn at the report's \textwidth (162 mm), so they are
-%  included at width=\textwidth and their type prints at its design size.
-%
-%  BEFORE SUBMISSION: fill in the cover-page data in the block marked
-%  "COVER-PAGE DATA" below (full names and student IDs). Placeholders are
-%  printed in dark red so that none can slip through unnoticed.
-% =============================================================================
+
 \documentclass[10pt,a4paper]{article}
 
-% ---------------------------------------------------------------------------
-% Encoding, fonts and language
-% ---------------------------------------------------------------------------
 \usepackage[T1]{fontenc}
 \usepackage[utf8]{inputenc}
 \usepackage{lmodern}
 \usepackage[english]{babel}
 \usepackage{microtype}
-% Command-line flags such as --scale must keep both hyphens in typewriter type.
+
 \DisableLigatures[-]{family = tt*}
 
-% ---------------------------------------------------------------------------
-% Page layout
-% ---------------------------------------------------------------------------
 \usepackage[a4paper,top=2.1cm,bottom=2.1cm,left=2cm,right=2cm,headheight=14pt]{geometry}
 \usepackage{fancyhdr}
 \setlength{\parskip}{0.35em}
 \setlength{\parindent}{0pt}
 \setlength{\emergencystretch}{6em}
-% Float placement: allow more floats per page and stack float pages from the top.
+
 \renewcommand{\topfraction}{0.9}
 \renewcommand{\bottomfraction}{0.8}
 \renewcommand{\textfraction}{0.07}
@@ -55,49 +32,35 @@
 \titlespacing*{\subsection}{0pt}{1.8ex plus .2ex}{1ex plus .1ex}
 \titlespacing*{\subsubsection}{0pt}{1.5ex plus .2ex}{0.8ex plus .1ex}
 
-% ---------------------------------------------------------------------------
-% Mathematics, tables, floats, lists, listings
-% ---------------------------------------------------------------------------
 \usepackage{amsmath,amssymb}
 \usepackage{array,booktabs,tabularx,longtable,multirow,makecell}
 \usepackage{float}
 \usepackage[font=small,labelfont=bf,skip=4pt]{caption}
 \usepackage{enumitem}
 \setlist{itemsep=0.15em,topsep=0.3em}
+\renewcommand{\arraystretch}{1.2}
 \usepackage[table]{xcolor}
 \usepackage{graphicx}
-\graphicspath{{../docs/figures/}{docs/figures/}}
+\graphicspath{{../figures/}{figures/}}
 \usepackage{listings}
 \usepackage[most]{tcolorbox}
 
-% ---------------------------------------------------------------------------
-% Diagrams (TikZ). Data plots are external figures: see scripts/generate_charts.py
-% ---------------------------------------------------------------------------
 \usepackage{tikz}
 \usetikzlibrary{arrows.meta,positioning,fit,backgrounds,calc,shapes.geometric,decorations.pathreplacing}
 
-% ---------------------------------------------------------------------------
-% Links and cross-references (hyperref before cleveref)
-% ---------------------------------------------------------------------------
 \usepackage{xurl}
-\usepackage[colorlinks=true,linkcolor=linkc,urlcolor=linkc,citecolor=linkc]{hyperref}
+\usepackage[colorlinks=true,linkcolor=black,urlcolor=linkc,citecolor=black]{hyperref}
 \usepackage[capitalise,noabbrev]{cleveref}
 
-% ---------------------------------------------------------------------------
-% Colours. The component hues are those of the data figures
-% (scripts/generate_charts.py), a palette validated for colour-vision
-% deficiency against the white page: lightness band, chroma floor, CVD and
-% normal-vision separation. They are used here only for legend swatches.
-% ---------------------------------------------------------------------------
 \definecolor{linkc}{HTML}{1C4E8A}
 \definecolor{inkc}{HTML}{0B0B0B}
 \definecolor{inksec}{HTML}{52514E}
-\definecolor{cMongo}{HTML}{E0573F}    % MongoDB (mongod): coral
-\definecolor{cSearch}{HTML}{009488}   % Search Service: deep teal
-\definecolor{cIndex}{HTML}{5A55CC}    % Indexing Service: indigo
-\definecolor{cNginx}{HTML}{3A7BD5}    % nginx reverse proxy: blue
-\definecolor{cIngest}{HTML}{A23E8C}   % Ingestion Service: plum
-% Diagram strokes and fills
+\definecolor{cMongo}{HTML}{E0573F}
+\definecolor{cSearch}{HTML}{009488}
+\definecolor{cIndex}{HTML}{5A55CC}
+\definecolor{cNginx}{HTML}{3A7BD5}
+\definecolor{cIngest}{HTML}{A23E8C}
+
 \definecolor{frontc}{HTML}{1F5FA8}
 \definecolor{datac}{HTML}{C0661A}
 \definecolor{coordc}{HTML}{2E7D32}
@@ -114,22 +77,15 @@
   pdfkeywords={service-oriented architecture, Go, MongoDB, nginx, k6, benchmarking}
 }
 
-% ---------------------------------------------------------------------------
-% Macros
-% ---------------------------------------------------------------------------
-% \fixed marks a protocol constant, as in the Stage 1 report.
 \newcommand{\fixed}[1]{#1}
-% Inline identifiers, routes and files.
+
 \newcommand{\code}[1]{\texttt{#1}}
 \newcommand{\route}[1]{\texttt{#1}}
-% Colour key used in running text: a small square in a component's figure colour.
+
 \newcommand{\swatch}[1]{\tikz[baseline=-0.1ex]\fill[#1,rounded corners=0.4pt] (0,0) rectangle (0.72em,0.72em);}
-% Visible placeholder for data that must be filled in before submission.
+
 \newcommand{\placeholder}[1]{\textcolor{placeholderc}{\textbf{[#1]}}}
 
-% ---------------------------------------------------------------------------
-% COVER-PAGE DATA -- edit here
-% ---------------------------------------------------------------------------
 \newcommand{\coursename}{Big Data}
 \newcommand{\degreename}{Grado en Ciencia e Ingeniería de Datos}
 \newcommand{\universityname}{Universidad de Las Palmas de Gran Canaria}
@@ -137,17 +93,13 @@
 \newcommand{\projecttitle}{Boogle Engine}
 \newcommand{\groupname}{bigdata-devs}
 \newcommand{\repourl}{https://github.com/bigdata-devs/stage_2}
-% Members, listed by GitHub account. Replace each placeholder with the
-% member's full name and student ID (DNI/NIE as registered at ULPGC).
+
 \newcommand{\memberAname}{\placeholder{Full name}}\newcommand{\memberAid}{\placeholder{Student ID}}\newcommand{\memberAgit}{aledelgadoo}
 \newcommand{\memberBname}{\placeholder{Full name}}\newcommand{\memberBid}{\placeholder{Student ID}}\newcommand{\memberBgit}{aythamilorenzo}
 \newcommand{\memberCname}{\placeholder{Full name}}\newcommand{\memberCid}{\placeholder{Student ID}}\newcommand{\memberCgit}{CarlosMontesdeoca21}
 \newcommand{\memberDname}{\placeholder{Full name}}\newcommand{\memberDid}{\placeholder{Student ID}}\newcommand{\memberDgit}{javierruanohdez}
 \newcommand{\memberEname}{\placeholder{Full name}}\newcommand{\memberEid}{\placeholder{Student ID}}\newcommand{\memberEgit}{TemiArtemi}
 
-% ---------------------------------------------------------------------------
-% Listings: JSON and shell snippets
-% ---------------------------------------------------------------------------
 \lstdefinestyle{snippet}{
   basicstyle=\ttfamily\scriptsize,
   columns=fullflexible,
@@ -165,9 +117,6 @@
 }
 \lstset{style=snippet}
 
-% ---------------------------------------------------------------------------
-% Headers and footers
-% ---------------------------------------------------------------------------
 \pagestyle{fancy}
 \fancyhf{}
 \fancyhead[L]{\small\textcolor{inksec}{\projecttitle{} --- Stage 2: Service-Oriented Architecture}}
@@ -175,7 +124,6 @@
 \fancyfoot[C]{\small\thepage}
 \renewcommand{\headrulewidth}{0.3pt}
 
-% Key-results box
 \newtcolorbox{keyresults}[1][]{
   enhanced, breakable,
   colback=black!2, colframe=black!35, boxrule=0.4pt, arc=2pt,
@@ -186,9 +134,6 @@
 
 \begin{document}
 
-% =============================================================================
-% 1. COVER PAGE
-% =============================================================================
 \pagenumbering{Alph}
 \begin{titlepage}
   \thispagestyle{empty}
@@ -239,12 +184,8 @@
 \clearpage
 \pagenumbering{arabic}
 
-% Section numbers follow the report structure of the assignment (Section 7.1),
-% in which item 1 is the cover page: the introduction is therefore Section 2.
 \setcounter{section}{1}
-% =============================================================================
-% 2. INTRODUCTION AND OBJECTIVES
-% =============================================================================
+
 \section{Introduction and Objectives}
 \label{sec:introduction}
 
@@ -317,9 +258,6 @@ configuration. The numbers characterise this implementation on this machine.
 Following the assignment, a single-machine experiment is \emph{not} presented
 as evidence of cluster scalability; that question belongs to Stage~3.
 
-% =============================================================================
-% 3. SYSTEM ARCHITECTURE
-% =============================================================================
 \section{System Architecture}
 \label{sec:architecture}
 
@@ -363,9 +301,7 @@ each service is described in \cref{sec:implementation}.
 
 \begin{figure}[tbp]
   \centering
-  % Architecture diagram drawn with TikZ. To use an exported drawing instead,
-  % replace the whole tikzpicture with, for example:
-  %   \includegraphics[width=\textwidth]{figures/architecture.pdf}
+
   \begin{tikzpicture}[
       font=\fontsize{7}{8.4}\selectfont,
       every node/.append style={execute at begin node={\hyphenpenalty=10000\exhyphenpenalty=10000}},
@@ -385,7 +321,7 @@ each service is described in \cref{sec:implementation}.
       elabel/.style={fill=white, inner sep=1pt, align=center, font=\fontsize{6.5}{7.8}\selectfont},
       zlabel/.style={align=left, font=\fontsize{7}{8.4}\selectfont\itshape},
     ]
-    % ---------------- host frame and zones ----------------
+
     \fill[hostfill] (-0.1,-0.45) rectangle (16.0,10.15);
     \draw[black!60, line width=0.8pt, dash pattern=on 5pt off 3pt, rounded corners=6pt]
       (-0.1,-0.45) rectangle (16.0,10.15);
@@ -400,14 +336,12 @@ each service is described in \cref{sec:implementation}.
     \node[zlabel, anchor=south west, text=datac!80!black] at (0.15,-0.42)
       {Shared storage: named Docker volumes and the MongoDB server};
 
-    % ---------------- external provider and consumer ----------------
     \node[ext, text width=2.9cm] (gutenberg) at (2.0,11.35)
       {\textbf{Project Gutenberg}\\ external provider (HTTPS)};
     \node[ext, text width=6.0cm] (frontend) at (11.95,11.35)
       {\textbf{Front-end} (browser) \textperiodcentered{} \textbf{k6} load generator\\
        client concurrency: $N$ users or virtual users};
 
-    % ---------------- internal tier ----------------
     \node[store, minimum width=2.0cm, minimum height=1.0cm] (ctlstate) at (1.95,8.1)
       {control-state\\ volume};
     \node[wide, text width=3.0cm] (control) at (5.45,8.1)
@@ -419,7 +353,6 @@ each service is described in \cref{sec:implementation}.
       {\textbf{Indexing Service}\\ :7002 \textperiodcentered{} 1 replica\\[1pt]
        goroutine per request\\ 8 update slots\\ rebuild lease};
 
-    % ---------------- front-end-facing tier ----------------
     \node[wide, text width=5.6cm] (nginx) at (11.95,8.1)
       {\textbf{nginx} reverse proxy, publishes the Search API on :7003\\
        \code{least\_conn} \textperiodcentered{} DNS re-resolution every 5 s
@@ -433,20 +366,17 @@ each service is described in \cref{sec:implementation}.
     \node[font=\fontsize{6.5}{7.8}\selectfont\itshape, text=frontc, align=center] at (11.95,6.92)
       {$R$ replicas set by\\ \code{SEARCH\_REPLICAS}};
 
-    % ---------------- shared storage ----------------
     \node[store, minimum width=3.6cm, minimum height=1.5cm] (datalake) at (3.4,1.2)
       {\textbf{datalake volume}\\ \code{batch\_<lo>\_<hi>/<id>/}\\ body + header files};
     \node[store, minimum width=7.0cm, minimum height=1.5cm] (mongo) at (11.5,1.2)
       {\textbf{MongoDB 7} (\code{mongod} :27017), one thread per connection\\
        \code{books} \textperiodcentered{} \code{inverted\_index} \textperiodcentered{} \code{locks} (rebuild lease)};
 
-    % ---------------- front-end traffic ----------------
     \draw[front] (frontend.south) -- node[elabel, right=2pt, pos=0.15]
       {GET /search, /books/\{id\},\\ /search/filters (JSON, CORS)} (nginx.north);
     \draw[front, line width=0.9pt] (nginx.south -| search1.north) -- (search1.north);
     \draw[front, line width=0.9pt] (nginx.south -| search2.north) -- (search2.north);
 
-    % ---------------- internal HTTP ----------------
     \draw[internal] ($(control.south west)+(0.3,0)$) -- node[elabel, left=3pt, pos=0.5]
       {POST /ingest/\{id\}} ($(ingestion.north east)+(-0.3,0)$);
     \draw[internal] ($(control.south)+(0.3,0)$) -- node[elabel, right=2pt, pos=0.5]
@@ -454,11 +384,9 @@ each service is described in \cref{sec:implementation}.
     \draw[internal] ($(ingestion.north west)+(0.3,0)$) coordinate (gA) -- node[elabel, right=2pt, pos=0.93]
       {HTTPS GET} (gA |- gutenberg.south);
 
-    % ---------------- coordination state ----------------
     \draw[coord] (control.west) -- node[above=1pt, font=\fontsize{6.5}{7.8}\selectfont, fill=zoneint, inner sep=1pt]
       {append} (ctlstate.east);
 
-    % ---------------- storage access ----------------
     \draw[data] (ingestion.south) -- node[elabel, right=2pt, pos=0.45]
       {atomic write\\ (temp, fsync,\\ rename)} ($(datalake.north)+(-1.0,0)$);
     \draw[data] ($(indexing.south)+(-0.7,0)$) -- node[elabel, right=1pt, pos=0.45]
@@ -469,7 +397,6 @@ each service is described in \cref{sec:implementation}.
       {one aggregation\\ per query (read-only)} (search1.south |- mongo.north);
     \draw[data] (search2.south) -- (search2.south |- mongo.north);
 
-    % ---------------- legend ----------------
     \begin{scope}[shift={(0.0,-0.9)}]
       \draw[front] (0,0) -- (0.7,0);     \node[anchor=west] at (0.75,0) {front-end HTTP};
       \draw[internal] (3.4,0) -- (4.1,0); \node[anchor=west] at (4.15,0) {internal HTTP};
@@ -554,22 +481,18 @@ duplicates (\cref{sec:readiness}).
     \node[head] at (\xS,0) {Search\\[-1pt]Service};
     \foreach \x in {\xC,\xG,\xL,\xI,\xM,\xS} { \draw[life] (\x,-0.4) -- (\x,-10.75); }
 
-    % activation bars
     \filldraw[act] (\xG-0.07,-1.85) rectangle (\xG+0.07,-3.15);
     \filldraw[act] (\xI-0.07,-4.5) rectangle (\xI+0.07,-8.25);
 
-    % readiness probe
     \node[note, text width=6.0cm] at (5.0,-1.0)
       {readiness probe before the first claim (10 s deadline):\\
        \route{GET /ingest/list} and \route{GET /index/status}};
 
-    % ingestion
     \draw[msg] (\xC,-1.85) -- node[mlabel] {POST /ingest/\{id\}} (\xG-0.07,-1.85);
     \draw[msg] (\xG+0.07,-2.5) -- node[mlabel] {write body, then header} (\xL,-2.5);
     \draw[ret] (\xG-0.07,-3.15) -- node[mlabel] {200 downloaded} (\xC,-3.15);
     \node[note, anchor=west] at (\xC+0.1,-3.75) {append \code{downloaded\_books.txt} under \code{flock}};
 
-    % indexing
     \draw[msg] (\xC,-4.5) -- node[mlabel] {POST /index/update/\{id\}} (\xI-0.07,-4.5);
     \draw[msg] (\xI-0.07,-5.15) -- node[mlabel] {read both files} (\xL,-5.15);
     \draw[msg] (\xI+0.07,-5.8) -- node[mlabel] {\textbf{1} status: pending} (\xM,-5.8);
@@ -579,13 +502,11 @@ duplicates (\cref{sec:readiness}).
     \draw[ret] (\xI-0.07,-8.25) -- node[mlabel] {200 updated} (\xC,-8.25);
     \node[note, anchor=west] at (\xC+0.1,-8.85) {append \code{indexed\_books.txt} under \code{flock}};
 
-    % visibility brace on the MongoDB lifeline
-    \draw[decorate, decoration={brace, amplitude=4pt}, draw=placeholderc!80!black, line width=0.6pt]
+    \draw[decorate, decoration={brace, amplitude=4pt}, draw=inksec!70!black, line width=0.6pt]
       (\xM+0.15,-5.65) -- (\xM+0.15,-7.6)
-      node[midway, right=5pt, align=left, text=placeholderc!80!black]
+      node[midway, right=5pt, align=left, text=inksec!70!black]
       {book still invisible\\ to search};
 
-    % search
     \draw[msg] (\xS,-9.7) -- node[mlabel] {one aggregation} (\xM,-9.7);
     \draw[ret] (\xM,-10.3) -- node[mlabel] {ranked page + total} (\xS,-10.3);
   \end{tikzpicture}
@@ -625,7 +546,6 @@ two request paths of the system.
     \node[hdr] at (11.35,1.2) {connections};
     \node[hdr] at (14.45,1.2) {server threads};
 
-    % read path
     \node[lvl, fill=zonefront] (k6) at (1.5,0)
       {\textbf{k6 or front-end}\\ $N$ = 1, 10, 50, 100 VUs\\ closed loop, think time 0};
     \node[lvl, fill=zonefront] (ngx) at (4.75,0)
@@ -635,7 +555,6 @@ two request paths of the system.
     \node[lvl, fill=zonefront] (pool1) at (11.35,0)
       {\textbf{driver pool}\\ $\le$100 connections\\ per replica};
 
-    % write path
     \node[lvl, fill=zoneint] (ctl) at (1.5,-2.3)
       {\textbf{Control Module}\\ $W$ = 4 worker goroutines\\ (\code{-workers})};
     \node[lvl, fill=zoneint] (idx) at (8.05,-2.3)
@@ -643,7 +562,6 @@ two request paths of the system.
     \node[lvl, fill=zoneint] (pool2) at (11.35,-2.3)
       {\textbf{driver pool}\\ $\le$100 connections};
 
-    % shared server
     \node[draw=black!70, rounded corners=2pt, fill=storefill, align=center, text width=2.45cm,
           minimum height=3.75cm, inner sep=2.5pt] (mongod) at (14.45,-1.15)
       {\textbf{mongod}\\ 1 process\\[3pt] one thread per\\ connection\\[3pt] every query and update\\ shares the host's\\ 12 logical CPUs};
@@ -755,9 +673,7 @@ the benchmarks, the k6 load generator and the resource sampler, runs on the
 one host described in \cref{tab:host}. No container had CPU or memory limits in
 the official session, so all processes competed for the same 12 logical CPUs
 and 9.7~GiB of memory.
-% =============================================================================
-% 4. API DESIGN AND CONTRACTS
-% =============================================================================
+
 \section{API Design and Contracts}
 \label{sec:api}
 
@@ -1132,9 +1048,7 @@ cross-replica rebuild lease was verified live
 load, the k6 checks \emph{page respects limit} and \emph{pagination is echoed}
 held for 100\% of the 65{,}950 successful queries of the two search runs. The
 unit and integration tests are summarised in \cref{sec:testing}.
-% =============================================================================
-% 5. MICROSERVICE IMPLEMENTATION
-% =============================================================================
+
 \section{Microservice Implementation}
 \label{sec:implementation}
 
@@ -1378,9 +1292,7 @@ path's idempotency and the visibility of pending books, the rebuild and its
 lease, and the search aggregation's ranking, filters and pagination. The
 micro-benchmarks of \cref{sec:bench-threads} live in the same
 \code{\_test.go} files.
-% =============================================================================
-% 6. DESIGN DECISIONS
-% =============================================================================
+
 \section{Design Decisions}
 \label{sec:design}
 
@@ -1671,9 +1583,7 @@ The decisions above lead to expectations that \cref{sec:benchmarks} tests:
   updates to the rebuild owner, because the replay list of concurrent updates
   is kept per process.
 \end{itemize}
-% =============================================================================
-% 7. BENCHMARKS AND RESULTS
-% =============================================================================
+
 \section{Benchmarks and Results}
 \label{sec:benchmarks}
 
@@ -1805,7 +1715,6 @@ distributions, and they turn the plots below into diagnoses:
   clients can only queue.
 \end{itemize}
 
-% -----------------------------------------------------------------------------
 \subsection{Indexing throughput}
 \label{sec:bench-indexing}
 
@@ -1918,7 +1827,6 @@ overlapping request was answered \code{409 rebuild\_in\_progress} in under a
 second, and its retry after the lease was released succeeded in 7~min 54.5~s
 (0.81~books/s).
 
-% -----------------------------------------------------------------------------
 \subsection{Query latency and concurrency}
 \label{sec:bench-search}
 
@@ -2011,7 +1919,6 @@ searches gives the population a saturated service supports:
 $N \approx X\,(R + Z) \approx 1{,}250$ users who search every 5~s. This is an
 estimate derived from the law, not a measurement.
 
-% -----------------------------------------------------------------------------
 \subsection{CPU and memory utilisation per process and host}
 \label{sec:bench-resources}
 
@@ -2149,7 +2056,6 @@ while each Search process stayed at 13 to 24 operating-system threads for up to
 memory becomes relevant when the working set of posting arrays outgrows it,
 which this corpus does not exercise.
 
-% -----------------------------------------------------------------------------
 \subsection{Effects of replication}
 \label{sec:bench-replication}
 
@@ -2201,7 +2107,6 @@ datamart: each replica brings its own connection pool, so \code{mongod} ran up t
 209 threads instead of 155, with no more CPU to run them. The measurement
 thus confirms the expectation of \cref{sec:decision-scaling}.
 
-% -----------------------------------------------------------------------------
 \subsection{Effects of threading}
 \label{sec:bench-threads}
 
@@ -2298,7 +2203,6 @@ nginx, so the proxy's own latency was not isolated. The services'
 \code{GOMAXPROCS}, the driver's pool size and the eight-slot bounds were not
 varied, and no container ran with CPU or memory limits or pinned to cores.
 
-% -----------------------------------------------------------------------------
 \subsection{Coordination overhead}
 \label{sec:bench-coordination}
 
@@ -2345,7 +2249,6 @@ ingestion step stayed between 0.43 and 0.59~s. In other words, adding workers
 to the coordinator moves the queue from the coordinator into MongoDB; it does
 not shorten it.
 
-% -----------------------------------------------------------------------------
 \subsection{Bottlenecks and performance limits of the single host}
 \label{sec:bench-limits}
 
@@ -2404,9 +2307,6 @@ The figures rank the limits of the deployment in the order in which they bind:
   numerically with the official ones.
 \end{itemize}
 
-% =============================================================================
-% 8. CONCLUSIONS AND FUTURE IMPROVEMENTS
-% =============================================================================
 \section{Conclusions and Future Improvements}
 \label{sec:conclusions}
 
@@ -2650,10 +2550,6 @@ coordination, together with its Stage~3 replacement.
   \end{tabularx}
 \end{table}
 
-
-% =============================================================================
-% APPENDIX: EVIDENCE PROVENANCE
-% =============================================================================
 \appendix
 \section{Evidence Provenance}
 \label{sec:provenance}
