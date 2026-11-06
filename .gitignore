@@ -25,3 +25,14 @@ coverage.*
 .vscode/
 .DS_Store
 Thumbs.db
+
+# LaTeX build artifacts
+docs/report/*.aux
+docs/report/*.fdb_latexmk
+docs/report/*.fls
+docs/report/*.log
+docs/report/*.out
+docs/report/*.toc
+docs/report/*.synctex.gz
+docs/report/*.bbl
+docs/report/*.blg
