@@ -1,1 +1,6 @@
 * text=auto eol=lf
+*.tex linguist-vendored
+*.js linguist-vendored
+*.py linguist-vendored
+*.sh linguist-vendored
+*.ps1 linguist-vendored
