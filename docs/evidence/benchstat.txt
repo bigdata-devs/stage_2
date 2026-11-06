@@ -1,0 +1,38 @@
+goos: linux
+goarch: amd64
+pkg: boogle-engine/internal/mongodb
+cpu: Intel(R) Core(TM) i7-10750H CPU @ 2.60GHz
+                             │ docs/evidence/benchmarks.txt │
+                             │            sec/op            │
+PostingsForTerms-12                            603.0µ ±  5%
+SearchBooksWithoutFilters-12                   26.18m ±  3%
+SearchBooksWithAllFilters-12                   37.90m ± 12%
+IndexBook-12                                   4.544m ±  4%
+IndexBookRealBook-12                           636.9m ±  2%
+geomean                                        17.69m
+
+                             │ docs/evidence/benchmarks.txt │
+                             │             B/op             │
+PostingsForTerms-12                            54.36Ki ± 0%
+SearchBooksWithoutFilters-12                   34.11Ki ± 0%
+SearchBooksWithAllFilters-12                   35.56Ki ± 0%
+IndexBook-12                                   42.40Ki ± 0%
+IndexBookRealBook-12                           42.35Mi ± 5%
+geomean                                        164.7Ki
+
+                             │ docs/evidence/benchmarks.txt │
+                             │          allocs/op           │
+PostingsForTerms-12                             1.973k ± 0%
+SearchBooksWithoutFilters-12                     773.0 ± 0%
+SearchBooksWithAllFilters-12                     679.0 ± 0%
+IndexBook-12                                     582.0 ± 0%
+IndexBookRealBook-12                            444.4k ± 0%
+geomean                                         3.059k
+
+                     │ docs/evidence/benchmarks.txt │
+                     │          terms/book          │
+IndexBookRealBook-12                    6.576k ± 0%
+
+                     │ docs/evidence/benchmarks.txt │
+                     │         tokens/book          │
+IndexBookRealBook-12                    58.86k ± 0%

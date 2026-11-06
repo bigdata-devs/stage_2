@@ -1,0 +1,934 @@
+?   	boogle-engine/api/indexing	[no test files]
+?   	boogle-engine/api/ingestion	[no test files]
+?   	boogle-engine/api/search	[no test files]
+?   	boogle-engine/cmd/control	[no test files]
+=== RUN   TestDatamartIndexPublishesBook
+2026/11/01 15:50:36 INFO mongodb indexes ready created="[author_1_language_1_publication_year_1 language_1 publication_year_1]" posting_indexes_created=[postings.book_id_1]
+--- PASS: TestDatamartIndexPublishesBook (0.25s)
+=== RUN   TestDatamartIndexIsIdempotent
+2026/11/01 15:50:37 INFO mongodb indexes ready created="[author_1_language_1_publication_year_1 language_1 publication_year_1]" posting_indexes_created=[postings.book_id_1]
+--- PASS: TestDatamartIndexIsIdempotent (0.17s)
+=== RUN   TestDatamartIndexKeepsDataAcrossInstances
+2026/11/01 15:50:37 INFO mongodb indexes ready created="[author_1_language_1_publication_year_1 language_1 publication_year_1]" posting_indexes_created=[postings.book_id_1]
+--- PASS: TestDatamartIndexKeepsDataAcrossInstances (0.14s)
+=== RUN   TestDatamartIndexMissingBookFails
+2026/11/01 15:50:37 INFO mongodb indexes ready created="[author_1_language_1_publication_year_1 language_1 publication_year_1]" posting_indexes_created=[postings.book_id_1]
+--- PASS: TestDatamartIndexMissingBookFails (0.30s)
+=== RUN   TestRebuildPublishesEveryBookOfTheDatalake
+2026/11/01 15:50:37 INFO mongodb indexes ready created="[author_1_language_1_publication_year_1 language_1 publication_year_1]" posting_indexes_created=[postings.book_id_1]
+--- PASS: TestRebuildPublishesEveryBookOfTheDatalake (0.37s)
+=== RUN   TestRebuildReplacesPreviousContent
+2026/11/01 15:50:38 INFO mongodb indexes ready created="[author_1_language_1_publication_year_1 language_1 publication_year_1]" posting_indexes_created=[postings.book_id_1]
+--- PASS: TestRebuildReplacesPreviousContent (0.20s)
+=== RUN   TestRebuildRejectsASecondConcurrentRebuild
+2026/11/01 15:50:38 INFO mongodb indexes ready created="[author_1_language_1_publication_year_1 language_1 publication_year_1]" posting_indexes_created=[postings.book_id_1]
+--- PASS: TestRebuildRejectsASecondConcurrentRebuild (0.19s)
+=== RUN   TestNewDatamartIndexRejectsANonPositiveConcurrency
+--- PASS: TestNewDatamartIndexRejectsANonPositiveConcurrency (0.00s)
+=== RUN   TestIndexBookGivesUpItsSlotWhenTheCallerDisconnects
+--- PASS: TestIndexBookGivesUpItsSlotWhenTheCallerDisconnects (0.00s)
+=== RUN   TestRebuildRejectsWhileAnotherReplicaHoldsTheLock
+2026/11/01 15:50:38 INFO mongodb indexes ready created="[author_1_language_1_publication_year_1 language_1 publication_year_1]" posting_indexes_created=[postings.book_id_1]
+--- PASS: TestRebuildRejectsWhileAnotherReplicaHoldsTheLock (0.46s)
+=== RUN   TestUpdatesDuringARebuildAreRecordedAndCleared
+2026/11/01 15:50:38 INFO mongodb indexes ready created="[author_1_language_1_publication_year_1 language_1 publication_year_1]" posting_indexes_created=[postings.book_id_1]
+--- PASS: TestUpdatesDuringARebuildAreRecordedAndCleared (0.48s)
+PASS
+ok  	boogle-engine/cmd/indexing	2.574s
+?   	boogle-engine/cmd/ingestion	[no test files]
+=== RUN   TestCORSPolicyFromEnvironment
+=== RUN   TestCORSPolicyFromEnvironment/unset_falls_back_to_any_origin
+=== RUN   TestCORSPolicyFromEnvironment/blank_falls_back_to_any_origin
+=== RUN   TestCORSPolicyFromEnvironment/explicit_wildcard
+=== RUN   TestCORSPolicyFromEnvironment/comma-separated_list
+=== RUN   TestCORSPolicyFromEnvironment/invalid_origin
+--- PASS: TestCORSPolicyFromEnvironment (0.00s)
+    --- PASS: TestCORSPolicyFromEnvironment/unset_falls_back_to_any_origin (0.00s)
+    --- PASS: TestCORSPolicyFromEnvironment/blank_falls_back_to_any_origin (0.00s)
+    --- PASS: TestCORSPolicyFromEnvironment/explicit_wildcard (0.00s)
+    --- PASS: TestCORSPolicyFromEnvironment/comma-separated_list (0.00s)
+    --- PASS: TestCORSPolicyFromEnvironment/invalid_origin (0.00s)
+=== RUN   TestSearchRoutesAnswerCrossOriginBrowsers
+=== RUN   TestSearchRoutesAnswerCrossOriginBrowsers/preflight_for_search
+=== RUN   TestSearchRoutesAnswerCrossOriginBrowsers/search_results
+=== RUN   TestSearchRoutesAnswerCrossOriginBrowsers/search_validation_error_stays_readable
+=== RUN   TestSearchRoutesAnswerCrossOriginBrowsers/catalog_filters
+=== RUN   TestSearchRoutesAnswerCrossOriginBrowsers/preflight_from_another_origin
+=== RUN   TestSearchRoutesAnswerCrossOriginBrowsers/same-origin_request
+--- PASS: TestSearchRoutesAnswerCrossOriginBrowsers (0.00s)
+    --- PASS: TestSearchRoutesAnswerCrossOriginBrowsers/preflight_for_search (0.00s)
+    --- PASS: TestSearchRoutesAnswerCrossOriginBrowsers/search_results (0.00s)
+    --- PASS: TestSearchRoutesAnswerCrossOriginBrowsers/search_validation_error_stays_readable (0.00s)
+    --- PASS: TestSearchRoutesAnswerCrossOriginBrowsers/catalog_filters (0.00s)
+    --- PASS: TestSearchRoutesAnswerCrossOriginBrowsers/preflight_from_another_origin (0.00s)
+    --- PASS: TestSearchRoutesAnswerCrossOriginBrowsers/same-origin_request (0.00s)
+=== RUN   TestDatamartEngineAgainstLiveDatamart
+2026/11/01 15:50:37 INFO mongodb indexes ready created="[author_1_language_1_publication_year_1 language_1 publication_year_1]" posting_indexes_created=[postings.book_id_1]
+=== RUN   TestDatamartEngineAgainstLiveDatamart/single_term_is_ranked_by_term_frequency
+=== RUN   TestDatamartEngineAgainstLiveDatamart/filters_combine_with_AND
+=== RUN   TestDatamartEngineAgainstLiveDatamart/total_counts_every_page
+=== RUN   TestDatamartEngineAgainstLiveDatamart/GET_/search_serves_the_datamart_through_the_production_router
+=== RUN   TestDatamartEngineAgainstLiveDatamart/GET_/search_normalizes_q_and_ANDs_every_word
+--- PASS: TestDatamartEngineAgainstLiveDatamart (0.28s)
+    --- PASS: TestDatamartEngineAgainstLiveDatamart/single_term_is_ranked_by_term_frequency (0.01s)
+    --- PASS: TestDatamartEngineAgainstLiveDatamart/filters_combine_with_AND (0.00s)
+    --- PASS: TestDatamartEngineAgainstLiveDatamart/total_counts_every_page (0.00s)
+    --- PASS: TestDatamartEngineAgainstLiveDatamart/GET_/search_serves_the_datamart_through_the_production_router (0.00s)
+    --- PASS: TestDatamartEngineAgainstLiveDatamart/GET_/search_normalizes_q_and_ANDs_every_word (0.01s)
+=== RUN   TestDatamartEngineMapsQueryToDatamartRequest
+--- PASS: TestDatamartEngineMapsQueryToDatamartRequest (0.00s)
+=== RUN   TestDatamartEngineWithoutTermsDoesNotQueryDatamart
+--- PASS: TestDatamartEngineWithoutTermsDoesNotQueryDatamart (0.00s)
+=== RUN   TestDatamartEngineReturnsDatamartPage
+--- PASS: TestDatamartEngineReturnsDatamartPage (0.00s)
+=== RUN   TestDatamartEnginePropagatesDatamartFailure
+--- PASS: TestDatamartEnginePropagatesDatamartFailure (0.00s)
+=== RUN   TestSearchRouteIsServedByDatamartEngine
+--- PASS: TestSearchRouteIsServedByDatamartEngine (0.00s)
+=== RUN   TestSearchRouteSendsEveryWordToDatamart
+--- PASS: TestSearchRouteSendsEveryWordToDatamart (0.00s)
+=== RUN   TestSearchRouteAnswersUnsearchableQueriesWithoutDatamart
+=== RUN   TestSearchRouteAnswersUnsearchableQueriesWithoutDatamart/q=the+of+and
+=== RUN   TestSearchRouteAnswersUnsearchableQueriesWithoutDatamart/q=1813
+=== RUN   TestSearchRouteAnswersUnsearchableQueriesWithoutDatamart/q=alpha+bravo+charlie+delta+echo+foxtrot+golf+hotel+india+juliet+kilo
+--- PASS: TestSearchRouteAnswersUnsearchableQueriesWithoutDatamart (0.00s)
+    --- PASS: TestSearchRouteAnswersUnsearchableQueriesWithoutDatamart/q=the+of+and (0.00s)
+    --- PASS: TestSearchRouteAnswersUnsearchableQueriesWithoutDatamart/q=1813 (0.00s)
+    --- PASS: TestSearchRouteAnswersUnsearchableQueriesWithoutDatamart/q=alpha+bravo+charlie+delta+echo+foxtrot+golf+hotel+india+juliet+kilo (0.00s)
+=== RUN   TestSearchRouteReportsDatamartFailureAsInternalError
+2026/11/01 15:50:37 ERROR search engine failed term=whale filters="{Author: Language: Year:0}" error="connection refused"
+--- PASS: TestSearchRouteReportsDatamartFailureAsInternalError (0.00s)
+PASS
+ok  	boogle-engine/cmd/search	0.295s
+=== RUN   TestNewCORSPolicyNormalizesAllowedOrigins
+=== RUN   TestNewCORSPolicyNormalizesAllowedOrigins/*
+=== RUN   TestNewCORSPolicyNormalizesAllowedOrigins/__*__
+=== RUN   TestNewCORSPolicyNormalizesAllowedOrigins/https://boogle.example.com
+=== RUN   TestNewCORSPolicyNormalizesAllowedOrigins/HTTPS://Boogle.Example.COM/
+=== RUN   TestNewCORSPolicyNormalizesAllowedOrigins/https://boogle.example.com:443,http://localhost:80
+=== RUN   TestNewCORSPolicyNormalizesAllowedOrigins/https://boogle.example.com:8443
+=== RUN   TestNewCORSPolicyNormalizesAllowedOrigins/_http://localhost:5173_,_https://boogle.example.com,http://localhost:5173,
+=== RUN   TestNewCORSPolicyNormalizesAllowedOrigins/http://[::1]:5173
+--- PASS: TestNewCORSPolicyNormalizesAllowedOrigins (0.00s)
+    --- PASS: TestNewCORSPolicyNormalizesAllowedOrigins/* (0.00s)
+    --- PASS: TestNewCORSPolicyNormalizesAllowedOrigins/__*__ (0.00s)
+    --- PASS: TestNewCORSPolicyNormalizesAllowedOrigins/https://boogle.example.com (0.00s)
+    --- PASS: TestNewCORSPolicyNormalizesAllowedOrigins/HTTPS://Boogle.Example.COM/ (0.00s)
+    --- PASS: TestNewCORSPolicyNormalizesAllowedOrigins/https://boogle.example.com:443,http://localhost:80 (0.00s)
+    --- PASS: TestNewCORSPolicyNormalizesAllowedOrigins/https://boogle.example.com:8443 (0.00s)
+    --- PASS: TestNewCORSPolicyNormalizesAllowedOrigins/_http://localhost:5173_,_https://boogle.example.com,http://localhost:5173, (0.00s)
+    --- PASS: TestNewCORSPolicyNormalizesAllowedOrigins/http://[::1]:5173 (0.00s)
+=== RUN   TestNewCORSPolicyRejectsSettingsItCannotEnforce
+=== RUN   TestNewCORSPolicyRejectsSettingsItCannotEnforce/#00
+=== RUN   TestNewCORSPolicyRejectsSettingsItCannotEnforce/_,_
+=== RUN   TestNewCORSPolicyRejectsSettingsItCannotEnforce/*,https://boogle.example.com
+=== RUN   TestNewCORSPolicyRejectsSettingsItCannotEnforce/boogle.example.com
+=== RUN   TestNewCORSPolicyRejectsSettingsItCannotEnforce/localhost:5173
+=== RUN   TestNewCORSPolicyRejectsSettingsItCannotEnforce/https://boogle.example.com/app
+=== RUN   TestNewCORSPolicyRejectsSettingsItCannotEnforce/https://boogle.example.com?env=prod
+=== RUN   TestNewCORSPolicyRejectsSettingsItCannotEnforce/https://boogle.example.com#top
+=== RUN   TestNewCORSPolicyRejectsSettingsItCannotEnforce/https://user:secret@boogle.example.com
+=== RUN   TestNewCORSPolicyRejectsSettingsItCannotEnforce/ftp://boogle.example.com
+=== RUN   TestNewCORSPolicyRejectsSettingsItCannotEnforce/null
+=== RUN   TestNewCORSPolicyRejectsSettingsItCannotEnforce/https://
+=== RUN   TestNewCORSPolicyRejectsSettingsItCannotEnforce/https://:8443
+--- PASS: TestNewCORSPolicyRejectsSettingsItCannotEnforce (0.00s)
+    --- PASS: TestNewCORSPolicyRejectsSettingsItCannotEnforce/#00 (0.00s)
+    --- PASS: TestNewCORSPolicyRejectsSettingsItCannotEnforce/_,_ (0.00s)
+    --- PASS: TestNewCORSPolicyRejectsSettingsItCannotEnforce/*,https://boogle.example.com (0.00s)
+    --- PASS: TestNewCORSPolicyRejectsSettingsItCannotEnforce/boogle.example.com (0.00s)
+    --- PASS: TestNewCORSPolicyRejectsSettingsItCannotEnforce/localhost:5173 (0.00s)
+    --- PASS: TestNewCORSPolicyRejectsSettingsItCannotEnforce/https://boogle.example.com/app (0.00s)
+    --- PASS: TestNewCORSPolicyRejectsSettingsItCannotEnforce/https://boogle.example.com?env=prod (0.00s)
+    --- PASS: TestNewCORSPolicyRejectsSettingsItCannotEnforce/https://boogle.example.com#top (0.00s)
+    --- PASS: TestNewCORSPolicyRejectsSettingsItCannotEnforce/https://user:secret@boogle.example.com (0.00s)
+    --- PASS: TestNewCORSPolicyRejectsSettingsItCannotEnforce/ftp://boogle.example.com (0.00s)
+    --- PASS: TestNewCORSPolicyRejectsSettingsItCannotEnforce/null (0.00s)
+    --- PASS: TestNewCORSPolicyRejectsSettingsItCannotEnforce/https:// (0.00s)
+    --- PASS: TestNewCORSPolicyRejectsSettingsItCannotEnforce/https://:8443 (0.00s)
+=== RUN   TestCORSAnyOriginLetsEveryPageReadResponses
+--- PASS: TestCORSAnyOriginLetsEveryPageReadResponses (0.00s)
+=== RUN   TestCORSAllowedOriginCanReadErrorResponses
+--- PASS: TestCORSAllowedOriginCanReadErrorResponses (0.00s)
+=== RUN   TestCORSAnswersPreflightWithoutReachingTheRouter
+=== RUN   TestCORSAnswersPreflightWithoutReachingTheRouter/*
+=== RUN   TestCORSAnswersPreflightWithoutReachingTheRouter/https://boogle.example.com
+--- PASS: TestCORSAnswersPreflightWithoutReachingTheRouter (0.00s)
+    --- PASS: TestCORSAnswersPreflightWithoutReachingTheRouter/* (0.00s)
+    --- PASS: TestCORSAnswersPreflightWithoutReachingTheRouter/https://boogle.example.com (0.00s)
+=== RUN   TestCORSOriginListEchoesTheMatchingOrigin
+=== RUN   TestCORSOriginListEchoesTheMatchingOrigin/http://localhost:5173
+=== RUN   TestCORSOriginListEchoesTheMatchingOrigin/https://boogle.example.com
+=== RUN   TestCORSOriginListEchoesTheMatchingOrigin/HTTPS://BOOGLE.example.com
+--- PASS: TestCORSOriginListEchoesTheMatchingOrigin (0.00s)
+    --- PASS: TestCORSOriginListEchoesTheMatchingOrigin/http://localhost:5173 (0.00s)
+    --- PASS: TestCORSOriginListEchoesTheMatchingOrigin/https://boogle.example.com (0.00s)
+    --- PASS: TestCORSOriginListEchoesTheMatchingOrigin/HTTPS://BOOGLE.example.com (0.00s)
+=== RUN   TestCORSOriginOutsideTheListIsServedWithoutCORSHeaders
+--- PASS: TestCORSOriginOutsideTheListIsServedWithoutCORSHeaders (0.00s)
+=== RUN   TestCORSRejectsPreflightFromOriginOutsideTheList
+=== RUN   TestCORSRejectsPreflightFromOriginOutsideTheList/https://evil.example.net
+=== RUN   TestCORSRejectsPreflightFromOriginOutsideTheList/null
+=== RUN   TestCORSRejectsPreflightFromOriginOutsideTheList/https://boogle.example.com.evil.net
+--- PASS: TestCORSRejectsPreflightFromOriginOutsideTheList (0.00s)
+    --- PASS: TestCORSRejectsPreflightFromOriginOutsideTheList/https://evil.example.net (0.00s)
+    --- PASS: TestCORSRejectsPreflightFromOriginOutsideTheList/null (0.00s)
+    --- PASS: TestCORSRejectsPreflightFromOriginOutsideTheList/https://boogle.example.com.evil.net (0.00s)
+=== RUN   TestCORSLeavesRequestsWithoutOriginAlone
+=== RUN   TestCORSLeavesRequestsWithoutOriginAlone/*
+=== RUN   TestCORSLeavesRequestsWithoutOriginAlone/https://boogle.example.com
+--- PASS: TestCORSLeavesRequestsWithoutOriginAlone (0.00s)
+    --- PASS: TestCORSLeavesRequestsWithoutOriginAlone/* (0.00s)
+    --- PASS: TestCORSLeavesRequestsWithoutOriginAlone/https://boogle.example.com (0.00s)
+=== RUN   TestCORSPassesPlainOptionsRequestsToTheRouter
+--- PASS: TestCORSPassesPlainOptionsRequestsToTheRouter (0.00s)
+=== RUN   TestIndexUpdateIndexesBookFromDatalake
+--- PASS: TestIndexUpdateIndexesBookFromDatalake (0.00s)
+=== RUN   TestIndexUpdateRepeatedIsIdempotent
+--- PASS: TestIndexUpdateRepeatedIsIdempotent (0.00s)
+=== RUN   TestConcurrentIndexUpdatesOfSameBookCreateNoDuplicates
+--- PASS: TestConcurrentIndexUpdatesOfSameBookCreateNoDuplicates (0.00s)
+=== RUN   TestIndexUpdateOfBookMissingFromDatalakeReturnsNotFound
+--- PASS: TestIndexUpdateOfBookMissingFromDatalakeReturnsNotFound (0.00s)
+=== RUN   TestIndexUpdateRejectsInvalidBookID
+=== RUN   TestIndexUpdateRejectsInvalidBookID//index/update/abc
+=== RUN   TestIndexUpdateRejectsInvalidBookID//index/update/0
+=== RUN   TestIndexUpdateRejectsInvalidBookID//index/update/-1
+=== RUN   TestIndexUpdateRejectsInvalidBookID//index/update/1.5
+--- PASS: TestIndexUpdateRejectsInvalidBookID (0.00s)
+    --- PASS: TestIndexUpdateRejectsInvalidBookID//index/update/abc (0.00s)
+    --- PASS: TestIndexUpdateRejectsInvalidBookID//index/update/0 (0.00s)
+    --- PASS: TestIndexUpdateRejectsInvalidBookID//index/update/-1 (0.00s)
+    --- PASS: TestIndexUpdateRejectsInvalidBookID//index/update/1.5 (0.00s)
+=== RUN   TestRebuildIndexesEveryBookInDatalake
+2026/11/01 15:50:36 INFO [INDEXING] index rebuilt books=3 elapsed=0s
+--- PASS: TestRebuildIndexesEveryBookInDatalake (0.00s)
+=== RUN   TestRebuildStartsFromScratch
+2026/11/01 15:50:36 INFO [INDEXING] index rebuilt books=1 elapsed=0s
+--- PASS: TestRebuildStartsFromScratch (0.00s)
+=== RUN   TestRebuildFailuresKeepTheContract
+=== RUN   TestRebuildFailuresKeepTheContract/another_rebuild_running
+=== RUN   TestRebuildFailuresKeepTheContract/caller_disconnected
+2026/11/01 15:50:36 WARN [INDEXING] rebuild interrupted error="rebuild index: context canceled"
+=== RUN   TestRebuildFailuresKeepTheContract/unreadable_datalake
+2026/11/01 15:50:36 ERROR [INDEXING] rebuild failed error="list datalake books: permission denied"
+--- PASS: TestRebuildFailuresKeepTheContract (0.00s)
+    --- PASS: TestRebuildFailuresKeepTheContract/another_rebuild_running (0.00s)
+    --- PASS: TestRebuildFailuresKeepTheContract/caller_disconnected (0.00s)
+    --- PASS: TestRebuildFailuresKeepTheContract/unreadable_datalake (0.00s)
+=== RUN   TestRebuildIsStoppedByTheRebuildBudget
+2026/11/01 15:50:36 WARN [INDEXING] rebuild interrupted error="rebuild index: context deadline exceeded"
+--- PASS: TestRebuildIsStoppedByTheRebuildBudget (0.02s)
+=== RUN   TestIndexUpdateFailureReturnsInternalError
+2026/11/01 15:50:36 ERROR [INDEXING] book could not be indexed book_id=1342 error="disk read failed"
+--- PASS: TestIndexUpdateFailureReturnsInternalError (0.00s)
+=== RUN   TestStatusMatchesTheContractExample
+--- PASS: TestStatusMatchesTheContractExample (0.00s)
+=== RUN   TestNewIndexingHandlerValidatesItsArguments
+--- PASS: TestNewIndexingHandlerValidatesItsArguments (0.00s)
+=== RUN   TestIngestDownloadsBookIntoDatalake
+2026/11/01 15:50:36 INFO [DATALAKE] book stored book_id=1342 path=/tmp/TestIngestDownloadsBookIntoDatalake901788547/001/datalake/batch_1000_1999/1342
+--- PASS: TestIngestDownloadsBookIntoDatalake (0.00s)
+=== RUN   TestIngestTwiceReturnsAvailableWithoutDownloadingAgain
+2026/11/01 15:50:36 INFO [DATALAKE] book stored book_id=84 path=/tmp/TestIngestTwiceReturnsAvailableWithoutDownloadingAgain3570633677/001/datalake/batch_0_999/84
+--- PASS: TestIngestTwiceReturnsAvailableWithoutDownloadingAgain (0.00s)
+=== RUN   TestConcurrentIngestionsOfSameBookShareOneDownload
+2026/11/01 15:50:36 INFO [DATALAKE] book stored book_id=2701 path=/tmp/TestConcurrentIngestionsOfSameBookShareOneDownload793550013/001/datalake/batch_2000_2999/2701
+--- PASS: TestConcurrentIngestionsOfSameBookShareOneDownload (0.10s)
+=== RUN   TestIngestUnavailableBookReturnsNotFound
+2026/11/01 15:50:36 WARN [INGESTION] book unavailable book_id=99999 error="book unavailable: book 99999 (HTTP 404)"
+--- PASS: TestIngestUnavailableBookReturnsNotFound (0.00s)
+=== RUN   TestIngestTransientFailureReturnsServiceUnavailable
+2026/11/01 15:50:36 WARN [INGESTION] download failed book_id=1342 error="transient download failure: book 1342 (HTTP 503)"
+--- PASS: TestIngestTransientFailureReturnsServiceUnavailable (0.00s)
+=== RUN   TestIngestStorageFailureReturnsInternalError
+2026/11/01 15:50:36 ERROR [INGESTION] book could not be stored book_id=1342 status=failed error="create folder of book 1342: mkdir /tmp/TestIngestStorageFailureReturnsInternalError4254369284/001/datalake: not a directory"
+--- PASS: TestIngestStorageFailureReturnsInternalError (0.00s)
+=== RUN   TestEndpointsRejectInvalidBookID
+=== RUN   TestEndpointsRejectInvalidBookID/POST_/ingest/abc
+=== RUN   TestEndpointsRejectInvalidBookID/POST_/ingest/0
+=== RUN   TestEndpointsRejectInvalidBookID/POST_/ingest/-7
+=== RUN   TestEndpointsRejectInvalidBookID/POST_/ingest/1.5
+=== RUN   TestEndpointsRejectInvalidBookID/POST_/ingest/99999999999999999999999
+=== RUN   TestEndpointsRejectInvalidBookID/POST_/ingest/list
+=== RUN   TestEndpointsRejectInvalidBookID/GET_/ingest/status/12a
+--- PASS: TestEndpointsRejectInvalidBookID (0.00s)
+    --- PASS: TestEndpointsRejectInvalidBookID/POST_/ingest/abc (0.00s)
+    --- PASS: TestEndpointsRejectInvalidBookID/POST_/ingest/0 (0.00s)
+    --- PASS: TestEndpointsRejectInvalidBookID/POST_/ingest/-7 (0.00s)
+    --- PASS: TestEndpointsRejectInvalidBookID/POST_/ingest/1.5 (0.00s)
+    --- PASS: TestEndpointsRejectInvalidBookID/POST_/ingest/99999999999999999999999 (0.00s)
+    --- PASS: TestEndpointsRejectInvalidBookID/POST_/ingest/list (0.00s)
+    --- PASS: TestEndpointsRejectInvalidBookID/GET_/ingest/status/12a (0.00s)
+=== RUN   TestStatusReportsAvailableBook
+--- PASS: TestStatusReportsAvailableBook (0.00s)
+=== RUN   TestListReturnsCompleteBooksInAscendingOrder
+--- PASS: TestListReturnsCompleteBooksInAscendingOrder (0.00s)
+=== RUN   TestRoutesRejectWrongMethods
+--- PASS: TestRoutesRejectWrongMethods (0.00s)
+=== RUN   TestCoalescerJoinsTheIngestionInProgress
+--- PASS: TestCoalescerJoinsTheIngestionInProgress (0.00s)
+=== RUN   TestCoalescerReportsTransientFailureWhenNoSlotFreesUpInTime
+--- PASS: TestCoalescerReportsTransientFailureWhenNoSlotFreesUpInTime (0.02s)
+=== RUN   TestCoalescerLetsCallerStopWaitingWithoutCancellingTheIngestion
+--- PASS: TestCoalescerLetsCallerStopWaitingWithoutCancellingTheIngestion (0.00s)
+=== RUN   TestNewIngestionHandlerValidatesItsDependencies
+--- PASS: TestNewIngestionHandlerValidatesItsDependencies (0.00s)
+=== RUN   TestBookReturnsPublishedBookMetadata
+--- PASS: TestBookReturnsPublishedBookMetadata (0.00s)
+=== RUN   TestBookOfMissingOrUnpublishedBookReturnsNotFound
+=== RUN   TestBookOfMissingOrUnpublishedBookReturnsNotFound/unknown_book
+=== RUN   TestBookOfMissingOrUnpublishedBookReturnsNotFound/book_awaiting_publication
+--- PASS: TestBookOfMissingOrUnpublishedBookReturnsNotFound (0.00s)
+    --- PASS: TestBookOfMissingOrUnpublishedBookReturnsNotFound/unknown_book (0.00s)
+    --- PASS: TestBookOfMissingOrUnpublishedBookReturnsNotFound/book_awaiting_publication (0.00s)
+=== RUN   TestBookWithMalformedIDReturnsBadRequest
+=== RUN   TestBookWithMalformedIDReturnsBadRequest//books/abc
+=== RUN   TestBookWithMalformedIDReturnsBadRequest//books/0
+=== RUN   TestBookWithMalformedIDReturnsBadRequest//books/-7
+=== RUN   TestBookWithMalformedIDReturnsBadRequest//books/1.5
+--- PASS: TestBookWithMalformedIDReturnsBadRequest (0.00s)
+    --- PASS: TestBookWithMalformedIDReturnsBadRequest//books/abc (0.00s)
+    --- PASS: TestBookWithMalformedIDReturnsBadRequest//books/0 (0.00s)
+    --- PASS: TestBookWithMalformedIDReturnsBadRequest//books/-7 (0.00s)
+    --- PASS: TestBookWithMalformedIDReturnsBadRequest//books/1.5 (0.00s)
+=== RUN   TestBookFailureReturnsInternalErrorWithoutDetails
+2026/11/01 15:50:36 ERROR catalog request failed action="look up a book" error="mongo: connection refused"
+--- PASS: TestBookFailureReturnsInternalErrorWithoutDetails (0.00s)
+=== RUN   TestFiltersReturnsDistinctPublishedValues
+--- PASS: TestFiltersReturnsDistinctPublishedValues (0.00s)
+=== RUN   TestFiltersSerializesEmptyArraysWhenNoBooksArePublished
+--- PASS: TestFiltersSerializesEmptyArraysWhenNoBooksArePublished (0.00s)
+=== RUN   TestFiltersFailureReturnsInternalError
+2026/11/01 15:50:36 ERROR catalog request failed action="list filter values" error="mongo: socket closed"
+--- PASS: TestFiltersFailureReturnsInternalError (0.00s)
+=== RUN   TestCatalogRoutesRejectOtherMethods
+=== RUN   TestCatalogRoutesRejectOtherMethods/POST_/books/1342
+=== RUN   TestCatalogRoutesRejectOtherMethods/DELETE_/search/filters
+--- PASS: TestCatalogRoutesRejectOtherMethods (0.00s)
+    --- PASS: TestCatalogRoutesRejectOtherMethods/POST_/books/1342 (0.00s)
+    --- PASS: TestCatalogRoutesRejectOtherMethods/DELETE_/search/filters (0.00s)
+=== RUN   TestNewCatalogHandlerRejectsMissingCatalog
+--- PASS: TestNewCatalogHandlerRejectsMissingCatalog (0.00s)
+=== RUN   TestSearchReturnsMatchingBooksWithDefaultPagination
+--- PASS: TestSearchReturnsMatchingBooksWithDefaultPagination (0.00s)
+=== RUN   TestSearchMapsBookMetadataToResultSchema
+--- PASS: TestSearchMapsBookMetadataToResultSchema (0.00s)
+=== RUN   TestSearchCombinesFilters
+--- PASS: TestSearchCombinesFilters (0.00s)
+=== RUN   TestSearchEchoesOnlyTheFiltersThatWereSent
+--- PASS: TestSearchEchoesOnlyTheFiltersThatWereSent (0.00s)
+=== RUN   TestSearchForwardsValidatedQueryToEngine
+--- PASS: TestSearchForwardsValidatedQueryToEngine (0.00s)
+=== RUN   TestSearchPaginatesMatches
+=== RUN   TestSearchPaginatesMatches/first_page
+=== RUN   TestSearchPaginatesMatches/partial_last_page
+=== RUN   TestSearchPaginatesMatches/offset_past_the_last_match
+--- PASS: TestSearchPaginatesMatches (0.00s)
+    --- PASS: TestSearchPaginatesMatches/first_page (0.00s)
+    --- PASS: TestSearchPaginatesMatches/partial_last_page (0.00s)
+    --- PASS: TestSearchPaginatesMatches/offset_past_the_last_match (0.00s)
+=== RUN   TestSearchWithoutMatchesReturnsEmptyResults
+--- PASS: TestSearchWithoutMatchesReturnsEmptyResults (0.00s)
+=== RUN   TestSearchSerializesEmptyResultsWhenEngineReturnsNoSlice
+--- PASS: TestSearchSerializesEmptyResultsWhenEngineReturnsNoSlice (0.00s)
+=== RUN   TestSearchWithoutQueryReturnsBadRequest
+=== RUN   TestSearchWithoutQueryReturnsBadRequest/query_string_
+=== RUN   TestSearchWithoutQueryReturnsBadRequest/query_string_q=
+=== RUN   TestSearchWithoutQueryReturnsBadRequest/query_string_q=%20%20
+=== RUN   TestSearchWithoutQueryReturnsBadRequest/query_string_author=Austen&language=en
+--- PASS: TestSearchWithoutQueryReturnsBadRequest (0.00s)
+    --- PASS: TestSearchWithoutQueryReturnsBadRequest/query_string_ (0.00s)
+    --- PASS: TestSearchWithoutQueryReturnsBadRequest/query_string_q= (0.00s)
+    --- PASS: TestSearchWithoutQueryReturnsBadRequest/query_string_q=%20%20 (0.00s)
+    --- PASS: TestSearchWithoutQueryReturnsBadRequest/query_string_author=Austen&language=en (0.00s)
+=== RUN   TestSearchWithMalformedParameterReturnsBadRequest
+=== RUN   TestSearchWithMalformedParameterReturnsBadRequest/q=whale&year=eighteen
+=== RUN   TestSearchWithMalformedParameterReturnsBadRequest/q=whale&year=0
+=== RUN   TestSearchWithMalformedParameterReturnsBadRequest/q=whale&offset=-1
+=== RUN   TestSearchWithMalformedParameterReturnsBadRequest/q=whale&offset=first
+=== RUN   TestSearchWithMalformedParameterReturnsBadRequest/q=whale&limit=0
+=== RUN   TestSearchWithMalformedParameterReturnsBadRequest/q=whale&limit=101
+=== RUN   TestSearchWithMalformedParameterReturnsBadRequest/q=whale&limit=2.5
+--- PASS: TestSearchWithMalformedParameterReturnsBadRequest (0.00s)
+    --- PASS: TestSearchWithMalformedParameterReturnsBadRequest/q=whale&year=eighteen (0.00s)
+    --- PASS: TestSearchWithMalformedParameterReturnsBadRequest/q=whale&year=0 (0.00s)
+    --- PASS: TestSearchWithMalformedParameterReturnsBadRequest/q=whale&offset=-1 (0.00s)
+    --- PASS: TestSearchWithMalformedParameterReturnsBadRequest/q=whale&offset=first (0.00s)
+    --- PASS: TestSearchWithMalformedParameterReturnsBadRequest/q=whale&limit=0 (0.00s)
+    --- PASS: TestSearchWithMalformedParameterReturnsBadRequest/q=whale&limit=101 (0.00s)
+    --- PASS: TestSearchWithMalformedParameterReturnsBadRequest/q=whale&limit=2.5 (0.00s)
+=== RUN   TestSearchEngineFailureReturnsInternalError
+2026/11/01 15:50:36 ERROR search engine failed term=whale filters="{Author: Language: Year:0}" error="mongo: connection refused"
+--- PASS: TestSearchEngineFailureReturnsInternalError (0.00s)
+=== RUN   TestNewSearchHandlerRejectsMissingEngine
+--- PASS: TestNewSearchHandlerRejectsMissingEngine (0.00s)
+=== RUN   TestSearchSplitsMultiWordQueryIntoDistinctTerms
+=== RUN   TestSearchSplitsMultiWordQueryIntoDistinctTerms/sherlock_holmes
+=== RUN   TestSearchSplitsMultiWordQueryIntoDistinctTerms/__Moby-Dick,_the_WHALE!__
+=== RUN   TestSearchSplitsMultiWordQueryIntoDistinctTerms/whale_Whale_WHALE_ship
+=== RUN   TestSearchSplitsMultiWordQueryIntoDistinctTerms/Volume_XIV_of_a_Treasure
+=== RUN   TestSearchSplitsMultiWordQueryIntoDistinctTerms/island1883treasure
+--- PASS: TestSearchSplitsMultiWordQueryIntoDistinctTerms (0.00s)
+    --- PASS: TestSearchSplitsMultiWordQueryIntoDistinctTerms/sherlock_holmes (0.00s)
+    --- PASS: TestSearchSplitsMultiWordQueryIntoDistinctTerms/__Moby-Dick,_the_WHALE!__ (0.00s)
+    --- PASS: TestSearchSplitsMultiWordQueryIntoDistinctTerms/whale_Whale_WHALE_ship (0.00s)
+    --- PASS: TestSearchSplitsMultiWordQueryIntoDistinctTerms/Volume_XIV_of_a_Treasure (0.00s)
+    --- PASS: TestSearchSplitsMultiWordQueryIntoDistinctTerms/island1883treasure (0.00s)
+=== RUN   TestSearchRequiresEveryWordToMatch
+=== RUN   TestSearchRequiresEveryWordToMatch/adventures_sherlock
+=== RUN   TestSearchRequiresEveryWordToMatch/sherlock_adventures
+=== RUN   TestSearchRequiresEveryWordToMatch/adventures_of_huckleberry
+=== RUN   TestSearchRequiresEveryWordToMatch/adventure_whale
+--- PASS: TestSearchRequiresEveryWordToMatch (0.00s)
+    --- PASS: TestSearchRequiresEveryWordToMatch/adventures_sherlock (0.00s)
+    --- PASS: TestSearchRequiresEveryWordToMatch/sherlock_adventures (0.00s)
+    --- PASS: TestSearchRequiresEveryWordToMatch/adventures_of_huckleberry (0.00s)
+    --- PASS: TestSearchRequiresEveryWordToMatch/adventure_whale (0.00s)
+=== RUN   TestSearchWithOnlyIgnoredWordsReturnsEmptyPageWithoutEngine
+=== RUN   TestSearchWithOnlyIgnoredWordsReturnsEmptyPageWithoutEngine/the
+=== RUN   TestSearchWithOnlyIgnoredWordsReturnsEmptyPageWithoutEngine/The_Of_And
+=== RUN   TestSearchWithOnlyIgnoredWordsReturnsEmptyPageWithoutEngine/XIV
+=== RUN   TestSearchWithOnlyIgnoredWordsReturnsEmptyPageWithoutEngine/a_b_c
+=== RUN   TestSearchWithOnlyIgnoredWordsReturnsEmptyPageWithoutEngine/to_be_or_not_to_be
+--- PASS: TestSearchWithOnlyIgnoredWordsReturnsEmptyPageWithoutEngine (0.00s)
+    --- PASS: TestSearchWithOnlyIgnoredWordsReturnsEmptyPageWithoutEngine/the (0.00s)
+    --- PASS: TestSearchWithOnlyIgnoredWordsReturnsEmptyPageWithoutEngine/The_Of_And (0.00s)
+    --- PASS: TestSearchWithOnlyIgnoredWordsReturnsEmptyPageWithoutEngine/XIV (0.00s)
+    --- PASS: TestSearchWithOnlyIgnoredWordsReturnsEmptyPageWithoutEngine/a_b_c (0.00s)
+    --- PASS: TestSearchWithOnlyIgnoredWordsReturnsEmptyPageWithoutEngine/to_be_or_not_to_be (0.00s)
+=== RUN   TestSearchWithoutAnyWordReturnsBadRequest
+=== RUN   TestSearchWithoutAnyWordReturnsBadRequest/1813
+=== RUN   TestSearchWithoutAnyWordReturnsBadRequest/?!
+=== RUN   TestSearchWithoutAnyWordReturnsBadRequest/42_-_17
+=== RUN   TestSearchWithoutAnyWordReturnsBadRequest/¿¡
+=== RUN   TestSearchWithoutAnyWordReturnsBadRequest/日本語
+=== RUN   TestSearchWithoutAnyWordReturnsBadRequest/ÉÉÉ
+--- PASS: TestSearchWithoutAnyWordReturnsBadRequest (0.00s)
+    --- PASS: TestSearchWithoutAnyWordReturnsBadRequest/1813 (0.00s)
+    --- PASS: TestSearchWithoutAnyWordReturnsBadRequest/?! (0.00s)
+    --- PASS: TestSearchWithoutAnyWordReturnsBadRequest/42_-_17 (0.00s)
+    --- PASS: TestSearchWithoutAnyWordReturnsBadRequest/¿¡ (0.00s)
+    --- PASS: TestSearchWithoutAnyWordReturnsBadRequest/日本語 (0.00s)
+    --- PASS: TestSearchWithoutAnyWordReturnsBadRequest/ÉÉÉ (0.00s)
+=== RUN   TestSearchLimitsTheNumberOfDistinctTerms
+=== RUN   TestSearchLimitsTheNumberOfDistinctTerms/exactly_the_limit
+=== RUN   TestSearchLimitsTheNumberOfDistinctTerms/limit_plus_repeats_and_stop_words
+=== RUN   TestSearchLimitsTheNumberOfDistinctTerms/one_distinct_term_over_the_limit
+=== RUN   TestSearchLimitsTheNumberOfDistinctTerms/a_very_long_query
+--- PASS: TestSearchLimitsTheNumberOfDistinctTerms (0.03s)
+    --- PASS: TestSearchLimitsTheNumberOfDistinctTerms/exactly_the_limit (0.00s)
+    --- PASS: TestSearchLimitsTheNumberOfDistinctTerms/limit_plus_repeats_and_stop_words (0.00s)
+    --- PASS: TestSearchLimitsTheNumberOfDistinctTerms/one_distinct_term_over_the_limit (0.00s)
+    --- PASS: TestSearchLimitsTheNumberOfDistinctTerms/a_very_long_query (0.03s)
+PASS
+ok  	boogle-engine/internal/api	0.204s
+=== RUN   TestClaimHandsOutEveryCandidateOnce
+--- PASS: TestClaimHandsOutEveryCandidateOnce (0.00s)
+=== RUN   TestNewBookSelectorDropsRepeats
+--- PASS: TestNewBookSelectorDropsRepeats (0.00s)
+=== RUN   TestConcurrentClaimsNeverRepeatCandidates
+--- PASS: TestConcurrentClaimsNeverRepeatCandidates (0.00s)
+=== RUN   TestRunIngestsIndexesAndRecords
+2026/11/01 15:50:36 INFO [CONTROL] processing book book_id=1342
+2026/11/01 15:50:36 INFO [CONTROL] ingest step finished book_id=1342 duration=5.735901ms
+2026/11/01 15:50:36 INFO [CONTROL] index step finished book_id=1342 duration=5.508101ms
+2026/11/01 15:50:36 INFO [CONTROL] book indexed book_id=1342
+--- PASS: TestRunIngestsIndexesAndRecords (0.01s)
+=== RUN   TestRunSkipsAlreadyIndexedBooks
+--- PASS: TestRunSkipsAlreadyIndexedBooks (0.00s)
+=== RUN   TestRunSkipsPreviouslyFailedBooks
+2026/11/01 15:50:36 INFO [CONTROL] skipping previously failed book book_id=5 reason="book unavailable"
+--- PASS: TestRunSkipsPreviouslyFailedBooks (0.00s)
+=== RUN   TestRunResumesFromDownloadedState
+2026/11/01 15:50:36 INFO [CONTROL] processing book book_id=1342
+2026/11/01 15:50:36 INFO [CONTROL] ingest step finished book_id=1342 duration=400ns
+2026/11/01 15:50:36 INFO [CONTROL] index step finished book_id=1342 duration=5.698001ms
+2026/11/01 15:50:36 INFO [CONTROL] book indexed book_id=1342
+--- PASS: TestRunResumesFromDownloadedState (0.01s)
+=== RUN   TestRunRetriesTransientFailures
+2026/11/01 15:50:36 INFO [CONTROL] processing book book_id=1342
+2026/11/01 15:50:36 WARN [CONTROL] transient failure, retrying step="ingest book" attempt=1 backoff=1ms error="transient service error"
+2026/11/01 15:50:36 INFO [CONTROL] ingest step finished book_id=1342 duration=1.1843ms
+2026/11/01 15:50:36 INFO [CONTROL] index step finished book_id=1342 duration=5.478501ms
+2026/11/01 15:50:36 INFO [CONTROL] book indexed book_id=1342
+--- PASS: TestRunRetriesTransientFailures (0.01s)
+=== RUN   TestRunAbortsRetriesOnPermanentFailure
+2026/11/01 15:50:36 INFO [CONTROL] processing book book_id=1342
+2026/11/01 15:50:36 WARN [CONTROL] book failed book_id=1342 error="permanent service error"
+--- PASS: TestRunAbortsRetriesOnPermanentFailure (0.00s)
+=== RUN   TestRunGivesUpAfterMaxAttempts
+2026/11/01 15:50:36 INFO [CONTROL] processing book book_id=1342
+2026/11/01 15:50:36 WARN [CONTROL] transient failure, retrying step="ingest book" attempt=1 backoff=1ms error="transient service error"
+2026/11/01 15:50:36 WARN [CONTROL] transient failure, retrying step="ingest book" attempt=2 backoff=2ms error="transient service error"
+2026/11/01 15:50:36 WARN [CONTROL] book failed book_id=1342 error="ingest book failed after 3 attempts: transient service error"
+--- PASS: TestRunGivesUpAfterMaxAttempts (0.00s)
+=== RUN   TestRunReportsUnavailableBookAsFailed
+2026/11/01 15:50:36 INFO [CONTROL] processing book book_id=1342
+2026/11/01 15:50:36 WARN [CONTROL] book failed book_id=1342 error="book unavailable: service answered \"unavailable\""
+--- PASS: TestRunReportsUnavailableBookAsFailed (0.00s)
+=== RUN   TestRunLeavesBooksPendingOnShutdown
+2026/11/01 15:50:36 INFO [CONTROL] processing book book_id=1342
+2026/11/01 15:50:36 WARN [CONTROL] transient failure, retrying step="ingest book" attempt=1 backoff=1ms error="context canceled"
+2026/11/01 15:50:36 INFO [CONTROL] book left pending by shutdown book_id=1342 error="ingest book interrupted: context canceled"
+--- PASS: TestRunLeavesBooksPendingOnShutdown (0.00s)
+=== RUN   TestRunProcessesEveryCandidateAcrossWorkers
+2026/11/01 15:50:36 INFO [CONTROL] processing book book_id=1
+2026/11/01 15:50:36 INFO [CONTROL] processing book book_id=2
+2026/11/01 15:50:36 INFO [CONTROL] processing book book_id=3
+2026/11/01 15:50:36 INFO [CONTROL] processing book book_id=4
+2026/11/01 15:50:36 INFO [CONTROL] ingest step finished book_id=4 duration=5.359401ms
+2026/11/01 15:50:36 INFO [CONTROL] ingest step finished book_id=3 duration=5.448101ms
+2026/11/01 15:50:36 INFO [CONTROL] ingest step finished book_id=1 duration=5.524201ms
+2026/11/01 15:50:36 INFO [CONTROL] ingest step finished book_id=2 duration=5.695901ms
+2026/11/01 15:50:36 INFO [CONTROL] index step finished book_id=3 duration=5.490601ms
+2026/11/01 15:50:36 INFO [CONTROL] book indexed book_id=3
+2026/11/01 15:50:36 INFO [CONTROL] processing book book_id=5
+2026/11/01 15:50:36 INFO [CONTROL] index step finished book_id=1 duration=5.594501ms
+2026/11/01 15:50:36 INFO [CONTROL] book indexed book_id=1
+2026/11/01 15:50:36 INFO [CONTROL] processing book book_id=6
+2026/11/01 15:50:36 INFO [CONTROL] index step finished book_id=4 duration=5.709201ms
+2026/11/01 15:50:36 INFO [CONTROL] book indexed book_id=4
+2026/11/01 15:50:36 INFO [CONTROL] processing book book_id=7
+2026/11/01 15:50:36 INFO [CONTROL] index step finished book_id=2 duration=5.429401ms
+2026/11/01 15:50:36 INFO [CONTROL] book indexed book_id=2
+2026/11/01 15:50:36 INFO [CONTROL] processing book book_id=8
+2026/11/01 15:50:36 INFO [CONTROL] ingest step finished book_id=8 duration=5.293501ms
+2026/11/01 15:50:36 INFO [CONTROL] ingest step finished book_id=5 duration=5.481401ms
+2026/11/01 15:50:36 INFO [CONTROL] ingest step finished book_id=7 duration=5.395201ms
+2026/11/01 15:50:36 INFO [CONTROL] ingest step finished book_id=6 duration=5.494501ms
+2026/11/01 15:50:36 INFO [CONTROL] index step finished book_id=8 duration=5.359701ms
+2026/11/01 15:50:36 INFO [CONTROL] book indexed book_id=8
+2026/11/01 15:50:36 INFO [CONTROL] processing book book_id=9
+2026/11/01 15:50:36 INFO [CONTROL] index step finished book_id=6 duration=5.447601ms
+2026/11/01 15:50:36 INFO [CONTROL] book indexed book_id=6
+2026/11/01 15:50:36 INFO [CONTROL] index step finished book_id=7 duration=5.554301ms
+2026/11/01 15:50:36 INFO [CONTROL] processing book book_id=10
+2026/11/01 15:50:36 INFO [CONTROL] book indexed book_id=7
+2026/11/01 15:50:36 INFO [CONTROL] processing book book_id=11
+2026/11/01 15:50:36 INFO [CONTROL] index step finished book_id=5 duration=5.593101ms
+2026/11/01 15:50:36 INFO [CONTROL] book indexed book_id=5
+2026/11/01 15:50:36 INFO [CONTROL] processing book book_id=12
+2026/11/01 15:50:36 INFO [CONTROL] ingest step finished book_id=10 duration=5.374501ms
+2026/11/01 15:50:36 INFO [CONTROL] ingest step finished book_id=12 duration=5.452001ms
+2026/11/01 15:50:36 INFO [CONTROL] ingest step finished book_id=9 duration=5.624501ms
+2026/11/01 15:50:36 INFO [CONTROL] ingest step finished book_id=11 duration=5.577201ms
+2026/11/01 15:50:36 INFO [CONTROL] index step finished book_id=11 duration=5.191101ms
+2026/11/01 15:50:36 INFO [CONTROL] book indexed book_id=11
+2026/11/01 15:50:36 INFO [CONTROL] index step finished book_id=9 duration=5.268501ms
+2026/11/01 15:50:36 INFO [CONTROL] book indexed book_id=9
+2026/11/01 15:50:36 INFO [CONTROL] processing book book_id=14
+2026/11/01 15:50:36 INFO [CONTROL] index step finished book_id=10 duration=5.446701ms
+2026/11/01 15:50:36 INFO [CONTROL] book indexed book_id=10
+2026/11/01 15:50:36 INFO [CONTROL] processing book book_id=15
+2026/11/01 15:50:36 INFO [CONTROL] index step finished book_id=12 duration=5.411901ms
+2026/11/01 15:50:36 INFO [CONTROL] book indexed book_id=12
+2026/11/01 15:50:36 INFO [CONTROL] processing book book_id=16
+2026/11/01 15:50:36 INFO [CONTROL] processing book book_id=13
+2026/11/01 15:50:36 INFO [CONTROL] ingest step finished book_id=13 duration=5.094401ms
+2026/11/01 15:50:36 INFO [CONTROL] ingest step finished book_id=15 duration=5.220601ms
+2026/11/01 15:50:36 INFO [CONTROL] ingest step finished book_id=16 duration=5.214801ms
+2026/11/01 15:50:36 INFO [CONTROL] ingest step finished book_id=14 duration=5.369801ms
+2026/11/01 15:50:36 INFO [CONTROL] index step finished book_id=14 duration=5.3187ms
+2026/11/01 15:50:36 INFO [CONTROL] book indexed book_id=14
+2026/11/01 15:50:36 INFO [CONTROL] processing book book_id=17
+2026/11/01 15:50:36 INFO [CONTROL] index step finished book_id=16 duration=5.4109ms
+2026/11/01 15:50:36 INFO [CONTROL] book indexed book_id=16
+2026/11/01 15:50:36 INFO [CONTROL] processing book book_id=18
+2026/11/01 15:50:36 INFO [CONTROL] index step finished book_id=15 duration=5.5514ms
+2026/11/01 15:50:36 INFO [CONTROL] book indexed book_id=15
+2026/11/01 15:50:36 INFO [CONTROL] processing book book_id=19
+2026/11/01 15:50:36 INFO [CONTROL] index step finished book_id=13 duration=5.607ms
+2026/11/01 15:50:36 INFO [CONTROL] book indexed book_id=13
+2026/11/01 15:50:36 INFO [CONTROL] processing book book_id=20
+2026/11/01 15:50:36 INFO [CONTROL] ingest step finished book_id=17 duration=5.299801ms
+2026/11/01 15:50:36 INFO [CONTROL] ingest step finished book_id=20 duration=5.170401ms
+2026/11/01 15:50:36 INFO [CONTROL] ingest step finished book_id=19 duration=5.239701ms
+2026/11/01 15:50:36 INFO [CONTROL] ingest step finished book_id=18 duration=5.342301ms
+2026/11/01 15:50:36 INFO [CONTROL] index step finished book_id=19 duration=5.319901ms
+2026/11/01 15:50:36 INFO [CONTROL] book indexed book_id=19
+2026/11/01 15:50:36 INFO [CONTROL] index step finished book_id=20 duration=5.346101ms
+2026/11/01 15:50:36 INFO [CONTROL] index step finished book_id=17 duration=5.374601ms
+2026/11/01 15:50:36 INFO [CONTROL] book indexed book_id=20
+2026/11/01 15:50:36 INFO [CONTROL] book indexed book_id=17
+2026/11/01 15:50:36 INFO [CONTROL] index step finished book_id=18 duration=5.334201ms
+2026/11/01 15:50:36 INFO [CONTROL] book indexed book_id=18
+--- PASS: TestRunProcessesEveryCandidateAcrossWorkers (0.05s)
+=== RUN   TestNewOrchestratorValidatesConfig
+--- PASS: TestNewOrchestratorValidatesConfig (0.00s)
+=== RUN   TestLoadStateTreatsMissingDirectoryAsEmpty
+--- PASS: TestLoadStateTreatsMissingDirectoryAsEmpty (0.00s)
+=== RUN   TestRecordsRoundTripThroughFiles
+--- PASS: TestRecordsRoundTripThroughFiles (0.00s)
+=== RUN   TestRecordIsIdempotent
+--- PASS: TestRecordIsIdempotent (0.00s)
+=== RUN   TestLoadStateSkipsMalformedLines
+--- PASS: TestLoadStateSkipsMalformedLines (0.00s)
+=== RUN   TestLastFailureReasonWinsOnLoad
+--- PASS: TestLastFailureReasonWinsOnLoad (0.00s)
+=== RUN   TestRecordFailedSanitizesReason
+--- PASS: TestRecordFailedSanitizesReason (0.00s)
+=== RUN   TestConcurrentRecordsNeverLoseLines
+--- PASS: TestConcurrentRecordsNeverLoseLines (0.00s)
+=== RUN   TestWipeFailuresClearsAndReturnsClearedIDs
+--- PASS: TestWipeFailuresClearsAndReturnsClearedIDs (0.00s)
+=== RUN   TestWipeFailuresOnEmptyStateReturnsEmptyList
+--- PASS: TestWipeFailuresOnEmptyStateReturnsEmptyList (0.00s)
+=== RUN   TestWipeFailuresAtomicWrite
+--- PASS: TestWipeFailuresAtomicWrite (0.00s)
+=== RUN   TestIndexedIDsReturnsSortedCopy
+--- PASS: TestIndexedIDsReturnsSortedCopy (0.00s)
+=== RUN   TestIndexedIDsOnEmptyStateReturnsEmptyList
+--- PASS: TestIndexedIDsOnEmptyStateReturnsEmptyList (0.00s)
+PASS
+ok  	boogle-engine/internal/control	0.097s
+=== RUN   TestUpdateReportsIndexedBook
+--- PASS: TestUpdateReportsIndexedBook (0.01s)
+=== RUN   TestUpdateClassifiesHTTPAnswers
+--- PASS: TestUpdateClassifiesHTTPAnswers (0.00s)
+=== RUN   TestStatsDecodesProgress
+--- PASS: TestStatsDecodesProgress (0.00s)
+=== RUN   TestIngestDownloadsBook
+--- PASS: TestIngestDownloadsBook (0.00s)
+=== RUN   TestIngestReportsAvailableBook
+--- PASS: TestIngestReportsAvailableBook (0.00s)
+=== RUN   TestIngestClassifiesHTTPAnswers
+--- PASS: TestIngestClassifiesHTTPAnswers (0.01s)
+=== RUN   TestIngestTreatsNetworkFailureAsTransient
+--- PASS: TestIngestTreatsNetworkFailureAsTransient (0.00s)
+=== RUN   TestIngestTreatsMalformedAnswerAsTransient
+--- PASS: TestIngestTreatsMalformedAnswerAsTransient (0.00s)
+=== RUN   TestListReturnsEveryCompleteBook
+--- PASS: TestListReturnsEveryCompleteBook (0.00s)
+=== RUN   TestListOnEmptyDatalakeDecodesEmptySlice
+--- PASS: TestListOnEmptyDatalakeDecodesEmptySlice (0.00s)
+=== RUN   TestStatusAsksDedicatedRoute
+--- PASS: TestStatusAsksDedicatedRoute (0.00s)
+PASS
+ok  	boogle-engine/internal/control/httpclient	0.037s
+=== RUN   TestBookURLFollowsGutenbergCacheLayout
+--- PASS: TestBookURLFollowsGutenbergCacheLayout (0.00s)
+=== RUN   TestFetchBookReturnsSplitBook
+--- PASS: TestFetchBookReturnsSplitBook (0.01s)
+=== RUN   TestFetchBookClassifiesClientErrorsAsUnavailable
+--- PASS: TestFetchBookClassifiesClientErrorsAsUnavailable (0.01s)
+=== RUN   TestFetchBookClassifiesThrottlingAndServerErrorsAsTransient
+--- PASS: TestFetchBookClassifiesThrottlingAndServerErrorsAsTransient (0.00s)
+=== RUN   TestFetchBookWithoutMarkersIsUnavailable
+--- PASS: TestFetchBookWithoutMarkersIsUnavailable (0.00s)
+=== RUN   TestFetchBookNetworkErrorIsTransient
+--- PASS: TestFetchBookNetworkErrorIsTransient (0.00s)
+=== RUN   TestSplitBookTextSeparatesHeaderAndBodyAndDropsFooter
+--- PASS: TestSplitBookTextSeparatesHeaderAndBodyAndDropsFooter (0.00s)
+=== RUN   TestSplitBookTextRemovesByteOrderMark
+--- PASS: TestSplitBookTextRemovesByteOrderMark (0.00s)
+=== RUN   TestSplitBookTextWithoutStartMarkerIsUnavailable
+--- PASS: TestSplitBookTextWithoutStartMarkerIsUnavailable (0.00s)
+=== RUN   TestSplitBookTextWithEndMarkerBeforeStartIsUnavailable
+--- PASS: TestSplitBookTextWithEndMarkerBeforeStartIsUnavailable (0.00s)
+=== RUN   TestWorkerPoolStoresEveryBookWithBoundedConcurrency
+2026/11/01 15:50:36 INFO [DATALAKE] book stored book_id=3 path=/tmp/TestWorkerPoolStoresEveryBookWithBoundedConcurrency1574296864/001/batch_0_999/3
+2026/11/01 15:50:36 INFO [DATALAKE] book stored book_id=2 path=/tmp/TestWorkerPoolStoresEveryBookWithBoundedConcurrency1574296864/001/batch_0_999/2
+2026/11/01 15:50:36 INFO [DATALAKE] book stored book_id=1 path=/tmp/TestWorkerPoolStoresEveryBookWithBoundedConcurrency1574296864/001/batch_0_999/1
+2026/11/01 15:50:36 INFO [DATALAKE] book stored book_id=4 path=/tmp/TestWorkerPoolStoresEveryBookWithBoundedConcurrency1574296864/001/batch_0_999/4
+2026/11/01 15:50:36 INFO [DATALAKE] book stored book_id=7 path=/tmp/TestWorkerPoolStoresEveryBookWithBoundedConcurrency1574296864/001/batch_0_999/7
+2026/11/01 15:50:36 INFO [DATALAKE] book stored book_id=6 path=/tmp/TestWorkerPoolStoresEveryBookWithBoundedConcurrency1574296864/001/batch_0_999/6
+2026/11/01 15:50:36 INFO [DATALAKE] book stored book_id=8 path=/tmp/TestWorkerPoolStoresEveryBookWithBoundedConcurrency1574296864/001/batch_0_999/8
+2026/11/01 15:50:36 INFO [DATALAKE] book stored book_id=5 path=/tmp/TestWorkerPoolStoresEveryBookWithBoundedConcurrency1574296864/001/batch_0_999/5
+2026/11/01 15:50:36 INFO [DATALAKE] book stored book_id=11 path=/tmp/TestWorkerPoolStoresEveryBookWithBoundedConcurrency1574296864/001/batch_0_999/11
+2026/11/01 15:50:36 INFO [DATALAKE] book stored book_id=10 path=/tmp/TestWorkerPoolStoresEveryBookWithBoundedConcurrency1574296864/001/batch_0_999/10
+2026/11/01 15:50:36 INFO [DATALAKE] book stored book_id=9 path=/tmp/TestWorkerPoolStoresEveryBookWithBoundedConcurrency1574296864/001/batch_0_999/9
+2026/11/01 15:50:36 INFO [DATALAKE] book stored book_id=12 path=/tmp/TestWorkerPoolStoresEveryBookWithBoundedConcurrency1574296864/001/batch_0_999/12
+2026/11/01 15:50:36 INFO [DATALAKE] book stored book_id=14 path=/tmp/TestWorkerPoolStoresEveryBookWithBoundedConcurrency1574296864/001/batch_0_999/14
+2026/11/01 15:50:36 INFO [DATALAKE] book stored book_id=13 path=/tmp/TestWorkerPoolStoresEveryBookWithBoundedConcurrency1574296864/001/batch_0_999/13
+2026/11/01 15:50:36 INFO [DATALAKE] book stored book_id=16 path=/tmp/TestWorkerPoolStoresEveryBookWithBoundedConcurrency1574296864/001/batch_0_999/16
+2026/11/01 15:50:36 INFO [DATALAKE] book stored book_id=15 path=/tmp/TestWorkerPoolStoresEveryBookWithBoundedConcurrency1574296864/001/batch_0_999/15
+2026/11/01 15:50:36 INFO [DATALAKE] book stored book_id=18 path=/tmp/TestWorkerPoolStoresEveryBookWithBoundedConcurrency1574296864/001/batch_0_999/18
+2026/11/01 15:50:36 INFO [DATALAKE] book stored book_id=20 path=/tmp/TestWorkerPoolStoresEveryBookWithBoundedConcurrency1574296864/001/batch_0_999/20
+2026/11/01 15:50:36 INFO [DATALAKE] book stored book_id=19 path=/tmp/TestWorkerPoolStoresEveryBookWithBoundedConcurrency1574296864/001/batch_0_999/19
+2026/11/01 15:50:36 INFO [DATALAKE] book stored book_id=17 path=/tmp/TestWorkerPoolStoresEveryBookWithBoundedConcurrency1574296864/001/batch_0_999/17
+2026/11/01 15:50:36 INFO [DATALAKE] book stored book_id=24 path=/tmp/TestWorkerPoolStoresEveryBookWithBoundedConcurrency1574296864/001/batch_0_999/24
+2026/11/01 15:50:36 INFO [DATALAKE] book stored book_id=23 path=/tmp/TestWorkerPoolStoresEveryBookWithBoundedConcurrency1574296864/001/batch_0_999/23
+2026/11/01 15:50:36 INFO [DATALAKE] book stored book_id=22 path=/tmp/TestWorkerPoolStoresEveryBookWithBoundedConcurrency1574296864/001/batch_0_999/22
+2026/11/01 15:50:36 INFO [DATALAKE] book stored book_id=21 path=/tmp/TestWorkerPoolStoresEveryBookWithBoundedConcurrency1574296864/001/batch_0_999/21
+2026/11/01 15:50:36 INFO [DATALAKE] book stored book_id=27 path=/tmp/TestWorkerPoolStoresEveryBookWithBoundedConcurrency1574296864/001/batch_0_999/27
+2026/11/01 15:50:36 INFO [DATALAKE] book stored book_id=25 path=/tmp/TestWorkerPoolStoresEveryBookWithBoundedConcurrency1574296864/001/batch_0_999/25
+2026/11/01 15:50:36 INFO [DATALAKE] book stored book_id=28 path=/tmp/TestWorkerPoolStoresEveryBookWithBoundedConcurrency1574296864/001/batch_0_999/28
+2026/11/01 15:50:36 INFO [DATALAKE] book stored book_id=26 path=/tmp/TestWorkerPoolStoresEveryBookWithBoundedConcurrency1574296864/001/batch_0_999/26
+2026/11/01 15:50:36 INFO [DATALAKE] book stored book_id=30 path=/tmp/TestWorkerPoolStoresEveryBookWithBoundedConcurrency1574296864/001/batch_0_999/30
+2026/11/01 15:50:36 INFO [DATALAKE] book stored book_id=29 path=/tmp/TestWorkerPoolStoresEveryBookWithBoundedConcurrency1574296864/001/batch_0_999/29
+2026/11/01 15:50:36 INFO [DATALAKE] book stored book_id=32 path=/tmp/TestWorkerPoolStoresEveryBookWithBoundedConcurrency1574296864/001/batch_0_999/32
+2026/11/01 15:50:36 INFO [DATALAKE] book stored book_id=31 path=/tmp/TestWorkerPoolStoresEveryBookWithBoundedConcurrency1574296864/001/batch_0_999/31
+2026/11/01 15:50:36 INFO [DATALAKE] book stored book_id=36 path=/tmp/TestWorkerPoolStoresEveryBookWithBoundedConcurrency1574296864/001/batch_0_999/36
+2026/11/01 15:50:36 INFO [DATALAKE] book stored book_id=34 path=/tmp/TestWorkerPoolStoresEveryBookWithBoundedConcurrency1574296864/001/batch_0_999/34
+2026/11/01 15:50:36 INFO [DATALAKE] book stored book_id=35 path=/tmp/TestWorkerPoolStoresEveryBookWithBoundedConcurrency1574296864/001/batch_0_999/35
+2026/11/01 15:50:36 INFO [DATALAKE] book stored book_id=33 path=/tmp/TestWorkerPoolStoresEveryBookWithBoundedConcurrency1574296864/001/batch_0_999/33
+2026/11/01 15:50:36 INFO [DATALAKE] book stored book_id=37 path=/tmp/TestWorkerPoolStoresEveryBookWithBoundedConcurrency1574296864/001/batch_0_999/37
+2026/11/01 15:50:36 INFO [DATALAKE] book stored book_id=39 path=/tmp/TestWorkerPoolStoresEveryBookWithBoundedConcurrency1574296864/001/batch_0_999/39
+2026/11/01 15:50:36 INFO [DATALAKE] book stored book_id=38 path=/tmp/TestWorkerPoolStoresEveryBookWithBoundedConcurrency1574296864/001/batch_0_999/38
+2026/11/01 15:50:36 INFO [DATALAKE] book stored book_id=40 path=/tmp/TestWorkerPoolStoresEveryBookWithBoundedConcurrency1574296864/001/batch_0_999/40
+--- PASS: TestWorkerPoolStoresEveryBookWithBoundedConcurrency (0.06s)
+=== RUN   TestWorkerPoolDropsDuplicateIDsAndSkipsStoredBooks
+2026/11/01 15:50:36 INFO [DATALAKE] book stored book_id=8 path=/tmp/TestWorkerPoolDropsDuplicateIDsAndSkipsStoredBooks514561476/001/batch_0_999/8
+2026/11/01 15:50:36 INFO [DATALAKE] book stored book_id=7 path=/tmp/TestWorkerPoolDropsDuplicateIDsAndSkipsStoredBooks514561476/001/batch_0_999/7
+--- PASS: TestWorkerPoolDropsDuplicateIDsAndSkipsStoredBooks (0.01s)
+=== RUN   TestWorkerPoolClassifiesFailuresAndRetriesTransientOnes
+2026/11/01 15:50:36 INFO [DATALAKE] book stored book_id=1342 path=/tmp/TestWorkerPoolClassifiesFailuresAndRetriesTransientOnes1593946725/001/batch_1000_1999/1342
+--- PASS: TestWorkerPoolClassifiesFailuresAndRetriesTransientOnes (0.01s)
+=== RUN   TestWorkerPoolGivesUpAfterMaxAttempts
+2026/11/01 15:50:36 WARN [CRAWLER] transient failure, retrying book_id=5 attempt=1 wait=1ms error="transient download failure: book 5 (HTTP 503)"
+2026/11/01 15:50:36 WARN [CRAWLER] transient failure, retrying book_id=5 attempt=2 wait=2ms error="transient download failure: book 5 (HTTP 503)"
+--- PASS: TestWorkerPoolGivesUpAfterMaxAttempts (0.02s)
+=== RUN   TestWorkerPoolStartsNoBookAfterCancellation
+--- PASS: TestWorkerPoolStartsNoBookAfterCancellation (0.00s)
+=== RUN   TestNewWorkerPoolRejectsZeroWorkers
+--- PASS: TestNewWorkerPoolRejectsZeroWorkers (0.00s)
+PASS
+ok  	boogle-engine/internal/crawler	0.126s
+=== RUN   TestNewRejectsNonPositiveBatchSize
+--- PASS: TestNewRejectsNonPositiveBatchSize (0.00s)
+=== RUN   TestBookDirectoryUsesBatchThenBookFolder
+--- PASS: TestBookDirectoryUsesBatchThenBookFolder (0.00s)
+=== RUN   TestStoreWritesHeaderAndBodyThatReadBookReturns
+--- PASS: TestStoreWritesHeaderAndBodyThatReadBookReturns (0.00s)
+=== RUN   TestStoreLeavesNoTemporaryFiles
+--- PASS: TestStoreLeavesNoTemporaryFiles (0.00s)
+=== RUN   TestLocateReportsIncompleteBookAsNotFound
+--- PASS: TestLocateReportsIncompleteBookAsNotFound (0.00s)
+=== RUN   TestListBookIDsReturnsOnlyCompleteBooksInOrder
+--- PASS: TestListBookIDsReturnsOnlyCompleteBooksInOrder (0.00s)
+=== RUN   TestListBookIDsOfMissingRootIsEmpty
+--- PASS: TestListBookIDsOfMissingRootIsEmpty (0.00s)
+PASS
+ok  	boogle-engine/internal/datalake	0.008s
+=== RUN   TestInvertedIndexKeepsPostingsSortedAndUnique
+--- PASS: TestInvertedIndexKeepsPostingsSortedAndUnique (0.00s)
+=== RUN   TestInvertedIndexSupportsConcurrentWriters
+--- PASS: TestInvertedIndexSupportsConcurrentWriters (0.00s)
+=== RUN   TestIndexBookFillsCatalogAndIndexIdempotently
+--- PASS: TestIndexBookFillsCatalogAndIndexIdempotently (0.00s)
+=== RUN   TestIndexBookReportsMissingBooks
+--- PASS: TestIndexBookReportsMissingBooks (0.00s)
+=== RUN   TestParseHeaderFieldsJoinsContinuationLinesAndIgnoresPreamble
+--- PASS: TestParseHeaderFieldsJoinsContinuationLinesAndIgnoresPreamble (0.00s)
+=== RUN   TestExtractMetadataNormalizesFields
+--- PASS: TestExtractMetadataNormalizesFields (0.00s)
+=== RUN   TestExtractMetadataReadsPublicationAndReleaseYears
+--- PASS: TestExtractMetadataReadsPublicationAndReleaseYears (0.00s)
+=== RUN   TestExtractMetadataFallsBackToTheReleaseYear
+--- PASS: TestExtractMetadataFallsBackToTheReleaseYear (0.00s)
+=== RUN   TestExtractMetadataMissingYearsAreZero
+--- PASS: TestExtractMetadataMissingYearsAreZero (0.00s)
+=== RUN   TestExtractMetadataUnreadableYearIsZero
+--- PASS: TestExtractMetadataUnreadableYearIsZero (0.00s)
+=== RUN   TestExtractMetadataJoinsSeveralAuthors
+--- PASS: TestExtractMetadataJoinsSeveralAuthors (0.00s)
+=== RUN   TestExtractMetadataMarksMissingFieldsUnknown
+--- PASS: TestExtractMetadataMarksMissingFieldsUnknown (0.00s)
+=== RUN   TestNormalizeLanguage
+--- PASS: TestNormalizeLanguage (0.00s)
+=== RUN   TestTokenize
+=== RUN   TestTokenize/lowercases
+=== RUN   TestTokenize/removes_punctuation
+=== RUN   TestTokenize/splits_hyphens
+=== RUN   TestTokenize/empty_string
+=== RUN   TestTokenize/keeps_letters_of_alphanumerics
+=== RUN   TestTokenize/splits_on_non-ASCII_letters
+=== RUN   TestTokenize/Python_lowercase_of_dotted_capital_I
+=== RUN   TestTokenize/Kelvin_sign_lowercases_to_k
+--- PASS: TestTokenize (0.00s)
+    --- PASS: TestTokenize/lowercases (0.00s)
+    --- PASS: TestTokenize/removes_punctuation (0.00s)
+    --- PASS: TestTokenize/splits_hyphens (0.00s)
+    --- PASS: TestTokenize/empty_string (0.00s)
+    --- PASS: TestTokenize/keeps_letters_of_alphanumerics (0.00s)
+    --- PASS: TestTokenize/splits_on_non-ASCII_letters (0.00s)
+    --- PASS: TestTokenize/Python_lowercase_of_dotted_capital_I (0.00s)
+    --- PASS: TestTokenize/Kelvin_sign_lowercases_to_k (0.00s)
+=== RUN   TestNormalizeDropsStopWordsRomanNumeralsAndSingleLetters
+--- PASS: TestNormalizeDropsStopWordsRomanNumeralsAndSingleLetters (0.00s)
+=== RUN   TestProcessTextRunsFullPipeline
+--- PASS: TestProcessTextRunsFullPipeline (0.00s)
+PASS
+ok  	boogle-engine/internal/indexer	0.008s
+=== RUN   TestParseBookIDStripsWhitespaceAndLeadingZeros
+--- PASS: TestParseBookIDStripsWhitespaceAndLeadingZeros (0.00s)
+=== RUN   TestParseBookIDRejectsMalformedValues
+=== RUN   TestParseBookIDRejectsMalformedValues/#00
+=== RUN   TestParseBookIDRejectsMalformedValues/___
+=== RUN   TestParseBookIDRejectsMalformedValues/abc
+=== RUN   TestParseBookIDRejectsMalformedValues/12a
+=== RUN   TestParseBookIDRejectsMalformedValues/-3
+=== RUN   TestParseBookIDRejectsMalformedValues/+3
+=== RUN   TestParseBookIDRejectsMalformedValues/1.5
+=== RUN   TestParseBookIDRejectsMalformedValues/1_2
+=== RUN   TestParseBookIDRejectsMalformedValues/0
+=== RUN   TestParseBookIDRejectsMalformedValues/000
+=== RUN   TestParseBookIDRejectsMalformedValues/٣
+=== RUN   TestParseBookIDRejectsMalformedValues/99999999999999999999
+--- PASS: TestParseBookIDRejectsMalformedValues (0.00s)
+    --- PASS: TestParseBookIDRejectsMalformedValues/#00 (0.00s)
+    --- PASS: TestParseBookIDRejectsMalformedValues/___ (0.00s)
+    --- PASS: TestParseBookIDRejectsMalformedValues/abc (0.00s)
+    --- PASS: TestParseBookIDRejectsMalformedValues/12a (0.00s)
+    --- PASS: TestParseBookIDRejectsMalformedValues/-3 (0.00s)
+    --- PASS: TestParseBookIDRejectsMalformedValues/+3 (0.00s)
+    --- PASS: TestParseBookIDRejectsMalformedValues/1.5 (0.00s)
+    --- PASS: TestParseBookIDRejectsMalformedValues/1_2 (0.00s)
+    --- PASS: TestParseBookIDRejectsMalformedValues/0 (0.00s)
+    --- PASS: TestParseBookIDRejectsMalformedValues/000 (0.00s)
+    --- PASS: TestParseBookIDRejectsMalformedValues/٣ (0.00s)
+    --- PASS: TestParseBookIDRejectsMalformedValues/99999999999999999999 (0.00s)
+=== RUN   TestBookIDStringIsCanonicalDecimal
+--- PASS: TestBookIDStringIsCanonicalDecimal (0.00s)
+PASS
+ok  	boogle-engine/internal/models	0.008s
+=== RUN   TestIndexBookStoresTermFrequency
+--- PASS: TestIndexBookStoresTermFrequency (0.12s)
+=== RUN   TestIndexBookIsIdempotent
+--- PASS: TestIndexBookIsIdempotent (0.11s)
+=== RUN   TestIndexBookUpdatesTermFrequencyWithoutDuplicating
+--- PASS: TestIndexBookUpdatesTermFrequencyWithoutDuplicating (0.08s)
+=== RUN   TestIndexBookForgetsTermsTheNewVersionDrops
+--- PASS: TestIndexBookForgetsTermsTheNewVersionDrops (0.07s)
+=== RUN   TestIndexBookKeepsPostingsSortedAcrossBooks
+--- PASS: TestIndexBookKeepsPostingsSortedAcrossBooks (0.08s)
+=== RUN   TestIndexBookIsConcurrencySafeForSameBook
+--- PASS: TestIndexBookIsConcurrencySafeForSameBook (0.26s)
+=== RUN   TestIndexBookPublishesMetadata
+--- PASS: TestIndexBookPublishesMetadata (0.07s)
+=== RUN   TestIndexBookWithholdsUnpublishedBookFromReaders
+--- PASS: TestIndexBookWithholdsUnpublishedBookFromReaders (0.08s)
+=== RUN   TestPublishedBookReturnsOnlyPublishedBooks
+--- PASS: TestPublishedBookReturnsOnlyPublishedBooks (0.07s)
+=== RUN   TestFilterOptionsListsPublishedValues
+--- PASS: TestFilterOptionsListsPublishedValues (0.08s)
+=== RUN   TestFilterOptionsOnAnEmptyDatamartReturnsEmptyLists
+--- PASS: TestFilterOptionsOnAnEmptyDatamartReturnsEmptyLists (0.01s)
+=== RUN   TestRedactURIHidesCredentialsAndKeepsDiagnostics
+=== RUN   TestRedactURIHidesCredentialsAndKeepsDiagnostics/no_credentials
+=== RUN   TestRedactURIHidesCredentialsAndKeepsDiagnostics/user_and_password
+=== RUN   TestRedactURIHidesCredentialsAndKeepsDiagnostics/percent-encoded_password_on_an_SRV_cluster
+=== RUN   TestRedactURIHidesCredentialsAndKeepsDiagnostics/replica_set_with_several_hosts
+=== RUN   TestRedactURIHidesCredentialsAndKeepsDiagnostics/user_without_password
+=== RUN   TestRedactURIHidesCredentialsAndKeepsDiagnostics/unescaped_@_in_password
+=== RUN   TestRedactURIHidesCredentialsAndKeepsDiagnostics/unescaped_slash_in_password
+=== RUN   TestRedactURIHidesCredentialsAndKeepsDiagnostics/AWS_session_token_in_authMechanismProperties
+=== RUN   TestRedactURIHidesCredentialsAndKeepsDiagnostics/TLS_key_password_option_with_;_separators
+=== RUN   TestRedactURIHidesCredentialsAndKeepsDiagnostics/missing_scheme
+=== RUN   TestRedactURIHidesCredentialsAndKeepsDiagnostics/@_inside_an_option_value_only
+--- PASS: TestRedactURIHidesCredentialsAndKeepsDiagnostics (0.00s)
+    --- PASS: TestRedactURIHidesCredentialsAndKeepsDiagnostics/no_credentials (0.00s)
+    --- PASS: TestRedactURIHidesCredentialsAndKeepsDiagnostics/user_and_password (0.00s)
+    --- PASS: TestRedactURIHidesCredentialsAndKeepsDiagnostics/percent-encoded_password_on_an_SRV_cluster (0.00s)
+    --- PASS: TestRedactURIHidesCredentialsAndKeepsDiagnostics/replica_set_with_several_hosts (0.00s)
+    --- PASS: TestRedactURIHidesCredentialsAndKeepsDiagnostics/user_without_password (0.00s)
+    --- PASS: TestRedactURIHidesCredentialsAndKeepsDiagnostics/unescaped_@_in_password (0.00s)
+    --- PASS: TestRedactURIHidesCredentialsAndKeepsDiagnostics/unescaped_slash_in_password (0.00s)
+    --- PASS: TestRedactURIHidesCredentialsAndKeepsDiagnostics/AWS_session_token_in_authMechanismProperties (0.00s)
+    --- PASS: TestRedactURIHidesCredentialsAndKeepsDiagnostics/TLS_key_password_option_with_;_separators (0.00s)
+    --- PASS: TestRedactURIHidesCredentialsAndKeepsDiagnostics/missing_scheme (0.00s)
+    --- PASS: TestRedactURIHidesCredentialsAndKeepsDiagnostics/@_inside_an_option_value_only (0.00s)
+=== RUN   TestConnectErrorsNeverContainThePassword
+=== RUN   TestConnectErrorsNeverContainThePassword/unreachable_server
+=== RUN   TestConnectErrorsNeverContainThePassword/driver_quotes_a_malformed_secret_option
+=== RUN   TestConnectErrorsNeverContainThePassword/driver_rejects_an_unescaped_slash_in_the_password
+--- PASS: TestConnectErrorsNeverContainThePassword (0.30s)
+    --- PASS: TestConnectErrorsNeverContainThePassword/unreachable_server (0.30s)
+    --- PASS: TestConnectErrorsNeverContainThePassword/driver_quotes_a_malformed_secret_option (0.00s)
+    --- PASS: TestConnectErrorsNeverContainThePassword/driver_rejects_an_unescaped_slash_in_the_password (0.00s)
+=== RUN   TestConnectErrorKeepsTheDriverCauseForErrorsIs
+--- PASS: TestConnectErrorKeepsTheDriverCauseForErrorsIs (0.00s)
+=== RUN   TestConnectAndCloseRoundTrip
+--- PASS: TestConnectAndCloseRoundTrip (0.00s)
+=== RUN   TestEnsureIndexesIsIdempotent
+2026/11/01 15:50:38 INFO mongodb indexes ready created="[author_1_language_1_publication_year_1 language_1 publication_year_1]" posting_indexes_created=[postings.book_id_1]
+2026/11/01 15:50:38 INFO mongodb indexes ready created="[author_1_language_1_publication_year_1 language_1 publication_year_1]" posting_indexes_created=[postings.book_id_1]
+--- PASS: TestEnsureIndexesIsIdempotent (0.13s)
+=== RUN   TestConfigFromEnvironmentUsesDefaultsWhenUnset
+--- PASS: TestConfigFromEnvironmentUsesDefaultsWhenUnset (0.00s)
+=== RUN   TestConfigFromEnvironmentHonoursOverrides
+--- PASS: TestConfigFromEnvironmentHonoursOverrides (0.00s)
+=== RUN   TestPostingsForTermsReturnsMatchingTermsOrderedByTerm
+--- PASS: TestPostingsForTermsReturnsMatchingTermsOrderedByTerm (0.07s)
+=== RUN   TestPostingsForTermsWithOnlyUnknownTermsReturnsEmptyList
+--- PASS: TestPostingsForTermsWithOnlyUnknownTermsReturnsEmptyList (0.07s)
+=== RUN   TestPostingsForTermsWithoutTermsReturnsEmptyList
+--- PASS: TestPostingsForTermsWithoutTermsReturnsEmptyList (0.00s)
+=== RUN   TestBooksByIDReturnsMetadataOrderedByBookID
+--- PASS: TestBooksByIDReturnsMetadataOrderedByBookID (0.08s)
+=== RUN   TestBooksWithoutMatchesReturnsEmptyList
+--- PASS: TestBooksWithoutMatchesReturnsEmptyList (0.01s)
+=== RUN   TestBooksWithoutIDsReturnsEmptyList
+--- PASS: TestBooksWithoutIDsReturnsEmptyList (0.00s)
+=== RUN   TestAcquireRebuildLockExcludesAnotherReplica
+--- PASS: TestAcquireRebuildLockExcludesAnotherReplica (0.03s)
+=== RUN   TestReleaseLetsAnotherReplicaRebuild
+--- PASS: TestReleaseLetsAnotherReplicaRebuild (0.04s)
+=== RUN   TestExpiredRebuildLockIsTakenOver
+--- PASS: TestExpiredRebuildLockIsTakenOver (0.03s)
+=== RUN   TestReleaseKeepsALockOwnedByAnotherReplica
+--- PASS: TestReleaseKeepsALockOwnedByAnotherReplica (0.04s)
+=== RUN   TestRebuildSwapsInNewDatamart
+--- PASS: TestRebuildSwapsInNewDatamart (0.31s)
+=== RUN   TestRebuildStopsWhenTheStreamFails
+--- PASS: TestRebuildStopsWhenTheStreamFails (0.17s)
+=== RUN   TestRebuildLeavesNoTemporaryCollections
+--- PASS: TestRebuildLeavesNoTemporaryCollections (0.17s)
+=== RUN   TestRebuildIsIdempotent
+--- PASS: TestRebuildIsIdempotent (0.31s)
+=== RUN   TestRebuildWithNoBooksClearsTheDatamart
+--- PASS: TestRebuildWithNoBooksClearsTheDatamart (0.13s)
+=== RUN   TestSearchBooksRanksByTermFrequency
+--- PASS: TestSearchBooksRanksByTermFrequency (0.06s)
+=== RUN   TestSearchBooksBreaksRelevanceTiesByBookID
+--- PASS: TestSearchBooksBreaksRelevanceTiesByBookID (0.06s)
+=== RUN   TestSearchBooksPaginatesWithoutChangingTotal
+--- PASS: TestSearchBooksPaginatesWithoutChangingTotal (0.06s)
+=== RUN   TestSearchBooksWithholdsPendingBooks
+--- PASS: TestSearchBooksWithholdsPendingBooks (0.05s)
+=== RUN   TestSearchBooksFiltersByLanguageList
+--- PASS: TestSearchBooksFiltersByLanguageList (0.06s)
+=== RUN   TestSearchBooksFiltersByAuthorIgnoringCaseAndSubstring
+--- PASS: TestSearchBooksFiltersByAuthorIgnoringCaseAndSubstring (0.06s)
+=== RUN   TestSearchBooksFiltersByExactYear
+--- PASS: TestSearchBooksFiltersByExactYear (0.05s)
+=== RUN   TestSearchBooksCombinesFiltersAsConjunction
+--- PASS: TestSearchBooksCombinesFiltersAsConjunction (0.05s)
+=== RUN   TestSearchBooksRequiresEveryTerm
+=== RUN   TestSearchBooksRequiresEveryTerm/two_terms_shared_by_one_book
+=== RUN   TestSearchBooksRequiresEveryTerm/term_order_does_not_matter
+=== RUN   TestSearchBooksRequiresEveryTerm/a_term_only_another_book_has
+=== RUN   TestSearchBooksRequiresEveryTerm/three_terms
+=== RUN   TestSearchBooksRequiresEveryTerm/terms_no_single_book_shares
+=== RUN   TestSearchBooksRequiresEveryTerm/a_term_the_index_lacks
+=== RUN   TestSearchBooksRequiresEveryTerm/repeated_term_counts_once
+=== RUN   TestSearchBooksRequiresEveryTerm/pending_book_stays_hidden
+--- PASS: TestSearchBooksRequiresEveryTerm (0.06s)
+    --- PASS: TestSearchBooksRequiresEveryTerm/two_terms_shared_by_one_book (0.00s)
+    --- PASS: TestSearchBooksRequiresEveryTerm/term_order_does_not_matter (0.00s)
+    --- PASS: TestSearchBooksRequiresEveryTerm/a_term_only_another_book_has (0.00s)
+    --- PASS: TestSearchBooksRequiresEveryTerm/three_terms (0.00s)
+    --- PASS: TestSearchBooksRequiresEveryTerm/terms_no_single_book_shares (0.00s)
+    --- PASS: TestSearchBooksRequiresEveryTerm/a_term_the_index_lacks (0.00s)
+    --- PASS: TestSearchBooksRequiresEveryTerm/repeated_term_counts_once (0.00s)
+    --- PASS: TestSearchBooksRequiresEveryTerm/pending_book_stays_hidden (0.00s)
+=== RUN   TestSearchBooksRanksMultiTermMatchesBySummedFrequency
+--- PASS: TestSearchBooksRanksMultiTermMatchesBySummedFrequency (0.06s)
+=== RUN   TestSearchBooksWithUnknownTermReturnsEmptyList
+--- PASS: TestSearchBooksWithUnknownTermReturnsEmptyList (0.05s)
+=== RUN   TestSearchBooksRejectsInvalidRequests
+=== RUN   TestSearchBooksRejectsInvalidRequests/no_terms
+=== RUN   TestSearchBooksRejectsInvalidRequests/empty_term_among_terms
+=== RUN   TestSearchBooksRejectsInvalidRequests/negative_offset
+=== RUN   TestSearchBooksRejectsInvalidRequests/zero_limit
+=== RUN   TestSearchBooksRejectsInvalidRequests/negative_year
+--- PASS: TestSearchBooksRejectsInvalidRequests (0.00s)
+    --- PASS: TestSearchBooksRejectsInvalidRequests/no_terms (0.00s)
+    --- PASS: TestSearchBooksRejectsInvalidRequests/empty_term_among_terms (0.00s)
+    --- PASS: TestSearchBooksRejectsInvalidRequests/negative_offset (0.00s)
+    --- PASS: TestSearchBooksRejectsInvalidRequests/zero_limit (0.00s)
+    --- PASS: TestSearchBooksRejectsInvalidRequests/negative_year (0.00s)
+PASS
+ok  	boogle-engine/internal/mongodb	3.585s
+?   	boogle-engine/test/load	[no test files]

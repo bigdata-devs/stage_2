@@ -1,0 +1,407 @@
+ Container boogle-engine-ingestion-1  Running
+ Container boogle-engine-mongo-1  Running
+ Container boogle-engine-indexing-1  Running
+ Container boogle-engine-mongo-1  Waiting
+ Container boogle-engine-mongo-1  Healthy
+time=2026-10-29T23:13:16.494Z level=INFO msg="[CONTROL] starting run" books=100 workers=2 state_dir=/data/control
+time=2026-10-29T23:13:16.494Z level=INFO msg="[CONTROL] processing book" book_id=101
+time=2026-10-29T23:13:16.494Z level=INFO msg="[CONTROL] processing book" book_id=102
+time=2026-10-29T23:13:17.561Z level=INFO msg="[CONTROL] ingest step finished" book_id=102 duration=1.066072932s
+time=2026-10-29T23:13:17.581Z level=INFO msg="[CONTROL] ingest step finished" book_id=101 duration=1.086338031s
+time=2026-10-29T23:13:19.813Z level=INFO msg="[CONTROL] index step finished" book_id=102 duration=2.252686156s
+time=2026-10-29T23:13:19.813Z level=INFO msg="[CONTROL] book indexed" book_id=102
+time=2026-10-29T23:13:19.813Z level=INFO msg="[CONTROL] processing book" book_id=103
+time=2026-10-29T23:13:20.427Z level=INFO msg="[CONTROL] ingest step finished" book_id=103 duration=613.08696ms
+time=2026-10-29T23:13:20.956Z level=INFO msg="[CONTROL] index step finished" book_id=101 duration=3.375276208s
+time=2026-10-29T23:13:20.956Z level=INFO msg="[CONTROL] book indexed" book_id=101
+time=2026-10-29T23:13:20.956Z level=INFO msg="[CONTROL] processing book" book_id=104
+time=2026-10-29T23:13:21.122Z level=INFO msg="[CONTROL] ingest step finished" book_id=104 duration=165.853199ms
+time=2026-10-29T23:13:21.412Z level=INFO msg="[CONTROL] index step finished" book_id=104 duration=289.437798ms
+time=2026-10-29T23:13:21.412Z level=INFO msg="[CONTROL] book indexed" book_id=104
+time=2026-10-29T23:13:21.412Z level=INFO msg="[CONTROL] processing book" book_id=105
+time=2026-10-29T23:13:21.889Z level=INFO msg="[CONTROL] ingest step finished" book_id=105 duration=477.115398ms
+time=2026-10-29T23:13:22.782Z level=INFO msg="[CONTROL] index step finished" book_id=103 duration=2.35568748s
+time=2026-10-29T23:13:22.782Z level=INFO msg="[CONTROL] book indexed" book_id=103
+time=2026-10-29T23:13:22.782Z level=INFO msg="[CONTROL] processing book" book_id=106
+time=2026-10-29T23:13:23.247Z level=INFO msg="[CONTROL] ingest step finished" book_id=106 duration=464.337398ms
+time=2026-10-29T23:13:24.135Z level=INFO msg="[CONTROL] index step finished" book_id=105 duration=2.245955986s
+time=2026-10-29T23:13:24.135Z level=INFO msg="[CONTROL] book indexed" book_id=105
+time=2026-10-29T23:13:24.135Z level=INFO msg="[CONTROL] processing book" book_id=107
+time=2026-10-29T23:13:24.862Z level=INFO msg="[CONTROL] ingest step finished" book_id=107 duration=726.954196ms
+time=2026-10-29T23:13:25.701Z level=INFO msg="[CONTROL] index step finished" book_id=106 duration=2.454371785s
+time=2026-10-29T23:13:25.701Z level=INFO msg="[CONTROL] book indexed" book_id=106
+time=2026-10-29T23:13:25.701Z level=INFO msg="[CONTROL] processing book" book_id=108
+time=2026-10-29T23:13:26.035Z level=INFO msg="[CONTROL] ingest step finished" book_id=108 duration=333.324298ms
+time=2026-10-29T23:13:28.678Z level=INFO msg="[CONTROL] index step finished" book_id=107 duration=3.816318878s
+time=2026-10-29T23:13:28.679Z level=INFO msg="[CONTROL] book indexed" book_id=107
+time=2026-10-29T23:13:28.679Z level=INFO msg="[CONTROL] processing book" book_id=109
+time=2026-10-29T23:13:28.978Z level=INFO msg="[CONTROL] ingest step finished" book_id=109 duration=299.2636ms
+time=2026-10-29T23:13:29.005Z level=INFO msg="[CONTROL] index step finished" book_id=108 duration=2.969849085s
+time=2026-10-29T23:13:29.005Z level=INFO msg="[CONTROL] book indexed" book_id=108
+time=2026-10-29T23:13:29.005Z level=INFO msg="[CONTROL] processing book" book_id=110
+time=2026-10-29T23:13:29.611Z level=INFO msg="[CONTROL] ingest step finished" book_id=110 duration=606.2001ms
+time=2026-10-29T23:13:29.675Z level=INFO msg="[CONTROL] index step finished" book_id=109 duration=697.3609ms
+time=2026-10-29T23:13:29.675Z level=INFO msg="[CONTROL] book indexed" book_id=109
+time=2026-10-29T23:13:29.675Z level=INFO msg="[CONTROL] processing book" book_id=111
+time=2026-10-29T23:13:29.895Z level=INFO msg="[CONTROL] ingest step finished" book_id=111 duration=219.1658ms
+time=2026-10-29T23:13:32.603Z level=INFO msg="[CONTROL] index step finished" book_id=111 duration=2.707904s
+time=2026-10-29T23:13:32.603Z level=INFO msg="[CONTROL] book indexed" book_id=111
+time=2026-10-29T23:13:32.603Z level=INFO msg="[CONTROL] processing book" book_id=112
+time=2026-10-29T23:13:33.056Z level=INFO msg="[CONTROL] ingest step finished" book_id=112 duration=453.0894ms
+time=2026-10-29T23:13:33.862Z level=INFO msg="[CONTROL] index step finished" book_id=110 duration=4.2515244s
+time=2026-10-29T23:13:33.862Z level=INFO msg="[CONTROL] book indexed" book_id=110
+time=2026-10-29T23:13:33.863Z level=INFO msg="[CONTROL] processing book" book_id=113
+time=2026-10-29T23:13:34.479Z level=INFO msg="[CONTROL] ingest step finished" book_id=113 duration=616.22ms
+time=2026-10-29T23:13:34.534Z level=INFO msg="[CONTROL] index step finished" book_id=112 duration=1.4778887s
+time=2026-10-29T23:13:34.534Z level=INFO msg="[CONTROL] book indexed" book_id=112
+time=2026-10-29T23:13:34.534Z level=INFO msg="[CONTROL] processing book" book_id=114
+time=2026-10-29T23:13:34.688Z level=WARN msg="[CONTROL] transient failure, retrying" step="ingest book" attempt=1 backoff=1s error="transient service error: POST http://ingestion:7001/ingest/114 answered 503 Service Unavailable: {\"book_id\":114,\"status\":\"unavailable\"}"
+time=2026-10-29T23:13:35.833Z level=WARN msg="[CONTROL] transient failure, retrying" step="ingest book" attempt=2 backoff=2s error="transient service error: POST http://ingestion:7001/ingest/114 answered 503 Service Unavailable: {\"book_id\":114,\"status\":\"unavailable\"}"
+time=2026-10-29T23:13:36.432Z level=INFO msg="[CONTROL] index step finished" book_id=113 duration=1.9533476s
+time=2026-10-29T23:13:36.432Z level=INFO msg="[CONTROL] book indexed" book_id=113
+time=2026-10-29T23:13:36.432Z level=INFO msg="[CONTROL] processing book" book_id=115
+time=2026-10-29T23:13:37.465Z level=INFO msg="[CONTROL] ingest step finished" book_id=115 duration=1.032729001s
+time=2026-10-29T23:13:37.634Z level=INFO msg="[CONTROL] index step finished" book_id=115 duration=168.617001ms
+time=2026-10-29T23:13:37.634Z level=INFO msg="[CONTROL] book indexed" book_id=115
+time=2026-10-29T23:13:37.634Z level=INFO msg="[CONTROL] processing book" book_id=116
+time=2026-10-29T23:13:37.791Z level=WARN msg="[CONTROL] transient failure, retrying" step="ingest book" attempt=1 backoff=1s error="transient service error: POST http://ingestion:7001/ingest/116 answered 503 Service Unavailable: {\"book_id\":116,\"status\":\"unavailable\"}"
+time=2026-10-29T23:13:37.975Z level=WARN msg="[CONTROL] book failed" book_id=114 error="ingest book failed after 3 attempts: transient service error: POST http://ingestion:7001/ingest/114 answered 503 Service Unavailable: {\"book_id\":114,\"status\":\"unavailable\"}"
+time=2026-10-29T23:13:37.975Z level=INFO msg="[CONTROL] processing book" book_id=117
+time=2026-10-29T23:13:38.135Z level=INFO msg="[CONTROL] ingest step finished" book_id=117 duration=160.791301ms
+time=2026-10-29T23:13:38.146Z level=INFO msg="[CONTROL] index step finished" book_id=117 duration=10.44ms
+time=2026-10-29T23:13:38.146Z level=INFO msg="[CONTROL] book indexed" book_id=117
+time=2026-10-29T23:13:38.146Z level=INFO msg="[CONTROL] processing book" book_id=118
+time=2026-10-29T23:13:38.357Z level=INFO msg="[CONTROL] ingest step finished" book_id=118 duration=210.4904ms
+time=2026-10-29T23:13:38.937Z level=WARN msg="[CONTROL] transient failure, retrying" step="ingest book" attempt=2 backoff=2s error="transient service error: POST http://ingestion:7001/ingest/116 answered 503 Service Unavailable: {\"book_id\":116,\"status\":\"unavailable\"}"
+time=2026-10-29T23:13:40.111Z level=INFO msg="[CONTROL] index step finished" book_id=118 duration=1.754309703s
+time=2026-10-29T23:13:40.111Z level=INFO msg="[CONTROL] book indexed" book_id=118
+time=2026-10-29T23:13:40.111Z level=INFO msg="[CONTROL] processing book" book_id=119
+time=2026-10-29T23:13:40.875Z level=INFO msg="[CONTROL] ingest step finished" book_id=119 duration=763.703802ms
+time=2026-10-29T23:13:41.085Z level=WARN msg="[CONTROL] book failed" book_id=116 error="ingest book failed after 3 attempts: transient service error: POST http://ingestion:7001/ingest/116 answered 503 Service Unavailable: {\"book_id\":116,\"status\":\"unavailable\"}"
+time=2026-10-29T23:13:41.085Z level=INFO msg="[CONTROL] processing book" book_id=120
+time=2026-10-29T23:13:41.285Z level=INFO msg="[CONTROL] ingest step finished" book_id=120 duration=199.4512ms
+time=2026-10-29T23:13:43.905Z level=INFO msg="[CONTROL] index step finished" book_id=120 duration=2.620332705s
+time=2026-10-29T23:13:43.905Z level=INFO msg="[CONTROL] book indexed" book_id=120
+time=2026-10-29T23:13:43.905Z level=INFO msg="[CONTROL] processing book" book_id=121
+time=2026-10-29T23:13:44.506Z level=INFO msg="[CONTROL] ingest step finished" book_id=121 duration=600.437601ms
+time=2026-10-29T23:13:45.423Z level=INFO msg="[CONTROL] index step finished" book_id=119 duration=4.548094609s
+time=2026-10-29T23:13:45.423Z level=INFO msg="[CONTROL] book indexed" book_id=119
+time=2026-10-29T23:13:45.423Z level=INFO msg="[CONTROL] processing book" book_id=122
+time=2026-10-29T23:13:46.057Z level=INFO msg="[CONTROL] ingest step finished" book_id=122 duration=633.691502ms
+time=2026-10-29T23:13:46.967Z level=INFO msg="[CONTROL] index step finished" book_id=121 duration=2.460914708s
+time=2026-10-29T23:13:46.967Z level=INFO msg="[CONTROL] book indexed" book_id=121
+time=2026-10-29T23:13:46.967Z level=INFO msg="[CONTROL] processing book" book_id=123
+time=2026-10-29T23:13:47.293Z level=INFO msg="[CONTROL] ingest step finished" book_id=123 duration=326.186701ms
+time=2026-10-29T23:13:49.698Z level=INFO msg="[CONTROL] index step finished" book_id=123 duration=2.404831108s
+time=2026-10-29T23:13:49.698Z level=INFO msg="[CONTROL] book indexed" book_id=123
+time=2026-10-29T23:13:49.698Z level=INFO msg="[CONTROL] processing book" book_id=124
+time=2026-10-29T23:13:49.909Z level=INFO msg="[CONTROL] index step finished" book_id=122 duration=3.852249613s
+time=2026-10-29T23:13:49.909Z level=INFO msg="[CONTROL] book indexed" book_id=122
+time=2026-10-29T23:13:49.909Z level=INFO msg="[CONTROL] processing book" book_id=125
+time=2026-10-29T23:13:50.456Z level=INFO msg="[CONTROL] ingest step finished" book_id=124 duration=757.901702ms
+time=2026-10-29T23:13:50.591Z level=INFO msg="[CONTROL] ingest step finished" book_id=125 duration=682.179102ms
+time=2026-10-29T23:13:52.900Z level=INFO msg="[CONTROL] index step finished" book_id=124 duration=2.44372811s
+time=2026-10-29T23:13:52.900Z level=INFO msg="[CONTROL] book indexed" book_id=124
+time=2026-10-29T23:13:52.900Z level=INFO msg="[CONTROL] processing book" book_id=126
+time=2026-10-29T23:13:53.351Z level=INFO msg="[CONTROL] ingest step finished" book_id=126 duration=451.346204ms
+time=2026-10-29T23:13:53.510Z level=INFO msg="[CONTROL] index step finished" book_id=125 duration=2.918945415s
+time=2026-10-29T23:13:53.510Z level=INFO msg="[CONTROL] book indexed" book_id=125
+time=2026-10-29T23:13:53.510Z level=INFO msg="[CONTROL] processing book" book_id=127
+time=2026-10-29T23:13:53.971Z level=WARN msg="[CONTROL] transient failure, retrying" step="ingest book" attempt=1 backoff=1s error="transient service error: POST http://ingestion:7001/ingest/127 answered 503 Service Unavailable: {\"book_id\":127,\"status\":\"unavailable\"}"
+time=2026-10-29T23:13:55.257Z level=INFO msg="[CONTROL] index step finished" book_id=126 duration=1.905799617s
+time=2026-10-29T23:13:55.257Z level=INFO msg="[CONTROL] book indexed" book_id=126
+time=2026-10-29T23:13:55.257Z level=INFO msg="[CONTROL] processing book" book_id=128
+time=2026-10-29T23:13:55.466Z level=WARN msg="[CONTROL] transient failure, retrying" step="ingest book" attempt=2 backoff=2s error="transient service error: POST http://ingestion:7001/ingest/127 answered 503 Service Unavailable: {\"book_id\":127,\"status\":\"unavailable\"}"
+time=2026-10-29T23:13:55.634Z level=INFO msg="[CONTROL] ingest step finished" book_id=128 duration=376.545603ms
+time=2026-10-29T23:13:58.199Z level=INFO msg="[CONTROL] index step finished" book_id=128 duration=2.565685222s
+time=2026-10-29T23:13:58.199Z level=INFO msg="[CONTROL] book indexed" book_id=128
+time=2026-10-29T23:13:58.199Z level=INFO msg="[CONTROL] processing book" book_id=129
+time=2026-10-29T23:13:58.213Z level=WARN msg="[CONTROL] book failed" book_id=127 error="ingest book failed after 3 attempts: transient service error: POST http://ingestion:7001/ingest/127 answered 503 Service Unavailable: {\"book_id\":127,\"status\":\"unavailable\"}"
+time=2026-10-29T23:13:58.213Z level=INFO msg="[CONTROL] processing book" book_id=130
+time=2026-10-29T23:13:58.359Z level=WARN msg="[CONTROL] transient failure, retrying" step="ingest book" attempt=1 backoff=1s error="transient service error: POST http://ingestion:7001/ingest/129 answered 503 Service Unavailable: {\"book_id\":129,\"status\":\"unavailable\"}"
+time=2026-10-29T23:13:58.417Z level=INFO msg="[CONTROL] ingest step finished" book_id=130 duration=203.708602ms
+time=2026-10-29T23:13:59.501Z level=WARN msg="[CONTROL] transient failure, retrying" step="ingest book" attempt=2 backoff=2s error="transient service error: POST http://ingestion:7001/ingest/129 answered 503 Service Unavailable: {\"book_id\":129,\"status\":\"unavailable\"}"
+time=2026-10-29T23:14:00.969Z level=INFO msg="[CONTROL] index step finished" book_id=130 duration=2.552519324s
+time=2026-10-29T23:14:00.969Z level=INFO msg="[CONTROL] book indexed" book_id=130
+time=2026-10-29T23:14:00.969Z level=INFO msg="[CONTROL] processing book" book_id=131
+time=2026-10-29T23:14:01.585Z level=INFO msg="[CONTROL] ingest step finished" book_id=131 duration=615.282107ms
+time=2026-10-29T23:14:01.710Z level=WARN msg="[CONTROL] book failed" book_id=129 error="ingest book failed after 3 attempts: transient service error: POST http://ingestion:7001/ingest/129 answered 503 Service Unavailable: {\"book_id\":129,\"status\":\"unavailable\"}"
+time=2026-10-29T23:14:01.710Z level=INFO msg="[CONTROL] processing book" book_id=132
+time=2026-10-29T23:14:01.909Z level=INFO msg="[CONTROL] ingest step finished" book_id=132 duration=199.007802ms
+time=2026-10-29T23:14:03.521Z level=INFO msg="[CONTROL] index step finished" book_id=131 duration=1.936169825s
+time=2026-10-29T23:14:03.521Z level=INFO msg="[CONTROL] book indexed" book_id=131
+time=2026-10-29T23:14:03.521Z level=INFO msg="[CONTROL] processing book" book_id=133
+time=2026-10-29T23:14:04.259Z level=INFO msg="[CONTROL] ingest step finished" book_id=133 duration=737.989609ms
+time=2026-10-29T23:14:04.524Z level=INFO msg="[CONTROL] index step finished" book_id=132 duration=2.614998233s
+time=2026-10-29T23:14:04.524Z level=INFO msg="[CONTROL] book indexed" book_id=132
+time=2026-10-29T23:14:04.524Z level=INFO msg="[CONTROL] processing book" book_id=134
+time=2026-10-29T23:14:04.720Z level=INFO msg="[CONTROL] ingest step finished" book_id=134 duration=195.206002ms
+time=2026-10-29T23:14:07.296Z level=INFO msg="[CONTROL] index step finished" book_id=134 duration=2.576189532s
+time=2026-10-29T23:14:07.296Z level=INFO msg="[CONTROL] book indexed" book_id=134
+time=2026-10-29T23:14:07.296Z level=INFO msg="[CONTROL] processing book" book_id=135
+time=2026-10-29T23:14:08.315Z level=INFO msg="[CONTROL] index step finished" book_id=133 duration=4.05618695s
+time=2026-10-29T23:14:08.315Z level=INFO msg="[CONTROL] book indexed" book_id=133
+time=2026-10-29T23:14:08.315Z level=INFO msg="[CONTROL] processing book" book_id=136
+time=2026-10-29T23:14:08.380Z level=INFO msg="[CONTROL] ingest step finished" book_id=135 duration=1.084177414s
+time=2026-10-29T23:14:08.500Z level=INFO msg="[CONTROL] ingest step finished" book_id=136 duration=185.227602ms
+time=2026-10-29T23:14:09.346Z level=INFO msg="[CONTROL] index step finished" book_id=136 duration=845.25051ms
+time=2026-10-29T23:14:09.346Z level=INFO msg="[CONTROL] book indexed" book_id=136
+time=2026-10-29T23:14:09.346Z level=INFO msg="[CONTROL] processing book" book_id=137
+time=2026-10-29T23:14:09.517Z level=INFO msg="[CONTROL] ingest step finished" book_id=137 duration=171.464702ms
+time=2026-10-29T23:14:10.565Z level=INFO msg="[CONTROL] index step finished" book_id=137 duration=1.047197811s
+time=2026-10-29T23:14:10.565Z level=INFO msg="[CONTROL] book indexed" book_id=137
+time=2026-10-29T23:14:10.565Z level=INFO msg="[CONTROL] processing book" book_id=138
+time=2026-10-29T23:14:11.014Z level=INFO msg="[CONTROL] ingest step finished" book_id=138 duration=449.027905ms
+time=2026-10-29T23:14:14.047Z level=INFO msg="[CONTROL] index step finished" book_id=138 duration=3.033411134s
+time=2026-10-29T23:14:14.047Z level=INFO msg="[CONTROL] book indexed" book_id=138
+time=2026-10-29T23:14:14.047Z level=INFO msg="[CONTROL] processing book" book_id=139
+time=2026-10-29T23:14:14.660Z level=INFO msg="[CONTROL] ingest step finished" book_id=139 duration=612.743906ms
+time=2026-10-29T23:14:15.543Z level=INFO msg="[CONTROL] index step finished" book_id=135 duration=7.162853879s
+time=2026-10-29T23:14:15.543Z level=INFO msg="[CONTROL] book indexed" book_id=135
+time=2026-10-29T23:14:15.543Z level=INFO msg="[CONTROL] processing book" book_id=140
+time=2026-10-29T23:14:16.163Z level=INFO msg="[CONTROL] ingest step finished" book_id=140 duration=620.022907ms
+time=2026-10-29T23:14:17.979Z level=INFO msg="[CONTROL] index step finished" book_id=139 duration=3.318580936s
+time=2026-10-29T23:14:17.979Z level=INFO msg="[CONTROL] book indexed" book_id=139
+time=2026-10-29T23:14:17.979Z level=INFO msg="[CONTROL] processing book" book_id=141
+time=2026-10-29T23:14:18.826Z level=INFO msg="[CONTROL] ingest step finished" book_id=141 duration=847.492108ms
+time=2026-10-29T23:14:20.201Z level=INFO msg="[CONTROL] index step finished" book_id=140 duration=4.038169742s
+time=2026-10-29T23:14:20.202Z level=INFO msg="[CONTROL] book indexed" book_id=140
+time=2026-10-29T23:14:20.202Z level=INFO msg="[CONTROL] processing book" book_id=142
+time=2026-10-29T23:14:20.806Z level=INFO msg="[CONTROL] ingest step finished" book_id=142 duration=604.518806ms
+time=2026-10-29T23:14:22.104Z level=INFO msg="[CONTROL] index step finished" book_id=141 duration=3.277687734s
+time=2026-10-29T23:14:22.104Z level=INFO msg="[CONTROL] book indexed" book_id=141
+time=2026-10-29T23:14:22.104Z level=INFO msg="[CONTROL] processing book" book_id=143
+time=2026-10-29T23:14:22.853Z level=INFO msg="[CONTROL] ingest step finished" book_id=143 duration=748.356508ms
+time=2026-10-29T23:14:24.810Z level=INFO msg="[CONTROL] index step finished" book_id=142 duration=4.003455741s
+time=2026-10-29T23:14:24.810Z level=INFO msg="[CONTROL] book indexed" book_id=142
+time=2026-10-29T23:14:24.810Z level=INFO msg="[CONTROL] processing book" book_id=144
+time=2026-10-29T23:14:25.591Z level=INFO msg="[CONTROL] ingest step finished" book_id=144 duration=780.887307ms
+time=2026-10-29T23:14:27.017Z level=INFO msg="[CONTROL] index step finished" book_id=143 duration=4.164204941s
+time=2026-10-29T23:14:27.017Z level=INFO msg="[CONTROL] book indexed" book_id=143
+time=2026-10-29T23:14:27.017Z level=INFO msg="[CONTROL] processing book" book_id=145
+time=2026-10-29T23:14:27.907Z level=INFO msg="[CONTROL] ingest step finished" book_id=145 duration=890.239009ms
+time=2026-10-29T23:14:29.514Z level=INFO msg="[CONTROL] index step finished" book_id=144 duration=3.923583038s
+time=2026-10-29T23:14:29.514Z level=INFO msg="[CONTROL] book indexed" book_id=144
+time=2026-10-29T23:14:29.514Z level=INFO msg="[CONTROL] processing book" book_id=146
+time=2026-10-29T23:14:29.982Z level=INFO msg="[CONTROL] ingest step finished" book_id=146 duration=467.726005ms
+time=2026-10-29T23:14:32.421Z level=INFO msg="[CONTROL] index step finished" book_id=146 duration=2.438507223s
+time=2026-10-29T23:14:32.421Z level=INFO msg="[CONTROL] book indexed" book_id=146
+time=2026-10-29T23:14:32.421Z level=INFO msg="[CONTROL] processing book" book_id=147
+time=2026-10-29T23:14:32.862Z level=INFO msg="[CONTROL] ingest step finished" book_id=147 duration=441.136504ms
+time=2026-10-29T23:14:33.666Z level=INFO msg="[CONTROL] index step finished" book_id=145 duration=5.759012554s
+time=2026-10-29T23:14:33.666Z level=INFO msg="[CONTROL] book indexed" book_id=145
+time=2026-10-29T23:14:33.666Z level=INFO msg="[CONTROL] processing book" book_id=148
+time=2026-10-29T23:14:34.268Z level=INFO msg="[CONTROL] ingest step finished" book_id=148 duration=601.622506ms
+time=2026-10-29T23:14:34.408Z level=INFO msg="[CONTROL] index step finished" book_id=147 duration=1.545587814s
+time=2026-10-29T23:14:34.408Z level=INFO msg="[CONTROL] book indexed" book_id=147
+time=2026-10-29T23:14:34.408Z level=INFO msg="[CONTROL] processing book" book_id=149
+time=2026-10-29T23:14:34.588Z level=INFO msg="[CONTROL] ingest step finished" book_id=149 duration=179.840901ms
+time=2026-10-29T23:14:36.985Z level=INFO msg="[CONTROL] index step finished" book_id=149 duration=2.397760221s
+time=2026-10-29T23:14:36.985Z level=INFO msg="[CONTROL] book indexed" book_id=149
+time=2026-10-29T23:14:36.985Z level=INFO msg="[CONTROL] processing book" book_id=150
+time=2026-10-29T23:14:37.108Z level=INFO msg="[CONTROL] index step finished" book_id=148 duration=2.839837624s
+time=2026-10-29T23:14:37.108Z level=INFO msg="[CONTROL] book indexed" book_id=148
+time=2026-10-29T23:14:37.108Z level=INFO msg="[CONTROL] processing book" book_id=151
+time=2026-10-29T23:14:37.727Z level=INFO msg="[CONTROL] ingest step finished" book_id=151 duration=619.449806ms
+time=2026-10-29T23:14:37.730Z level=INFO msg="[CONTROL] ingest step finished" book_id=150 duration=744.432707ms
+time=2026-10-29T23:14:38.333Z level=INFO msg="[CONTROL] index step finished" book_id=151 duration=605.100305ms
+time=2026-10-29T23:14:38.333Z level=INFO msg="[CONTROL] book indexed" book_id=151
+time=2026-10-29T23:14:38.333Z level=INFO msg="[CONTROL] processing book" book_id=152
+time=2026-10-29T23:14:38.700Z level=INFO msg="[CONTROL] ingest step finished" book_id=152 duration=367.495403ms
+time=2026-10-29T23:14:41.020Z level=INFO msg="[CONTROL] index step finished" book_id=150 duration=3.289696962s
+time=2026-10-29T23:14:41.020Z level=INFO msg="[CONTROL] book indexed" book_id=150
+time=2026-10-29T23:14:41.020Z level=INFO msg="[CONTROL] processing book" book_id=153
+time=2026-10-29T23:14:41.288Z level=INFO msg="[CONTROL] index step finished" book_id=152 duration=2.587684307s
+time=2026-10-29T23:14:41.288Z level=INFO msg="[CONTROL] book indexed" book_id=152
+time=2026-10-29T23:14:41.288Z level=INFO msg="[CONTROL] processing book" book_id=154
+time=2026-10-29T23:14:41.861Z level=INFO msg="[CONTROL] ingest step finished" book_id=153 duration=841.339152ms
+time=2026-10-29T23:14:42.010Z level=INFO msg="[CONTROL] ingest step finished" book_id=154 duration=721.625273ms
+time=2026-10-29T23:14:45.580Z level=INFO msg="[CONTROL] index step finished" book_id=154 duration=3.570817573s
+time=2026-10-29T23:14:45.581Z level=INFO msg="[CONTROL] book indexed" book_id=154
+time=2026-10-29T23:14:45.581Z level=INFO msg="[CONTROL] processing book" book_id=155
+time=2026-10-29T23:14:46.207Z level=INFO msg="[CONTROL] index step finished" book_id=153 duration=4.346149737s
+time=2026-10-29T23:14:46.207Z level=INFO msg="[CONTROL] book indexed" book_id=153
+time=2026-10-29T23:14:46.207Z level=INFO msg="[CONTROL] processing book" book_id=156
+time=2026-10-29T23:14:46.342Z level=INFO msg="[CONTROL] ingest step finished" book_id=155 duration=761.950867ms
+time=2026-10-29T23:14:46.358Z level=INFO msg="[CONTROL] ingest step finished" book_id=156 duration=150.600674ms
+time=2026-10-29T23:14:46.372Z level=INFO msg="[CONTROL] index step finished" book_id=156 duration=14.295597ms
+time=2026-10-29T23:14:46.372Z level=INFO msg="[CONTROL] book indexed" book_id=156
+time=2026-10-29T23:14:46.372Z level=INFO msg="[CONTROL] processing book" book_id=157
+time=2026-10-29T23:14:46.560Z level=INFO msg="[CONTROL] ingest step finished" book_id=157 duration=187.984567ms
+time=2026-10-29T23:14:48.792Z level=INFO msg="[CONTROL] index step finished" book_id=157 duration=2.231445328s
+time=2026-10-29T23:14:48.792Z level=INFO msg="[CONTROL] book indexed" book_id=157
+time=2026-10-29T23:14:48.792Z level=INFO msg="[CONTROL] processing book" book_id=158
+time=2026-10-29T23:14:49.588Z level=INFO msg="[CONTROL] ingest step finished" book_id=158 duration=795.490988ms
+time=2026-10-29T23:14:50.204Z level=INFO msg="[CONTROL] index step finished" book_id=155 duration=3.861917769s
+time=2026-10-29T23:14:50.205Z level=INFO msg="[CONTROL] book indexed" book_id=155
+time=2026-10-29T23:14:50.205Z level=INFO msg="[CONTROL] processing book" book_id=159
+time=2026-10-29T23:14:50.513Z level=INFO msg="[CONTROL] ingest step finished" book_id=159 duration=308.806195ms
+time=2026-10-29T23:14:52.871Z level=INFO msg="[CONTROL] index step finished" book_id=158 duration=3.282964154s
+time=2026-10-29T23:14:52.871Z level=INFO msg="[CONTROL] book indexed" book_id=158
+time=2026-10-29T23:14:52.871Z level=INFO msg="[CONTROL] processing book" book_id=160
+time=2026-10-29T23:14:53.053Z level=INFO msg="[CONTROL] index step finished" book_id=159 duration=2.539068064s
+time=2026-10-29T23:14:53.053Z level=INFO msg="[CONTROL] book indexed" book_id=159
+time=2026-10-29T23:14:53.053Z level=INFO msg="[CONTROL] processing book" book_id=161
+time=2026-10-29T23:14:53.510Z level=INFO msg="[CONTROL] ingest step finished" book_id=160 duration=639.184291ms
+time=2026-10-29T23:14:53.659Z level=INFO msg="[CONTROL] ingest step finished" book_id=161 duration=606.878991ms
+time=2026-10-29T23:14:56.657Z level=INFO msg="[CONTROL] index step finished" book_id=160 duration=3.146679455s
+time=2026-10-29T23:14:56.657Z level=INFO msg="[CONTROL] book indexed" book_id=160
+time=2026-10-29T23:14:56.657Z level=INFO msg="[CONTROL] processing book" book_id=162
+time=2026-10-29T23:14:56.720Z level=INFO msg="[CONTROL] index step finished" book_id=161 duration=3.060316457s
+time=2026-10-29T23:14:56.720Z level=INFO msg="[CONTROL] book indexed" book_id=161
+time=2026-10-29T23:14:56.720Z level=INFO msg="[CONTROL] processing book" book_id=163
+time=2026-10-29T23:14:57.256Z level=INFO msg="[CONTROL] ingest step finished" book_id=162 duration=598.963497ms
+time=2026-10-29T23:14:57.377Z level=INFO msg="[CONTROL] ingest step finished" book_id=163 duration=656.678397ms
+time=2026-10-29T23:14:58.721Z level=INFO msg="[CONTROL] index step finished" book_id=163 duration=1.343831694s
+time=2026-10-29T23:14:58.721Z level=INFO msg="[CONTROL] book indexed" book_id=163
+time=2026-10-29T23:14:58.721Z level=INFO msg="[CONTROL] processing book" book_id=164
+time=2026-10-29T23:14:59.491Z level=INFO msg="[CONTROL] ingest step finished" book_id=164 duration=770.624696ms
+time=2026-10-29T23:15:00.567Z level=INFO msg="[CONTROL] index step finished" book_id=162 duration=3.310790184s
+time=2026-10-29T23:15:00.567Z level=INFO msg="[CONTROL] book indexed" book_id=162
+time=2026-10-29T23:15:00.567Z level=INFO msg="[CONTROL] processing book" book_id=165
+time=2026-10-29T23:15:01.238Z level=INFO msg="[CONTROL] ingest step finished" book_id=165 duration=671.595097ms
+time=2026-10-29T23:15:03.596Z level=INFO msg="[CONTROL] index step finished" book_id=164 duration=4.104510582s
+time=2026-10-29T23:15:03.596Z level=INFO msg="[CONTROL] book indexed" book_id=164
+time=2026-10-29T23:15:03.596Z level=INFO msg="[CONTROL] processing book" book_id=166
+time=2026-10-29T23:15:04.201Z level=INFO msg="[CONTROL] ingest step finished" book_id=166 duration=604.535297ms
+time=2026-10-29T23:15:05.969Z level=INFO msg="[CONTROL] index step finished" book_id=165 duration=4.731061764s
+time=2026-10-29T23:15:05.969Z level=INFO msg="[CONTROL] book indexed" book_id=165
+time=2026-10-29T23:15:05.969Z level=INFO msg="[CONTROL] processing book" book_id=167
+time=2026-10-29T23:15:06.453Z level=INFO msg="[CONTROL] ingest step finished" book_id=167 duration=483.625692ms
+time=2026-10-29T23:15:07.728Z level=INFO msg="[CONTROL] index step finished" book_id=166 duration=3.526932148s
+time=2026-10-29T23:15:07.728Z level=INFO msg="[CONTROL] book indexed" book_id=166
+time=2026-10-29T23:15:07.728Z level=INFO msg="[CONTROL] processing book" book_id=168
+time=2026-10-29T23:15:08.179Z level=INFO msg="[CONTROL] ingest step finished" book_id=168 duration=451.797193ms
+time=2026-10-29T23:15:08.552Z level=INFO msg="[CONTROL] index step finished" book_id=167 duration=2.098721066s
+time=2026-10-29T23:15:08.552Z level=INFO msg="[CONTROL] book indexed" book_id=167
+time=2026-10-29T23:15:08.552Z level=INFO msg="[CONTROL] processing book" book_id=169
+time=2026-10-29T23:15:09.174Z level=INFO msg="[CONTROL] ingest step finished" book_id=169 duration=622.06619ms
+time=2026-10-29T23:15:10.199Z level=INFO msg="[CONTROL] index step finished" book_id=168 duration=2.019479067s
+time=2026-10-29T23:15:10.199Z level=INFO msg="[CONTROL] book indexed" book_id=168
+time=2026-10-29T23:15:10.199Z level=INFO msg="[CONTROL] processing book" book_id=170
+time=2026-10-29T23:15:10.554Z level=INFO msg="[CONTROL] ingest step finished" book_id=170 duration=354.587495ms
+time=2026-10-29T23:15:12.545Z level=INFO msg="[CONTROL] index step finished" book_id=169 duration=3.370666345s
+time=2026-10-29T23:15:12.545Z level=INFO msg="[CONTROL] book indexed" book_id=169
+time=2026-10-29T23:15:12.545Z level=INFO msg="[CONTROL] processing book" book_id=171
+time=2026-10-29T23:15:13.036Z level=INFO msg="[CONTROL] ingest step finished" book_id=171 duration=491.45851ms
+time=2026-10-29T23:15:13.466Z level=INFO msg="[CONTROL] index step finished" book_id=170 duration=2.912707293s
+time=2026-10-29T23:15:13.467Z level=INFO msg="[CONTROL] book indexed" book_id=170
+time=2026-10-29T23:15:13.467Z level=INFO msg="[CONTROL] processing book" book_id=172
+time=2026-10-29T23:15:13.810Z level=INFO msg="[CONTROL] ingest step finished" book_id=172 duration=343.480313ms
+time=2026-10-29T23:15:15.398Z level=INFO msg="[CONTROL] index step finished" book_id=171 duration=2.36162779s
+time=2026-10-29T23:15:15.398Z level=INFO msg="[CONTROL] book indexed" book_id=171
+time=2026-10-29T23:15:15.398Z level=INFO msg="[CONTROL] processing book" book_id=173
+time=2026-10-29T23:15:16.023Z level=INFO msg="[CONTROL] ingest step finished" book_id=173 duration=625.291824ms
+time=2026-10-29T23:15:17.467Z level=INFO msg="[CONTROL] index step finished" book_id=172 duration=3.656609941s
+time=2026-10-29T23:15:17.467Z level=INFO msg="[CONTROL] book indexed" book_id=172
+time=2026-10-29T23:15:17.467Z level=INFO msg="[CONTROL] processing book" book_id=174
+time=2026-10-29T23:15:18.058Z level=INFO msg="[CONTROL] ingest step finished" book_id=174 duration=590.760322ms
+time=2026-10-29T23:15:19.724Z level=INFO msg="[CONTROL] index step finished" book_id=173 duration=3.700447742s
+time=2026-10-29T23:15:19.724Z level=INFO msg="[CONTROL] book indexed" book_id=173
+time=2026-10-29T23:15:19.724Z level=INFO msg="[CONTROL] processing book" book_id=175
+time=2026-10-29T23:15:20.340Z level=INFO msg="[CONTROL] ingest step finished" book_id=175 duration=616.221824ms
+time=2026-10-29T23:15:21.442Z level=INFO msg="[CONTROL] index step finished" book_id=174 duration=3.384750103s
+time=2026-10-29T23:15:21.442Z level=INFO msg="[CONTROL] book indexed" book_id=174
+time=2026-10-29T23:15:21.442Z level=INFO msg="[CONTROL] processing book" book_id=176
+time=2026-10-29T23:15:22.073Z level=INFO msg="[CONTROL] ingest step finished" book_id=176 duration=630.807001ms
+time=2026-10-29T23:15:23.835Z level=INFO msg="[CONTROL] index step finished" book_id=175 duration=3.494922517s
+time=2026-10-29T23:15:23.835Z level=INFO msg="[CONTROL] book indexed" book_id=175
+time=2026-10-29T23:15:23.835Z level=INFO msg="[CONTROL] processing book" book_id=177
+time=2026-10-29T23:15:24.600Z level=INFO msg="[CONTROL] ingest step finished" book_id=177 duration=764.461801ms
+time=2026-10-29T23:15:26.818Z level=INFO msg="[CONTROL] index step finished" book_id=176 duration=4.744384103s
+time=2026-10-29T23:15:26.818Z level=INFO msg="[CONTROL] book indexed" book_id=176
+time=2026-10-29T23:15:26.818Z level=INFO msg="[CONTROL] processing book" book_id=178
+time=2026-10-29T23:15:27.421Z level=INFO msg="[CONTROL] ingest step finished" book_id=178 duration=602.753301ms
+time=2026-10-29T23:15:29.088Z level=INFO msg="[CONTROL] index step finished" book_id=177 duration=4.488384416s
+time=2026-10-29T23:15:29.088Z level=INFO msg="[CONTROL] book indexed" book_id=177
+time=2026-10-29T23:15:29.088Z level=INFO msg="[CONTROL] processing book" book_id=179
+time=2026-10-29T23:15:29.693Z level=INFO msg="[CONTROL] ingest step finished" book_id=179 duration=605.130923ms
+time=2026-10-29T23:15:30.805Z level=INFO msg="[CONTROL] index step finished" book_id=178 duration=3.38457878s
+time=2026-10-29T23:15:30.805Z level=INFO msg="[CONTROL] book indexed" book_id=178
+time=2026-10-29T23:15:30.805Z level=INFO msg="[CONTROL] processing book" book_id=180
+time=2026-10-29T23:15:31.881Z level=INFO msg="[CONTROL] ingest step finished" book_id=180 duration=1.075895041s
+time=2026-10-29T23:15:32.740Z level=INFO msg="[CONTROL] index step finished" book_id=179 duration=3.046054217s
+time=2026-10-29T23:15:32.740Z level=INFO msg="[CONTROL] book indexed" book_id=179
+time=2026-10-29T23:15:32.740Z level=INFO msg="[CONTROL] processing book" book_id=181
+time=2026-10-29T23:15:32.898Z level=INFO msg="[CONTROL] ingest step finished" book_id=181 duration=158.841206ms
+time=2026-10-29T23:15:33.375Z level=INFO msg="[CONTROL] index step finished" book_id=181 duration=476.268919ms
+time=2026-10-29T23:15:33.375Z level=INFO msg="[CONTROL] book indexed" book_id=181
+time=2026-10-29T23:15:33.375Z level=INFO msg="[CONTROL] processing book" book_id=182
+time=2026-10-29T23:15:33.523Z level=WARN msg="[CONTROL] transient failure, retrying" step="ingest book" attempt=1 backoff=1s error="transient service error: POST http://ingestion:7001/ingest/182 answered 503 Service Unavailable: {\"book_id\":182,\"status\":\"unavailable\"}"
+time=2026-10-29T23:15:34.673Z level=WARN msg="[CONTROL] transient failure, retrying" step="ingest book" attempt=2 backoff=2s error="transient service error: POST http://ingestion:7001/ingest/182 answered 503 Service Unavailable: {\"book_id\":182,\"status\":\"unavailable\"}"
+time=2026-10-29T23:15:36.836Z level=WARN msg="[CONTROL] book failed" book_id=182 error="ingest book failed after 3 attempts: transient service error: POST http://ingestion:7001/ingest/182 answered 503 Service Unavailable: {\"book_id\":182,\"status\":\"unavailable\"}"
+time=2026-10-29T23:15:36.836Z level=INFO msg="[CONTROL] processing book" book_id=183
+time=2026-10-29T23:15:36.979Z level=WARN msg="[CONTROL] transient failure, retrying" step="ingest book" attempt=1 backoff=1s error="transient service error: POST http://ingestion:7001/ingest/183 answered 503 Service Unavailable: {\"book_id\":183,\"status\":\"unavailable\"}"
+time=2026-10-29T23:15:38.128Z level=WARN msg="[CONTROL] transient failure, retrying" step="ingest book" attempt=2 backoff=2s error="transient service error: POST http://ingestion:7001/ingest/183 answered 503 Service Unavailable: {\"book_id\":183,\"status\":\"unavailable\"}"
+time=2026-10-29T23:15:38.162Z level=INFO msg="[CONTROL] index step finished" book_id=180 duration=6.280401385s
+time=2026-10-29T23:15:38.162Z level=INFO msg="[CONTROL] book indexed" book_id=180
+time=2026-10-29T23:15:38.162Z level=INFO msg="[CONTROL] processing book" book_id=184
+time=2026-10-29T23:15:38.305Z level=WARN msg="[CONTROL] transient failure, retrying" step="ingest book" attempt=1 backoff=1s error="transient service error: POST http://ingestion:7001/ingest/184 answered 503 Service Unavailable: {\"book_id\":184,\"status\":\"unavailable\"}"
+time=2026-10-29T23:15:39.450Z level=WARN msg="[CONTROL] transient failure, retrying" step="ingest book" attempt=2 backoff=2s error="transient service error: POST http://ingestion:7001/ingest/184 answered 503 Service Unavailable: {\"book_id\":184,\"status\":\"unavailable\"}"
+time=2026-10-29T23:15:40.300Z level=WARN msg="[CONTROL] book failed" book_id=183 error="ingest book failed after 3 attempts: transient service error: POST http://ingestion:7001/ingest/183 answered 503 Service Unavailable: {\"book_id\":183,\"status\":\"unavailable\"}"
+time=2026-10-29T23:15:40.301Z level=INFO msg="[CONTROL] processing book" book_id=185
+time=2026-10-29T23:15:40.458Z level=WARN msg="[CONTROL] transient failure, retrying" step="ingest book" attempt=1 backoff=1s error="transient service error: POST http://ingestion:7001/ingest/185 answered 503 Service Unavailable: {\"book_id\":185,\"status\":\"unavailable\"}"
+time=2026-10-29T23:15:41.593Z level=WARN msg="[CONTROL] book failed" book_id=184 error="ingest book failed after 3 attempts: transient service error: POST http://ingestion:7001/ingest/184 answered 503 Service Unavailable: {\"book_id\":184,\"status\":\"unavailable\"}"
+time=2026-10-29T23:15:41.593Z level=INFO msg="[CONTROL] processing book" book_id=186
+time=2026-10-29T23:15:41.603Z level=WARN msg="[CONTROL] transient failure, retrying" step="ingest book" attempt=2 backoff=2s error="transient service error: POST http://ingestion:7001/ingest/185 answered 503 Service Unavailable: {\"book_id\":185,\"status\":\"unavailable\"}"
+time=2026-10-29T23:15:41.734Z level=WARN msg="[CONTROL] transient failure, retrying" step="ingest book" attempt=1 backoff=1s error="transient service error: POST http://ingestion:7001/ingest/186 answered 503 Service Unavailable: {\"book_id\":186,\"status\":\"unavailable\"}"
+time=2026-10-29T23:15:42.899Z level=WARN msg="[CONTROL] transient failure, retrying" step="ingest book" attempt=2 backoff=2s error="transient service error: POST http://ingestion:7001/ingest/186 answered 503 Service Unavailable: {\"book_id\":186,\"status\":\"unavailable\"}"
+time=2026-10-29T23:15:43.745Z level=WARN msg="[CONTROL] book failed" book_id=185 error="ingest book failed after 3 attempts: transient service error: POST http://ingestion:7001/ingest/185 answered 503 Service Unavailable: {\"book_id\":185,\"status\":\"unavailable\"}"
+time=2026-10-29T23:15:43.745Z level=INFO msg="[CONTROL] processing book" book_id=187
+time=2026-10-29T23:15:43.903Z level=WARN msg="[CONTROL] transient failure, retrying" step="ingest book" attempt=1 backoff=1s error="transient service error: POST http://ingestion:7001/ingest/187 answered 503 Service Unavailable: {\"book_id\":187,\"status\":\"unavailable\"}"
+time=2026-10-29T23:15:45.049Z level=WARN msg="[CONTROL] transient failure, retrying" step="ingest book" attempt=2 backoff=2s error="transient service error: POST http://ingestion:7001/ingest/187 answered 503 Service Unavailable: {\"book_id\":187,\"status\":\"unavailable\"}"
+time=2026-10-29T23:15:45.061Z level=WARN msg="[CONTROL] book failed" book_id=186 error="ingest book failed after 3 attempts: transient service error: POST http://ingestion:7001/ingest/186 answered 503 Service Unavailable: {\"book_id\":186,\"status\":\"unavailable\"}"
+time=2026-10-29T23:15:45.061Z level=INFO msg="[CONTROL] processing book" book_id=188
+time=2026-10-29T23:15:45.202Z level=WARN msg="[CONTROL] transient failure, retrying" step="ingest book" attempt=1 backoff=1s error="transient service error: POST http://ingestion:7001/ingest/188 answered 503 Service Unavailable: {\"book_id\":188,\"status\":\"unavailable\"}"
+time=2026-10-29T23:15:46.346Z level=WARN msg="[CONTROL] transient failure, retrying" step="ingest book" attempt=2 backoff=2s error="transient service error: POST http://ingestion:7001/ingest/188 answered 503 Service Unavailable: {\"book_id\":188,\"status\":\"unavailable\"}"
+time=2026-10-29T23:15:47.193Z level=WARN msg="[CONTROL] book failed" book_id=187 error="ingest book failed after 3 attempts: transient service error: POST http://ingestion:7001/ingest/187 answered 503 Service Unavailable: {\"book_id\":187,\"status\":\"unavailable\"}"
+time=2026-10-29T23:15:47.193Z level=INFO msg="[CONTROL] processing book" book_id=189
+time=2026-10-29T23:15:47.337Z level=WARN msg="[CONTROL] transient failure, retrying" step="ingest book" attempt=1 backoff=1s error="transient service error: POST http://ingestion:7001/ingest/189 answered 503 Service Unavailable: {\"book_id\":189,\"status\":\"unavailable\"}"
+time=2026-10-29T23:15:48.496Z level=WARN msg="[CONTROL] transient failure, retrying" step="ingest book" attempt=2 backoff=2s error="transient service error: POST http://ingestion:7001/ingest/189 answered 503 Service Unavailable: {\"book_id\":189,\"status\":\"unavailable\"}"
+time=2026-10-29T23:15:48.496Z level=WARN msg="[CONTROL] book failed" book_id=188 error="ingest book failed after 3 attempts: transient service error: POST http://ingestion:7001/ingest/188 answered 503 Service Unavailable: {\"book_id\":188,\"status\":\"unavailable\"}"
+time=2026-10-29T23:15:48.496Z level=INFO msg="[CONTROL] processing book" book_id=190
+time=2026-10-29T23:15:48.654Z level=WARN msg="[CONTROL] transient failure, retrying" step="ingest book" attempt=1 backoff=1s error="transient service error: POST http://ingestion:7001/ingest/190 answered 503 Service Unavailable: {\"book_id\":190,\"status\":\"unavailable\"}"
+time=2026-10-29T23:15:49.899Z level=WARN msg="[CONTROL] transient failure, retrying" step="ingest book" attempt=2 backoff=2s error="transient service error: POST http://ingestion:7001/ingest/190 answered 503 Service Unavailable: {\"book_id\":190,\"status\":\"unavailable\"}"
+time=2026-10-29T23:15:50.662Z level=WARN msg="[CONTROL] book failed" book_id=189 error="ingest book failed after 3 attempts: transient service error: POST http://ingestion:7001/ingest/189 answered 503 Service Unavailable: {\"book_id\":189,\"status\":\"unavailable\"}"
+time=2026-10-29T23:15:50.662Z level=INFO msg="[CONTROL] processing book" book_id=191
+time=2026-10-29T23:15:50.864Z level=WARN msg="[CONTROL] transient failure, retrying" step="ingest book" attempt=1 backoff=1s error="transient service error: POST http://ingestion:7001/ingest/191 answered 503 Service Unavailable: {\"book_id\":191,\"status\":\"unavailable\"}"
+time=2026-10-29T23:15:52.092Z level=WARN msg="[CONTROL] book failed" book_id=190 error="ingest book failed after 3 attempts: transient service error: POST http://ingestion:7001/ingest/190 answered 503 Service Unavailable: {\"book_id\":190,\"status\":\"unavailable\"}"
+time=2026-10-29T23:15:52.092Z level=WARN msg="[CONTROL] transient failure, retrying" step="ingest book" attempt=2 backoff=2s error="transient service error: POST http://ingestion:7001/ingest/191 answered 503 Service Unavailable: {\"book_id\":191,\"status\":\"unavailable\"}"
+time=2026-10-29T23:15:52.092Z level=INFO msg="[CONTROL] processing book" book_id=192
+time=2026-10-29T23:15:52.296Z level=WARN msg="[CONTROL] transient failure, retrying" step="ingest book" attempt=1 backoff=1s error="transient service error: POST http://ingestion:7001/ingest/192 answered 503 Service Unavailable: {\"book_id\":192,\"status\":\"unavailable\"}"
+time=2026-10-29T23:15:53.443Z level=WARN msg="[CONTROL] transient failure, retrying" step="ingest book" attempt=2 backoff=2s error="transient service error: POST http://ingestion:7001/ingest/192 answered 503 Service Unavailable: {\"book_id\":192,\"status\":\"unavailable\"}"
+time=2026-10-29T23:15:54.238Z level=WARN msg="[CONTROL] book failed" book_id=191 error="ingest book failed after 3 attempts: transient service error: POST http://ingestion:7001/ingest/191 answered 503 Service Unavailable: {\"book_id\":191,\"status\":\"unavailable\"}"
+time=2026-10-29T23:15:54.238Z level=INFO msg="[CONTROL] processing book" book_id=193
+time=2026-10-29T23:15:54.381Z level=WARN msg="[CONTROL] transient failure, retrying" step="ingest book" attempt=1 backoff=1s error="transient service error: POST http://ingestion:7001/ingest/193 answered 503 Service Unavailable: {\"book_id\":193,\"status\":\"unavailable\"}"
+time=2026-10-29T23:15:55.529Z level=WARN msg="[CONTROL] transient failure, retrying" step="ingest book" attempt=2 backoff=2s error="transient service error: POST http://ingestion:7001/ingest/193 answered 503 Service Unavailable: {\"book_id\":193,\"status\":\"unavailable\"}"
+time=2026-10-29T23:15:55.590Z level=WARN msg="[CONTROL] book failed" book_id=192 error="ingest book failed after 3 attempts: transient service error: POST http://ingestion:7001/ingest/192 answered 503 Service Unavailable: {\"book_id\":192,\"status\":\"unavailable\"}"
+time=2026-10-29T23:15:55.590Z level=INFO msg="[CONTROL] processing book" book_id=194
+time=2026-10-29T23:15:55.735Z level=WARN msg="[CONTROL] transient failure, retrying" step="ingest book" attempt=1 backoff=1s error="transient service error: POST http://ingestion:7001/ingest/194 answered 503 Service Unavailable: {\"book_id\":194,\"status\":\"unavailable\"}"
+time=2026-10-29T23:15:56.879Z level=WARN msg="[CONTROL] transient failure, retrying" step="ingest book" attempt=2 backoff=2s error="transient service error: POST http://ingestion:7001/ingest/194 answered 503 Service Unavailable: {\"book_id\":194,\"status\":\"unavailable\"}"
+time=2026-10-29T23:15:57.686Z level=WARN msg="[CONTROL] book failed" book_id=193 error="ingest book failed after 3 attempts: transient service error: POST http://ingestion:7001/ingest/193 answered 503 Service Unavailable: {\"book_id\":193,\"status\":\"unavailable\"}"
+time=2026-10-29T23:15:57.686Z level=INFO msg="[CONTROL] processing book" book_id=195
+time=2026-10-29T23:15:57.855Z level=WARN msg="[CONTROL] transient failure, retrying" step="ingest book" attempt=1 backoff=1s error="transient service error: POST http://ingestion:7001/ingest/195 answered 503 Service Unavailable: {\"book_id\":195,\"status\":\"unavailable\"}"
+time=2026-10-29T23:15:59.000Z level=WARN msg="[CONTROL] transient failure, retrying" step="ingest book" attempt=2 backoff=2s error="transient service error: POST http://ingestion:7001/ingest/195 answered 503 Service Unavailable: {\"book_id\":195,\"status\":\"unavailable\"}"
+time=2026-10-29T23:15:59.022Z level=WARN msg="[CONTROL] book failed" book_id=194 error="ingest book failed after 3 attempts: transient service error: POST http://ingestion:7001/ingest/194 answered 503 Service Unavailable: {\"book_id\":194,\"status\":\"unavailable\"}"
+time=2026-10-29T23:15:59.022Z level=INFO msg="[CONTROL] processing book" book_id=196
+time=2026-10-29T23:15:59.180Z level=WARN msg="[CONTROL] transient failure, retrying" step="ingest book" attempt=1 backoff=1s error="transient service error: POST http://ingestion:7001/ingest/196 answered 503 Service Unavailable: {\"book_id\":196,\"status\":\"unavailable\"}"
+time=2026-10-29T23:16:00.323Z level=WARN msg="[CONTROL] transient failure, retrying" step="ingest book" attempt=2 backoff=2s error="transient service error: POST http://ingestion:7001/ingest/196 answered 503 Service Unavailable: {\"book_id\":196,\"status\":\"unavailable\"}"
+time=2026-10-29T23:16:01.145Z level=WARN msg="[CONTROL] book failed" book_id=195 error="ingest book failed after 3 attempts: transient service error: POST http://ingestion:7001/ingest/195 answered 503 Service Unavailable: {\"book_id\":195,\"status\":\"unavailable\"}"
+time=2026-10-29T23:16:01.145Z level=INFO msg="[CONTROL] processing book" book_id=197
+time=2026-10-29T23:16:01.293Z level=WARN msg="[CONTROL] transient failure, retrying" step="ingest book" attempt=1 backoff=1s error="transient service error: POST http://ingestion:7001/ingest/197 answered 503 Service Unavailable: {\"book_id\":197,\"status\":\"unavailable\"}"
+time=2026-10-29T23:16:02.434Z level=WARN msg="[CONTROL] transient failure, retrying" step="ingest book" attempt=2 backoff=2s error="transient service error: POST http://ingestion:7001/ingest/197 answered 503 Service Unavailable: {\"book_id\":197,\"status\":\"unavailable\"}"
+time=2026-10-29T23:16:02.465Z level=WARN msg="[CONTROL] book failed" book_id=196 error="ingest book failed after 3 attempts: transient service error: POST http://ingestion:7001/ingest/196 answered 503 Service Unavailable: {\"book_id\":196,\"status\":\"unavailable\"}"
+time=2026-10-29T23:16:02.465Z level=INFO msg="[CONTROL] processing book" book_id=198
+time=2026-10-29T23:16:02.607Z level=WARN msg="[CONTROL] transient failure, retrying" step="ingest book" attempt=1 backoff=1s error="transient service error: POST http://ingestion:7001/ingest/198 answered 503 Service Unavailable: {\"book_id\":198,\"status\":\"unavailable\"}"
+time=2026-10-29T23:16:03.750Z level=WARN msg="[CONTROL] transient failure, retrying" step="ingest book" attempt=2 backoff=2s error="transient service error: POST http://ingestion:7001/ingest/198 answered 503 Service Unavailable: {\"book_id\":198,\"status\":\"unavailable\"}"
+time=2026-10-29T23:16:04.578Z level=WARN msg="[CONTROL] book failed" book_id=197 error="ingest book failed after 3 attempts: transient service error: POST http://ingestion:7001/ingest/197 answered 503 Service Unavailable: {\"book_id\":197,\"status\":\"unavailable\"}"
+time=2026-10-29T23:16:04.579Z level=INFO msg="[CONTROL] processing book" book_id=199
+time=2026-10-29T23:16:04.721Z level=WARN msg="[CONTROL] transient failure, retrying" step="ingest book" attempt=1 backoff=1s error="transient service error: POST http://ingestion:7001/ingest/199 answered 503 Service Unavailable: {\"book_id\":199,\"status\":\"unavailable\"}"
+time=2026-10-29T23:16:05.886Z level=WARN msg="[CONTROL] transient failure, retrying" step="ingest book" attempt=2 backoff=2s error="transient service error: POST http://ingestion:7001/ingest/199 answered 503 Service Unavailable: {\"book_id\":199,\"status\":\"unavailable\"}"
+time=2026-10-29T23:16:05.915Z level=WARN msg="[CONTROL] book failed" book_id=198 error="ingest book failed after 3 attempts: transient service error: POST http://ingestion:7001/ingest/198 answered 503 Service Unavailable: {\"book_id\":198,\"status\":\"unavailable\"}"
+time=2026-10-29T23:16:05.915Z level=INFO msg="[CONTROL] processing book" book_id=200
+time=2026-10-29T23:16:08.097Z level=WARN msg="[CONTROL] book failed" book_id=199 error="ingest book failed after 3 attempts: transient service error: POST http://ingestion:7001/ingest/199 answered 503 Service Unavailable: {\"book_id\":199,\"status\":\"unavailable\"}"
+time=2026-10-29T23:16:08.126Z level=INFO msg="[CONTROL] ingest step finished" book_id=200 duration=2.210872258s
+time=2026-10-29T23:16:23.696Z level=INFO msg="[CONTROL] index step finished" book_id=200 duration=15.569983952s
+time=2026-10-29T23:16:23.696Z level=INFO msg="[CONTROL] book indexed" book_id=200
+time=2026-10-29T23:16:23.696Z level=INFO msg="[CONTROL] run finished" indexed=78 skipped=0 failed=22 pending=0 elapsed=3m7.202s books_per_second=0.42 ingest_step_total=44.634s ingest_step_avg=446ms index_step_total=3m56.576s index_step_avg=2.366s

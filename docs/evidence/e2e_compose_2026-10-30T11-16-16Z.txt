@@ -1,0 +1,44 @@
+﻿========================================================================
+ Docker Compose Stack — End-to-End Evidence (scripts/e2e_compose.sh)
+========================================================================
+Date:     2026-10-30 11:16:17 +00:00
+Host:     Windows 11 Home, Docker Desktop 4.97 (Engine 29.9.2, Compose v5.6.1, WSL2 backend)
+Commit:   e75fa7d (feature/ingestion-service)
+Script:   scripts/e2e_compose.sh
+Stack:    mongo:7 + ingestion + indexing + search (+ control on demand)
+Network:  real downloads from https://www.gutenberg.org (books 1342, 84, 5)
+========================================================================
+
+== building images and starting the stack ==
+NAME                        IMAGE                            COMMAND                  SERVICE     CREATED         STATUS                           PORTS
+boogle-engine-indexing-1    boogle-engine/indexing:latest    "/usr/local/bin/boogÔÇª"   indexing    7 seconds ago   Up 1 second (health: starting)   0.0.0.0:7002->7002/tcp, [::]:7002->7002/tcp
+boogle-engine-ingestion-1   boogle-engine/ingestion:latest   "/usr/local/bin/boogÔÇª"   ingestion   9 seconds ago   Up 6 seconds (healthy)           0.0.0.0:7001->7001/tcp, [::]:7001->7001/tcp
+boogle-engine-mongo-1       mongo:7                          "docker-entrypoint.sÔÇª"   mongo       9 seconds ago   Up 6 seconds (healthy)           0.0.0.0:27017->27017/tcp, [::]:27017->27017/tcp
+boogle-engine-search-1      boogle-engine/search:latest      "/usr/local/bin/boogÔÇª"   search      7 seconds ago   Up 1 second (health: starting)   0.0.0.0:7003->7003/tcp, [::]:7003->7003/tcp
+PASS: mongo, ingestion, indexing and search are up and healthy
+== orchestration of two real books from inside the compose network ==
+PASS: books 1342 and 84 ingested, indexed and published (datalake=2, datamart=2)
+== replayed run skips finished books ==
+PASS: replayed run skips both books (idempotent, no duplicates)
+== front-facing search answers from the datamart ==
+PASS: search API answers /search, /search/filters, /books/1342 and swagger
+== failure recovery: the ingestion container dies ==
+PASS: control refuses to claim books while ingestion is down (fail fast)
+PASS: ingestion relaunched, book 5 indexed: the pipeline survived the outage
+== named volumes survive container recreation ==
+PASS: containers recreated, datalake and datamart intact, control state resumed
+== teardown ==
+PASS: stack removed with its volumes
+ALL COMPOSE E2E CHECKS PASSED
+
+========================================================================
+Notes:
+- The stack was built from the current tree, which includes the restored
+  cmd/ingestion/main.go (RF 2) serving -addr :7001 with the
+  api.NewIngestionHandler contract consumed by the Control Module.
+- Verified properties: orchestration, idempotent replay, front-facing
+  search, ingestion-container failure recovery and named-volume
+  persistence across full container recreation.
+- Raw build/pull output (mongo:7 ~700MB, three Go images) is omitted;
+  the PASS/FAIL lines above are the complete check transcript.
+========================================================================

@@ -1,0 +1,10 @@
+.git
+.gitignore
+.env
+datalake
+control
+test/load/results
+cmd/*/results
+docs/evidence/*.csv
+docs/evidence/*.txt
+*.log

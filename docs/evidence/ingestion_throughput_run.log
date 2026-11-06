@@ -1,0 +1,8 @@
+-----------------------------------
+Books attempted:     100
+Ingested (2xx):      99
+Failed (non-2xx):    1
+Total elapsed time:  4.64 seconds
+Ingestion throughput: 21.32 books/second (2xx only)
+Status breakdown:    200:99 404:1
+-----------------------------------

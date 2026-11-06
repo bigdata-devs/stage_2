@@ -1,0 +1,157 @@
+# Local deployment of the whole Boogle Engine: MongoDB plus the three services
+# (long-running) and the Control Module (on demand, behind the "tools" profile).
+# Containers carry code only; every dataset lives in a named volume, so a
+# recreated container never loses the datalake, the control state or the datamart.
+# The Search Service runs as one or more stateless replicas behind nginx, which
+# publishes the Search API on SEARCH_PORT (audit RF 8 replica experiment):
+#   docker compose up -d --build --scale search=2
+name: boogle-engine
+
+services:
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    ports:
+      - "${MONGO_PORT:-27017}:27017"
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 5s
+      timeout: 5s
+      retries: 24
+      start_period: 15s
+    # Uncomment for benchmark runs:
+    # deploy:
+    #   resources:
+    #     limits:
+    #       cpus: '2.0'
+    #       memory: 2G
+
+  ingestion:
+    build:
+      context: .
+      args:
+        SERVICE: ingestion
+    image: boogle-engine/ingestion:latest
+    restart: unless-stopped
+    ports:
+      - "${INGESTION_PORT:-7001}:7001"
+    command: ["-addr", ":7001", "-datalake", "/data/datalake"]
+    volumes:
+      - datalake:/data/datalake
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:7001/ingest/list"]
+      interval: 5s
+      timeout: 5s
+      retries: 24
+      start_period: 10s
+    # Uncomment for benchmark runs:
+    # deploy:
+    #   resources:
+    #     limits:
+    #       cpus: '1.0'
+    #       memory: 512M
+
+  indexing:
+    build:
+      context: .
+      args:
+        SERVICE: indexing
+    image: boogle-engine/indexing:latest
+    restart: unless-stopped
+    ports:
+      - "${INDEXING_PORT:-7002}:7002"
+    command: ["-addr", ":7002", "-datalake", "/data/datalake"]
+    environment:
+      MONGO_URI: "mongodb://mongo:27017"
+      MONGO_DATABASE: "${MONGO_DATABASE:-boogle}"
+    volumes:
+      - datalake:/data/datalake
+    depends_on:
+      mongo:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:7002/index/status"]
+      interval: 5s
+      timeout: 5s
+      retries: 24
+      start_period: 10s
+    # Uncomment for benchmark runs:
+    # deploy:
+    #   resources:
+    #     limits:
+    #       cpus: '2.0'
+    #       memory: 1G
+
+  search:
+    build:
+      context: .
+      args:
+        SERVICE: search
+    image: boogle-engine/search:latest
+    restart: unless-stopped
+    # No host port: every replica listens on 7003 inside the compose network and nginx balances
+    # across them. SEARCH_REPLICAS (default 1) sets the count; --scale search=N overrides it.
+    expose:
+      - "7003"
+    deploy:
+      replicas: ${SEARCH_REPLICAS:-1}
+    command: ["-addr", ":7003"]
+    environment:
+      MONGO_URI: "mongodb://mongo:27017"
+      MONGO_DATABASE: "${MONGO_DATABASE:-boogle}"
+      CORS_ALLOWED_ORIGIN: "${CORS_ALLOWED_ORIGIN:-*}"
+    depends_on:
+      mongo:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:7003/search/filters"]
+      interval: 5s
+      timeout: 5s
+      retries: 24
+      start_period: 10s
+
+  # Front door of the Search API: load-balances SEARCH_PORT across the search replicas
+  # (configuration and rationale in deploy/nginx/nginx.conf).
+  nginx:
+    image: nginx:1.28-alpine
+    restart: unless-stopped
+    ports:
+      - "${SEARCH_PORT:-7003}:7003"
+    volumes:
+      - ./deploy/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      search:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:7003/search/filters"]
+      interval: 5s
+      timeout: 5s
+      retries: 24
+      start_period: 5s
+
+  control:
+    build:
+      context: .
+      args:
+        SERVICE: control
+    image: boogle-engine/control:latest
+    profiles: ["tools"]
+    command: ["-discover"]
+    environment:
+      INGESTION_URL: "http://ingestion:7001"
+      INDEXING_URL: "http://indexing:7002"
+      CONTROL_STATE_DIR: "/data/control"
+    volumes:
+      - control-state:/data/control
+    depends_on:
+      ingestion:
+        condition: service_healthy
+      indexing:
+        condition: service_healthy
+
+volumes:
+  datalake:
+  control-state:
+  mongo-data:

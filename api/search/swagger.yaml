@@ -1,0 +1,284 @@
+basePath: /
+definitions:
+  api.ErrorResponse:
+    properties:
+      error:
+        example: invalid_parameter
+        type: string
+      message:
+        example: query parameter "limit" must be an integer between 1 and 100
+        type: string
+    type: object
+  searchapi.BookResult:
+    properties:
+      author:
+        example: Jane Austen
+        type: string
+      book_id:
+        example: 1342
+        type: integer
+      language:
+        description: ISO 639 code; books written in several languages list them comma-separated
+          ("en,fr")
+        example: en
+        type: string
+      title:
+        example: Pride and Prejudice
+        type: string
+      year:
+        description: Original publication year, or 0 when unknown
+        example: 1813
+        type: integer
+    type: object
+  searchapi.FilterValuesResponse:
+    properties:
+      languages:
+        description: ISO 639 language codes of the published books, sorted ascending;
+          never null
+        example:
+        - en
+        - es
+        - fr
+        items:
+          type: string
+        type: array
+      years:
+        description: Original publication years of the published books, sorted ascending;
+          never null
+        example:
+        - 1719
+        - 1813
+        - 1851
+        items:
+          type: integer
+        type: array
+    type: object
+  searchapi.SearchFilters:
+    properties:
+      author:
+        example: Jane Austen
+        type: string
+      language:
+        example: en
+        type: string
+      year:
+        example: 1813
+        type: integer
+    type: object
+  searchapi.SearchResponse:
+    properties:
+      filters:
+        allOf:
+        - $ref: '#/definitions/searchapi.SearchFilters'
+        description: Filters that were applied; absent filters are omitted
+      limit:
+        example: 20
+        type: integer
+      offset:
+        example: 0
+        type: integer
+      query:
+        description: Keywords exactly as sent in q, without surrounding spaces
+        example: sherlock holmes
+        type: string
+      results:
+        description: Books of the requested page; never null
+        items:
+          $ref: '#/definitions/searchapi.BookResult'
+        type: array
+      total:
+        description: Number of matches across all pages
+        example: 25
+        type: integer
+    type: object
+info:
+  contact: {}
+  description: |-
+    Front-end-facing API of the Boogle Engine Search Service: keyword search over
+    Project Gutenberg books with optional author, language and publication-year filters.
+    Browsers may call every endpoint cross-origin (CORS) from the origins in the service's
+    CORS_ALLOWED_ORIGIN setting: any origin (`*`) by default, or an explicit comma-separated list.
+    Cross-origin pages may use GET, HEAD and OPTIONS and send the Content-Type header; credentials
+    (cookies, Authorization) are never allowed. Preflight OPTIONS requests are answered with 204,
+    or 403 `origin_not_allowed` for an origin outside the list.
+  title: Boogle Engine Search API
+  version: 1.0.0
+paths:
+  /books/{book_id}:
+    get:
+      description: |-
+        - **Provider:** Search Service
+        - **Intended consumer:** Front-end, to render the details of a book chosen from a search result.
+        - **Position in the workflow:** optional detail view after GET /search; it is one of the
+        variants of the front-end contract, not a separate route family.
+
+        Returns the metadata of a published book. A book that does not exist, or that is indexed
+        but still awaiting publication, is not visible and answers 404. The request has no body.
+
+        **Completion and publication.** Synchronous: the response always reflects the published
+        state of the datamart at the moment it is served.
+
+        **Idempotency and retries.** Read-only; repeating the request is always safe. A client
+        timeout of about 5 s is enough. Retry on timeouts and connection errors; a 404 does not
+        become 200 until the book is ingested and indexed.
+      parameters:
+      - description: Project Gutenberg book ID (positive integer)
+        example: 1342
+        in: path
+        minimum: 1
+        name: book_id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: The metadata of the published book
+          schema:
+            $ref: '#/definitions/searchapi.BookResult'
+        "400":
+          description: 'invalid_book_id: book_id is not a positive integer'
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "404":
+          description: 'book_not_found: no published book with that ID'
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "500":
+          description: 'internal_error: the datamart could not be read'
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+      summary: Get one book by ID
+      tags:
+      - search
+      x-audience: front-end
+      x-completion: synchronous
+      x-consumers:
+      - Front-end
+      x-idempotent: true
+      x-provider: Search Service
+  /search:
+    get:
+      description: |-
+        Returns one page of the books that contain every word of `q`, optionally narrowed by author,
+        language and original publication year. Filters can be combined and are joined with AND.
+        `q` may hold several words, matched with AND: a book is returned only when it contains all of them.
+        Words are split exactly like book text: runs of the letters a-z, case-insensitive, so digits, spaces
+        and punctuation separate words (`Moby-Dick` searches `moby` AND `dick`). Repeated words count once.
+        Stop words (the, and, of...), single letters and Roman numerals are never indexed and are ignored;
+        a `q` made only of them matches nothing and returns 200 with `results: []`.
+        `q` is rejected with 400 `invalid_parameter` when it contains no word at all (for example `1813` or `?!`)
+        or more than 10 distinct search words.
+        Empty filter values (for example `author=`) are treated as absent.
+        Only the filters that were applied are echoed in `filters`; the object is `{}` when none were sent.
+        Results are ordered by relevance, most relevant first: the summed frequency of the query words in
+        the book, with ties broken by ascending `book_id`.
+        `total` counts every match, while `results` holds at most `limit` books starting at `offset`.
+        A valid query without matches, or an `offset` past the last match, returns 200 with `results: []`.
+      parameters:
+      - description: One or more keywords, all of which a book must contain (AND);
+          surrounding spaces are ignored
+        example: sherlock holmes
+        in: query
+        minLength: 1
+        name: q
+        required: true
+        type: string
+      - description: Case-insensitive partial match on the author name
+        example: Austen
+        in: query
+        name: author
+        type: string
+      - description: ISO 639 language code, case-insensitive exact match (en, es,
+          fr...)
+        example: en
+        in: query
+        name: language
+        type: string
+      - description: Exact original publication year
+        example: 1813
+        in: query
+        maximum: 9999
+        minimum: 1
+        name: year
+        type: integer
+      - default: 0
+        description: Number of matches to skip before the first result
+        in: query
+        minimum: 0
+        name: offset
+        type: integer
+      - default: 20
+        description: Maximum number of results in the page
+        in: query
+        maximum: 100
+        minimum: 1
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: One page of matching books
+          schema:
+            $ref: '#/definitions/searchapi.SearchResponse'
+        "400":
+          description: q is missing (missing_parameter); q has no word or more than
+            10 distinct words, or another parameter is malformed (invalid_parameter)
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "500":
+          description: The search engine failed (internal_error)
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+      summary: Search books by keywords
+      tags:
+      - search
+      x-audience: front-end
+      x-completion: synchronous
+      x-consumers:
+      - Front-end
+      x-idempotent: true
+      x-provider: Search Service
+  /search/filters:
+    get:
+      description: |-
+        - **Provider:** Search Service
+        - **Intended consumer:** Front-end, to populate the language and year choices of its search form.
+
+        Returns the distinct ISO 639 language codes (a book written in several languages contributes
+        every one of its codes) and the distinct original publication years of the published books,
+        both sorted ascending. Books without a known language or year do not contribute a value, so
+        every returned value can be sent back to GET /search and actually match results. The request
+        has no body; the slices are empty arrays, never null, when no books are published.
+
+        **Completion and publication.** Synchronous and read-only; it reflects the published state
+        of the datamart when it is served.
+
+        **Idempotency and retries.** Safe to repeat; retry on timeouts and connection errors.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Distinct filter values of the published books
+          schema:
+            $ref: '#/definitions/searchapi.FilterValuesResponse'
+        "500":
+          description: 'internal_error: the datamart could not be read'
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+      summary: List the available search filters
+      tags:
+      - search
+      x-audience: front-end
+      x-completion: synchronous
+      x-consumers:
+      - Front-end
+      x-idempotent: true
+      x-provider: Search Service
+schemes:
+- http
+swagger: "2.0"
+tags:
+- description: Keyword search with metadata filters and pagination
+  name: search

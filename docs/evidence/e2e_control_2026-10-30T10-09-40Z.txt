@@ -1,0 +1,36 @@
+﻿========================================================================
+ Ingestion + Control Module — End-to-End Evidence (scripts/e2e_control.sh)
+========================================================================
+Date:     2026-10-30 10:09:41 +00:00
+Host:     Windows 11, Git Bash (MSYS), Go 1.27.2 windows/amd64
+Commit:   3566432 (feature/ingestion-service)
+Script:   scripts/e2e_control.sh
+Ports:    ingestion :17001, indexing :17002 (high ports, isolated datalake)
+Network:  real downloads from https://www.gutenberg.org (books 1342, 84, 5)
+========================================================================
+
+== building the three binaries ==
+PASS: ingestion, indexing and control binaries built
+== starting both services on high ports ==
+PASS: both services answer their documented status routes
+== orchestration of two real books ==
+PASS: books 1342 and 84 are downloaded and indexed in the control state
+PASS: services agree: datalake has 2 books, index has 2
+== restart semantics: a replayed run skips finished books ==
+PASS: replayed run skips both books and keeps the state files intact
+== permanent failure: an unknown book is recorded once ==
+PASS: unknown book recorded once in failed_books.txt with its reason
+== discovery mode: candidates come from GET /ingest/list ==
+PASS: discover run processes the datalake listing and skips finished books
+ALL E2E CHECKS PASSED
+evidence under /tmp/tmp.Kn18jz3hIj
+
+
+========================================================================
+Notes:
+- The restored cmd/ingestion/main.go (RF2) serves -addr :PORT, Swagger UI,
+  graceful shutdown and the api.NewIngestionHandler contract (404 unavailable,
+  503 transient, 200 downloaded/available) consumed by the Control Module.
+- scripts/e2e_compose.sh (Docker stack) was NOT re-run in this session;
+  re-run it when Docker is available and commit its transcript alongside.
+========================================================================

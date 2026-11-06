@@ -1,0 +1,10 @@
+# Shortcut for the RF 8 replica experiment: two Search Service replicas behind the nginx service
+# that docker-compose.yml already defines (deploy/nginx/nginx.conf publishes SEARCH_PORT).
+# Equivalent to `docker compose up -d --scale search=2` or SEARCH_REPLICAS=2 in .env.
+#
+# Usage: docker compose -f docker-compose.yml -f docker-compose.replicas.yml up -d --build
+
+services:
+  search:
+    deploy:
+      replicas: 2

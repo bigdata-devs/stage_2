@@ -1,0 +1,38 @@
+# Local AI agent guidelines (never committed)
+/AGENTS.md
+stage_2_service_oriented_architecture.md
+
+# Local deployment overrides (copy .env.example to .env)
+.env
+
+# Runtime data produced by the services (leading slash: only the root folders)
+/datalake/
+/datamarts/
+/control/
+
+# Build and test output
+/bin/
+*.exe
+*.test
+*.out
+coverage.*
+
+# Interrupted atomic writes
+*.tmp
+
+# IDE and OS files
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# LaTeX build artifacts
+docs/report/*.aux
+docs/report/*.fdb_latexmk
+docs/report/*.fls
+docs/report/*.log
+docs/report/*.out
+docs/report/*.toc
+docs/report/*.synctex.gz
+docs/report/*.bbl
+docs/report/*.blg
