@@ -4,3 +4,4 @@
 *.py linguist-vendored
 *.sh linguist-vendored
 *.ps1 linguist-vendored
+*Dockerfile* linguist-vendored
